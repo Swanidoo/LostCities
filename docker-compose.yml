@@ -15,18 +15,23 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgres://user:password@db:5432/lostcities
+      - DATABASE_URL=postgres://admin:adminpassword@db:5432/lostcities
     depends_on:
       - db
 
   db:
-    image: postgres:13
+    build:
+      context: ./database
+      dockerfile: Dockerfile
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=adminpassword
       - POSTGRES_DB=lostcities
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
 
 volumes:
   db-data:
