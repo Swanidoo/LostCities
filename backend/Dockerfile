@@ -14,4 +14,4 @@ RUN deno cache /app/back_server.ts
 EXPOSE 3000
 
 # Step 6: Run the Deno server
-CMD ["deno", "run", "--allow-net", "--allow-read", "/app/back_server.ts", "3000"]
+CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-env", "/app/back_server.ts"]

@@ -1,12 +1,21 @@
-import { Application, Router } from "https://deno.land/x/oak@v12.5.0/mod.ts";
+import { Application, Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { compare, hash } from "https://deno.land/x/bcrypt@v0.2.4/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import { create, verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
-import "https://deno.land/x/dotenv/load.ts";
+import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
 // Initialisation de l'application
 const app = new Application();
+
+// Récupération des variables d'environnement
+const DATABASE_URL = Deno.env.get("DATABASE_URL");
+console.log("DATABASE_URL:", DATABASE_URL);
+
+if (!DATABASE_URL) {
+  console.error("DATABASE_URL is not set in the environment variables.");
+  Deno.exit(1);
+}
 
 // Configuration CORS
 app.use(oakCors({
@@ -27,9 +36,29 @@ app.use(async (ctx, next) => {
   }
 });
 
-// Connexion à la base de données PostgreSQL
-const client = new Client(Deno.env.get("DATABASE_URL")!);
-await client.connect();
+// Connexion à la base de données PostgreSQL avec mécanisme de retry
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 5000; // 5 secondes
+
+async function connectWithRetry(attempt = 1) {
+  try {
+    console.log(`Tentative de connexion à la base de données (${attempt}/${MAX_RETRIES})...`);
+    const client = new Client(DATABASE_URL);
+    await client.connect();
+    console.log("Connexion à la base de données établie !");
+    return client;
+  } catch (err) {
+    if (attempt >= MAX_RETRIES) {
+      console.error("Impossible de se connecter à la base de données après plusieurs tentatives :", err);
+      Deno.exit(1);
+    }
+    console.error(`Échec de la connexion, nouvelle tentative dans ${RETRY_DELAY_MS / 1000} secondes...`);
+    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+    return connectWithRetry(attempt + 1);
+  }
+}
+
+const client = await connectWithRetry();
 
 // Création des tables si elles n'existent pas
 await client.queryObject(`
