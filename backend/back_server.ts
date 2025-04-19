@@ -60,16 +60,6 @@ async function connectWithRetry(attempt = 1) {
 
 const client = await connectWithRetry();
 
-// Création des tables si elles n'existent pas
-await client.queryObject(`
-  CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )
-`);
 
 // Initialisation du routeur
 const router = new Router();
@@ -103,38 +93,39 @@ router.post("/register", async (ctx) => {
 
 // 📌 Route de connexion
 router.post("/login", async (ctx) => {
-  const { email, password } = await ctx.request.body({ type: "json" }).value;
+  try {
+    const { email, password } = await ctx.request.body({ type: "json" }).value;
 
-  // Récupérer l'utilisateur
-  const user = await client.queryObject(
-    "SELECT * FROM users WHERE email = $1",
-    [email]
-  );
-  if (user.rows.length === 0) {
-    ctx.response.status = 400;
-    ctx.response.body = { error: "Utilisateur non trouvé !" };
-    return;
+    // Retrieve the user
+    const user = await client.queryObject(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (!user.rows || user.rows.length === 0) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "User not found" };
+      return;
+    }
+
+    const dbUser = user.rows[0];
+
+    // Compare passwords
+    const isPasswordValid = await compare(password, dbUser.password);
+    if (!isPasswordValid) {
+      ctx.response.status = 401;
+      ctx.response.body = { error: "Invalid password" };
+      return;
+    }
+
+    // Respond with success (e.g., generate a JWT token)
+    ctx.response.status = 200;
+    ctx.response.body = { message: "Login successful" };
+  } catch (err) {
+    console.error("Error in /login route:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
   }
-
-  const storedPassword = user.rows[0].password;
-
-  // Vérifier le mot de passe
-  if (!(await compare(password, storedPassword))) {
-    ctx.response.status = 400;
-    ctx.response.body = { error: "Mot de passe incorrect !" };
-    return;
-  }
-
-  // Générer un token JWT
-  const jwtKey = Deno.env.get("JWT_SECRET") || "secret_par_defaut";
-  const expirationTime = Math.floor(Date.now() / 1000) + 60 * 60; // 1 heure
-  const token = await create(
-    { alg: "HS256", typ: "JWT" },
-    { email, exp: expirationTime },
-    jwtKey
-  );
-
-  ctx.response.body = { message: "Connexion réussie", token };
 });
 
 // 📌 Middleware d'authentification

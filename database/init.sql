@@ -60,3 +60,7 @@ CREATE TABLE leaderboard (
     year INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Insert a default user with a hashed password
+INSERT INTO users (username, email, password) 
+VALUES ('tom', 'tom@example.com', '$2a$10$45exHZM9P9A34pfhEYebJ.Fom0QjUXq3dVLVllYu3BXOXo0nB93mW');
