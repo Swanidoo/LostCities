@@ -5,7 +5,7 @@ FROM denoland/deno:1.29.0
 WORKDIR /app
 
 # Step 3: Copy the backend code into the container
-COPY ./backend /app
+COPY . /app
 
 # Step 4: Allow the necessary permissions for Deno to run
 RUN deno cache /app/back_server.ts
