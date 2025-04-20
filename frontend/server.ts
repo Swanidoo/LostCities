@@ -3,9 +3,6 @@ import { Application, Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 const app = new Application();
 const ROOT = `${Deno.cwd()}/`;
 
-const API_URL = Deno.env.get("API_URL") || "https://lostcitiesbackend.onrender.com";
-fetch(`${API_URL}/api/endpoint`, { method: "GET" });
-
 app.use(async (ctx) => {
   try {
     await ctx.send({

@@ -1,10 +1,12 @@
+const API_URL = "https://lostcitiesbackend.onrender.com"; // Replace with your backend URL or dynamically load it
+
 document.getElementById('loginForm').addEventListener('submit', function(event) {
     event.preventDefault();
 
     const email = document.getElementById('username').value; // Use "email" instead of "username"
     const password = document.getElementById('password').value;
 
-    fetch('http://127.0.0.1:3000/login', {
+    fetch(`${API_URL}/login`, { // Use API_URL here
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
