@@ -3,6 +3,9 @@ import { Application, Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 const app = new Application();
 const ROOT = `${Deno.cwd()}/`;
 
+const API_URL = Deno.env.get("API_URL") || "http://localhost:3000";
+fetch(`${API_URL}/api/endpoint`, { method: "GET" });
+
 app.use(async (ctx) => {
   try {
     await ctx.send({
@@ -14,7 +17,6 @@ app.use(async (ctx) => {
     ctx.response.body = "404 File not found";
   }
 });
-
 
 if (Deno.args.length < 1) {
   console.log(`Usage: $ deno run --allow-net --allow-read=./ server.ts PORT [CERT_PATH KEY_PATH]`);
