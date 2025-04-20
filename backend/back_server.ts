@@ -60,9 +60,21 @@ async function connectWithRetry(attempt = 1) {
 
 const client = await connectWithRetry();
 
-
 // Initialisation du routeur
 const router = new Router();
+
+// 📌 Route pour la racine "/"
+router.get("/", (ctx) => {
+  ctx.response.status = 200;
+  ctx.response.body = {
+    message: "Bienvenue sur l'API LostCities !",
+    routes: {
+      register: "/register",
+      login: "/login",
+      profile: "/profile (requires authentication)",
+    },
+  };
+});
 
 // 📌 Route d'inscription
 router.post("/register", async (ctx) => {
