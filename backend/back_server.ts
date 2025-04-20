@@ -19,10 +19,14 @@ if (!DATABASE_URL) {
 
 // Configuration CORS
 app.use(oakCors({
-  origin: ["http://127.0.0.1:8080", "http://localhost:8080"],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  origin: [
+    "http://127.0.0.1:8080", // Pour le développement local
+    "http://localhost:8080", // Pour le développement local
+    "https://lostcitiesfrontend.onrender.com", // Frontend déployé
+  ],
+  credentials: true, // Si tu utilises des cookies ou des headers d'authentification
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Méthodes HTTP autorisées
+  allowedHeaders: ["Content-Type", "Authorization"], // Headers autorisés
 }));
 
 // Gestion des erreurs globales
