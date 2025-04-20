@@ -4,8 +4,8 @@ FROM denoland/deno:1.29.0
 # Step 2: Set the working directory
 WORKDIR /app
 
-# Step 3: Copy the frontend files into the container
-COPY ./frontend /app
+# Step 3: Copy all files into the container
+COPY . /app
 
 # Step 4: Expose the port the Deno server will run on
 EXPOSE 8080
