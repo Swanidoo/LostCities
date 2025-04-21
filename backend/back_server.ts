@@ -8,6 +8,9 @@ import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 // Initialisation de l'application
 const app = new Application();
 
+// Initialisation du routeur
+const router = new Router();
+
 // Récupération des variables d'environnement
 const DATABASE_URL = Deno.env.get("DATABASE_URL");
 console.log("DATABASE_URL:", DATABASE_URL);
@@ -28,6 +31,48 @@ app.use(oakCors({
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Méthodes HTTP autorisées
   allowedHeaders: ["Content-Type", "Authorization"], // Headers autorisés
 }));
+
+// Gestion des WebSockets
+const connectedClients: WebSocket[] = []; // Liste des clients connectés
+
+router.get("/ws", (ctx) => {
+  if (ctx.isUpgradable) {
+    const socket = ctx.upgrade(); // Met à niveau la connexion HTTP vers WebSocket
+    console.log("✅ Client connecté au WebSocket !");
+
+    // Ajouter le client à la liste des clients connectés
+    connectedClients.push(socket);
+
+    // Gérer les messages reçus
+    socket.onmessage = (event) => {
+      console.log("📩 Message reçu :", event.data);
+
+      // Diffuser le message à tous les clients connectés
+      connectedClients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(event.data);
+        }
+      });
+    };
+
+    // Gérer la déconnexion du client
+    socket.onclose = () => {
+      console.log("❌ Client déconnecté !");
+      const index = connectedClients.indexOf(socket);
+      if (index !== -1) {
+        connectedClients.splice(index, 1); // Supprimer le client de la liste
+      }
+    };
+
+    // Gérer les erreurs
+    socket.onerror = (error) => {
+      console.error("❌ Erreur WebSocket :", error);
+    };
+  } else {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Connexion WebSocket non supportée." };
+  }
+});
 
 // Gestion des erreurs globales
 app.use(async (ctx, next) => {
@@ -63,9 +108,6 @@ async function connectWithRetry(attempt = 1) {
 }
 
 const client = await connectWithRetry();
-
-// Initialisation du routeur
-const router = new Router();
 
 // 📌 Route pour la racine "/"
 router.get("/", (ctx) => {
