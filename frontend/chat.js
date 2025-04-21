@@ -1,5 +1,5 @@
 // Crée une connexion WebSocket vers le serveur
-const ws = new WebSocket('ws://127.0.0.1:8081');
+const ws = new WebSocket('wss://lostcitiesbackend.onrender.com');
 
 ws.addEventListener('open', () => {
     console.log("✅ WebSocket ouvert !");
