@@ -1,4 +1,8 @@
-const API_URL = "https://lostcitiesbackend.onrender.com"; // Replace with your backend URL or dynamically load it
+const API_URL = window.location.hostname === "localhost"
+  ? "http://localhost:3000" // Local backend URL
+  : "https://lostcitiesbackend.onrender.com"; // Render backend URL
+
+console.log("Using API_URL:", API_URL);
 
 document.getElementById('loginForm').addEventListener('submit', function(event) {
     event.preventDefault();
