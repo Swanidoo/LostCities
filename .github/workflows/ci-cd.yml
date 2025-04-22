@@ -13,15 +13,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout le code
+    # 1. Checkout the code
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 2. Configurer Docker
+    # 2. Set up Docker Buildx
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
-    # 3. Construire les images Docker
+    # 3. Build Docker images
     - name: Build backend image
       run: docker build -t backend ./backend
 
@@ -31,20 +31,31 @@ jobs:
     - name: Build database image
       run: docker build -t database ./database
 
-    # 4. Lancer les conteneurs pour les tests
+    # 4. Start services for testing
     - name: Start services
       run: docker-compose up -d
 
-    # 5. Tester le backend
-    - name: Run backend tests
-      run: docker exec backend deno test
+    # 5. Set up Deno
+    - name: Set up Deno
+      uses: denoland/setup-deno@v2
+      with:
+        deno-version: v1.29.0
 
-    # 6. Arrêter les conteneurs après les tests
+    # 6. Set API_URL for testing
+    - name: Set environment variable for API_URL
+      run: echo "API_URL=https://lostcitiesbackend.onrender.com" >> $GITHUB_ENV
+
+    # 7. Run backend tests with Deno
+    - name: Run backend tests
+      run: deno test --allow-net --allow-env --allow-read
+
+    # 8. Stop services after testing
     - name: Stop services
       run: docker-compose down
 
   deploy:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
     # 1. Checkout the code
@@ -58,11 +69,11 @@ jobs:
     # 3. Build and Push Backend Image
     - name: Build and Push Backend
       run: |
-        docker build -t registry.render.com/<your-backend-service-name>/backend ./backend
-        docker push registry.render.com/<your-backend-service-name>/backend
+        docker build -t registry.render.com/srv-d02mr6idbo4c73f02rlg/backend ./backend
+        docker push registry.render.com/srv-d02mr6idbo4c73f02rlg/backend
 
     # 4. Build and Push Frontend Image
     - name: Build and Push Frontend
       run: |
-        docker build -t registry.render.com/<your-frontend-service-name>/frontend ./frontend
-        docker push registry.render.com/<your-frontend-service-name>/frontend
+        docker build -t registry.render.com/srv-d02ng9adbo4c73f0hl9g/frontend ./frontend
+        docker push registry.render.com/srv-d02ng9adbo4c73f0hl9g/frontend
