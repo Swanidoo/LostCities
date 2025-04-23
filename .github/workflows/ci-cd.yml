@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for Render
+name: CI/CD Pipeline for Deployment in Polyech's Cloud
 
 on:
   push:
@@ -53,27 +53,24 @@ jobs:
     - name: Stop services
       run: docker-compose down
 
-  deploy:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+#  deploy:
+#    runs-on: ubuntu-latest
+#    if: github.ref == 'refs/heads/main'
 
-    steps:
-    # 1. Checkout the code
-    - name: Checkout code
-      uses: actions/checkout@v3
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v3
 
-    # 2. Login to Docker
-    - name: Login to Docker
-      run: echo ${{ secrets.RENDER_API_KEY }} | docker login --username=render --password-stdin registry.render.com
+#      - name: Setup SSH key
+#        uses: webfactory/ssh-agent@v0.7.0
+#        with:
+#          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    # 3. Build and Push Backend Image
-    - name: Build and Push Backend
-      run: |
-        docker build -t registry.render.com/srv-d02mr6idbo4c73f02rlg/backend ./backend
-        docker push registry.render.com/srv-d02mr6idbo4c73f02rlg/backend
-
-    # 4. Build and Push Frontend Image
-    - name: Build and Push Frontend
-      run: |
-        docker build -t registry.render.com/srv-d02ng9adbo4c73f0hl9g/frontend ./frontend
-        docker push registry.render.com/srv-d02ng9adbo4c73f0hl9g/frontend
+#      - name: Deploy to school server via SSH
+#        run: |
+#          ssh -o StrictHostKeyChecking=no USERNAME@SERVER_ADDRESS << 'EOF'
+#            cd /home/USERNAME/mon-projet  # ← à adapter avec le bon chemin sur le serveur
+#            git pull origin main
+#            docker-compose down
+#            docker-compose up --build -d
+#          EOF
