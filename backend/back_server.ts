@@ -124,29 +124,52 @@ router.get("/", (ctx) => {
 
 // 📌 Route d'inscription
 router.post("/register", async (ctx) => {
-  const body = ctx.request.body({ type: "json" });
-  const { username, email, password } = await body.value;
+  try {
+    console.log("Received request at /register");
 
-  // Vérifier si l'utilisateur existe déjà
-  const userExists = await client.queryObject(
-    "SELECT * FROM users WHERE email = $1",
-    [email]
-  );
-  if (userExists.rows.length > 0) {
-    ctx.response.status = 400;
-    ctx.response.body = { error: "Utilisateur déjà existant !" };
-    return;
+    const body = ctx.request.body({ type: "json" });
+    const { username, email, password } = await body.value;
+
+    if (!username || !email || !password) {
+      ctx.response.status = 400;
+      ctx.response.headers.set("Content-Type", "application/json");
+      ctx.response.body = { error: "Missing required fields: username, email, or password" };
+      return;
+    }
+
+    console.log("Request body:", { username, email, password });
+
+    const userExists = await client.queryObject(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+    if (userExists.rows.length > 0) {
+      console.log("User already exists:", email);
+      ctx.response.status = 400;
+      ctx.response.headers.set("Content-Type", "application/json");
+      ctx.response.body = { error: "Utilisateur déjà existant !" };
+      return;
+    }
+
+    console.log("Password to hash:", password);
+    const hashedPassword = await hash(password);
+    console.log("Hashed password:", hashedPassword);
+
+    await client.queryObject(
+      "INSERT INTO users (username, email, password) VALUES ($1, $2, $3)",
+      [username, email, hashedPassword]
+    );
+
+    console.log("User created successfully:", email);
+    ctx.response.status = 201;
+    ctx.response.headers.set("Content-Type", "application/json");
+    ctx.response.body = { message: "Utilisateur créé !" };
+  } catch (error) {
+    console.error("Error in /register:", error);
+    ctx.response.status = 500;
+    ctx.response.headers.set("Content-Type", "application/json");
+    ctx.response.body = { error: "Une erreur est survenue." };
   }
-
-  // Hacher le mot de passe et insérer l'utilisateur
-  const hashedPassword = await hash(password, 12);
-  await client.queryObject(
-    "INSERT INTO users (username, email, password) VALUES ($1, $2, $3)",
-    [username, email, hashedPassword]
-  );
-
-  ctx.response.status = 201;
-  ctx.response.body = { message: "Utilisateur créé !" };
 });
 
 // 📌 Route de connexion
