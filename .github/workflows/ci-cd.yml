@@ -33,7 +33,7 @@ jobs:
 
     # 4. Start services for testing
     - name: Start services
-      run: docker-compose up -d
+      run: docker compose up -d
 
     # 5. Set up Deno
     - name: Set up Deno
@@ -51,7 +51,7 @@ jobs:
 
     # 8. Stop services after testing
     - name: Stop services
-      run: docker-compose down
+      run: docker compose down
 
 #  deploy:
 #    runs-on: ubuntu-latest
