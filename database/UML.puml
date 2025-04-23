@@ -12,7 +12,7 @@ skinparam class {
 class User {
   +id: INTEGER [PK]
   +username: TEXT
-  +email: TEXT
+  +email: TEXT [UNIQUE]
   +password: TEXT
   +avatar_url: TEXT
   +bio: TEXT
@@ -61,7 +61,7 @@ class Leaderboard {
   +id: INTEGER [PK]
   +user_id: INTEGER [FK → User]
   +score: INTEGER
-  +month: INTEGER
+  +month: INTEGER 
   +year: INTEGER
   +created_at: TIMESTAMP
 }
