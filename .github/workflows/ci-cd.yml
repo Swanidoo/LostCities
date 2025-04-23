@@ -62,17 +62,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 2. Login to Docker
-    - name: Login to Docker
-      run: echo ${{ secrets.RENDER_API_KEY }} | docker login --username=render --password-stdin registry.render.com
+    # 2. Debug DNS Resolution
+    - name: Debug DNS Resolution
+      run: nslookup registry.render.com
 
-    # 3. Build and Push Backend Image
+    # 3. Retry Docker Login
+    - name: Retry Docker Login
+      run: |
+        for i in {1..3}; do
+          echo ${{ secrets.RENDER_API_KEY }} | docker login --username=render --password-stdin registry.render.com && break || sleep 10;
+        done
+
+    # 4. Build and Push Backend Image
     - name: Build and Push Backend
       run: |
         docker build -t registry.render.com/srv-d02mr6idbo4c73f02rlg/backend ./backend
         docker push registry.render.com/srv-d02mr6idbo4c73f02rlg/backend
 
-    # 4. Build and Push Frontend Image
+    # 5. Build and Push Frontend Image
     - name: Build and Push Frontend
       run: |
         docker build -t registry.render.com/srv-d02ng9adbo4c73f0hl9g/frontend ./frontend
