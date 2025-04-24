@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for Deployment in Polyech's Cloud
+name: CI/CD Pipeline for Deployment in Polytech's Cloud
 
 on:
   push:
@@ -11,6 +11,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }} # Securely inject secrets
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
     steps:
     # 1. Checkout the code
@@ -41,8 +45,8 @@ jobs:
       with:
         deno-version: v1.29.0
 
-    # 6. Set API_URL for testing
-    - name: Set environment variable for API_URL
+    # 6. Set API_URL dynamically
+    - name: Set API_URL
       run: echo "API_URL=https://lostcitiesbackend.onrender.com" >> $GITHUB_ENV
 
     # 7. Run backend tests with Deno
