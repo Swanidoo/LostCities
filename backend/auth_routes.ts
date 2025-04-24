@@ -58,15 +58,33 @@ authRouter.post("/login", async (ctx) => {
     }
 
     const dbUser = user.rows[0];
-    const isPasswordValid = await compare(password, dbUser.password);
+    const isPasswordValid = await compare(password, dbUser.password); // bcrypt for password verification
     if (!isPasswordValid) {
       ctx.response.status = 401;
       ctx.response.body = { error: "Invalid password" };
       return;
     }
 
-    // Create a JWT token with the secret key
-    const jwt = await create({ alg: "HS256", typ: "JWT" }, { id: dbUser.id, email: dbUser.email }, jwtKey);
+    // Generate a secure CryptoKey for signing the JWT
+    const cryptoKey = await crypto.subtle.generateKey(
+      { name: "HMAC", hash: "SHA-256" }, // Algorithm and hash function
+      true, // Whether the key is extractable
+      ["sign", "verify"] // Key usages
+    );
+
+    // Create the JWT token
+    const payload = {
+      id: dbUser.id,
+      email: dbUser.email,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60, // Token expires in 1 hour
+    };
+
+    const jwt = await create(
+      { alg: "HS256", typ: "JWT" }, // Header
+      payload, // Payload
+      cryptoKey // CryptoKey
+    );
+
     ctx.response.status = 200;
     ctx.response.body = { message: "Login successful", token: jwt };
   } catch (err) {
