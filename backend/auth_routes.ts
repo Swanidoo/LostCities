@@ -1,7 +1,7 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { hash, compare } from "https://deno.land/x/bcrypt@v0.2.4/mod.ts";
 import { create } from "https://deno.land/x/djwt@v2.8/mod.ts";
-import { authMiddleware } from "./middlewares/auth_middlewares.ts";
+import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { client } from "./db_client.ts";
 
 const authRouter = new Router();
@@ -11,6 +11,16 @@ if (!jwtKey) {
   console.error("JWT_SECRET is not set in the environment variables.");
   Deno.exit(1); // Exit if the secret is missing
 }
+
+const encoder = new TextEncoder();
+const keyData = encoder.encode(jwtKey);
+const cryptoKey = await crypto.subtle.importKey(
+  "raw",
+  keyData,
+  { name: "HMAC", hash: "SHA-256" },
+  false,
+  ["sign", "verify"]
+);
 
 // Route for user registration
 authRouter.post("/register", async (ctx) => {
@@ -65,18 +75,12 @@ authRouter.post("/login", async (ctx) => {
       return;
     }
 
-    // Generate a secure CryptoKey for signing the JWT
-    const cryptoKey = await crypto.subtle.generateKey(
-      { name: "HMAC", hash: "SHA-256" }, // Algorithm and hash function
-      true, // Whether the key is extractable
-      ["sign", "verify"] // Key usages
-    );
-
     // Create the JWT token
     const payload = {
       id: dbUser.id,
       email: dbUser.email,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60, // Token expires in 1 hour
+      role: dbUser.role, // Inclure le rôle dans le JWT
+      exp: Math.floor(Date.now() / 1000) + 60 * 60, // Expiration dans 1 heure
     };
 
     const jwt = await create(

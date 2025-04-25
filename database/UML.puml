@@ -17,6 +17,7 @@ class User {
   +avatar_url: TEXT
   +bio: TEXT
   +created_at: TIMESTAMP
+  +role: TEXT ("user", "admin") [DEFAULT: "user"]
 }
 
 class Game {

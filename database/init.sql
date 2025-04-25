@@ -6,7 +6,8 @@ CREATE TABLE users (
     password TEXT NOT NULL,
     avatar_url TEXT,
     bio TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    role TEXT DEFAULT 'user'
 );
 
 -- Create the "game_settings" table
