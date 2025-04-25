@@ -1,4 +1,4 @@
-import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
+import { oakCors } from "https://deno.land/x/cors@v1.2.3/mod.ts";
 
 export const corsMiddleware = oakCors({
   origin: (requestOrigin) => {
