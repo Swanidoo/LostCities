@@ -7,14 +7,12 @@ import userRouter from "./user_routes.ts";
 import settingsRouter from "./settings_routes.ts";
 import leaderboardRouter from "./leaderboard_routes.ts";
 import adminRouter from "./admin_routes.ts";
-
 import { corsMiddleware } from "./middlewares/cors_middleware.ts";
 import { errorMiddleware } from "./middlewares/error_middleware.ts";
 import { loggingMiddleware } from "./middlewares/logging_middleware.ts";
 import { securityHeadersMiddleware } from "./middlewares/security_headers_middleware.ts";
 import { rateLimitingMiddleware } from "./middlewares/rate_limiting_middleware.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
-
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
@@ -29,43 +27,39 @@ if (!DATABASE_URL) {
 const client = new Client(DATABASE_URL);
 await client.connect();
 
-// Order of middlewares is important!
-app.use(errorMiddleware);               // Global error handling
-app.use(securityHeadersMiddleware);     // Add security headers
-app.use(loggingMiddleware);             // Log requests
-app.use(rateLimitingMiddleware);        // Rate limiting
+// Apply CORS middleware first so all responses include CORS headers
+app.use(corsMiddleware);
 
-// Public routes
+// Global middlewares
+app.use(securityHeadersMiddleware);  // Add secure headers
+
+app.use(errorMiddleware);             // Global error handling
+app.use(securityHeadersMiddleware);  // Add secure headers
+app.use(loggingMiddleware);          // Log all incoming requests
+app.use(rateLimitingMiddleware);     // Limit requests to prevent abuse
+
+// Public routes (no auth required)
 app.use(welcomeRouter.routes());
 app.use(welcomeRouter.allowedMethods());
-
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
 
-// Auth required for everything after this
+// Auth middleware (protects all routes below)
 app.use(authMiddleware);
 
 // Protected routes
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
-
 app.use(wsRouter.routes());
 app.use(wsRouter.allowedMethods());
-
 app.use(userRouter.routes());
 app.use(userRouter.allowedMethods());
-
 app.use(settingsRouter.routes());
 app.use(settingsRouter.allowedMethods());
-
 app.use(leaderboardRouter.routes());
 app.use(leaderboardRouter.allowedMethods());
-
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
-
-// CORS should come last
-app.use(corsMiddleware);
 
 console.log("HTTP server running on port 3000");
 await app.listen({ port: 3000 });
