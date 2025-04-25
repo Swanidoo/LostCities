@@ -13,17 +13,25 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
     fetch(`${API_URL}/login`, { // Use API_URL here
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }), // Send "email" in the payload
-        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+        credentials: 'include', // Include cookies for authentication
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         console.log(data);
         if (data.message === "Login successful") {
+            // Store the JWT token in localStorage
+            localStorage.setItem("authToken", data.token);
+
             alert("Login successful!");
-            window.location.href = 'chat.html'; // Redirect to the chat page
+            window.location.href = '/chat.html'; // Redirect to chat page
         } else {
             alert(data.error || "Invalid credentials");
         }

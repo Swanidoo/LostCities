@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
+    networks:
+      - lostcities-network
+
   backend:
     build:
       context: ./backend
@@ -16,6 +19,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - lostcities-network
+
   db:
     build:
       context: ./database
@@ -32,5 +38,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - lostcities-network
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./localhost.crt:/etc/ssl/localhost.crt:ro
+      - ./localhost.key:/etc/ssl/localhost.key:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - lostcities-network
+
 volumes:
   db-data:
+
+networks:
+  lostcities-network:
