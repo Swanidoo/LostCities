@@ -35,27 +35,19 @@ app.use(rateLimitingMiddleware); // Limit requests to prevent abuse
 app.use(errorMiddleware); // Handle errors globally
 
 // Register public routes
-app.use(welcomeRouter.routes());
-app.use(welcomeRouter.allowedMethods());
-app.use(authRouter.routes());
-app.use(authRouter.allowedMethods());
+app.use(welcomeRouter.routes(), welcomeRouter.allowedMethods());
+app.use(authRouter.routes(), authRouter.allowedMethods());
 
 // Apply authMiddleware to protect all routes registered after this point
 app.use(authMiddleware);
 
 // Register protected routes
-app.use(gameRouter.routes());
-app.use(gameRouter.allowedMethods());
-app.use(wsRouter.routes());
-app.use(wsRouter.allowedMethods());
-app.use(userRouter.routes());
-app.use(userRouter.allowedMethods());
-app.use(settingsRouter.routes());
-app.use(settingsRouter.allowedMethods());
-app.use(leaderboardRouter.routes());
-app.use(leaderboardRouter.allowedMethods());
-app.use(adminRouter.routes());
-app.use(adminRouter.allowedMethods());
+app.use(gameRouter.routes(), gameRouter.allowedMethods());
+app.use(wsRouter.routes(), wsRouter.allowedMethods());
+app.use(userRouter.routes(), userRouter.allowedMethods());
+app.use(settingsRouter.routes(), settingsRouter.allowedMethods());
+app.use(leaderboardRouter.routes(), leaderboardRouter.allowedMethods());
+app.use(adminRouter.routes(), adminRouter.allowedMethods());
 
 console.log("HTTP server running on port 3000");
 await app.listen({ port: 3000 });
