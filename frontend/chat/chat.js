@@ -12,7 +12,19 @@ if (!token) {
     // WebSocket open event
     ws.addEventListener('open', () => {
         console.log("✅ WebSocket connection established!");
-        // No need to send a confirmation message - the server doesn't handle it
+    });
+
+    // WebSocket error and close event handlers
+    ws.addEventListener('error', (error) => {
+        console.error("❌ WebSocket error:", error);
+    });
+
+    ws.addEventListener('close', (event) => {
+        if (!event.wasClean) {
+            console.error("❌ WebSocket closed anormally", event);
+        } else {
+            console.log(`✅ WebSocket closed cleanly, code: ${event.code}, reason: ${event.reason}`);
+        }
     });
 
     // WebSocket message event
@@ -28,19 +40,6 @@ if (!token) {
             }
         } catch (error) {
             console.error("❌ JSON parsing error:", error);
-        }
-    });
-
-    // WebSocket error and close event handlers remain the same
-    ws.addEventListener('error', (error) => {
-        console.error("❌ WebSocket error:", error);
-    });
-
-    ws.addEventListener('close', (event) => {
-        if (event.wasClean) {
-            console.log(`✅ WebSocket closed cleanly, code: ${event.code}, reason: ${event.reason}`);
-        } else {
-            console.error("❌ WebSocket closed anormally", event);
         }
     });
 

@@ -27,7 +27,7 @@ export const authMiddleware = async (ctx, next) => {
   console.log("🔍 Token being verified:", token);
 
   try {
-    const payload = await verify(token, jwtKey, "HS256");
+    const payload = await verify(token, jwtKey, { alg: "HS256" });
     console.log("✅ Token payload:", payload); // Log the decoded payload
     ctx.state.user = payload; // Attach user payload to the context
     await next();
