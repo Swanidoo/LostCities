@@ -133,14 +133,16 @@ function handleChatMessage(
 ) {
   console.log(`💬 Chat message from ${username}: ${data.message}`);
   
+  // Format the message to be sent
+  const formattedMessage = JSON.stringify({ 
+    event: "chatMessage", 
+    data: { username, message: data.message } 
+  });
+  
+  // Send to all OTHER connected clients
   connectedClients.forEach((client) => {
     if (client.socket !== sender && client.socket.readyState === WebSocket.OPEN) {
-      client.socket.send(
-        JSON.stringify({ 
-          event: "chatMessage", 
-          data: { username, message: data.message } 
-        })
-      );
+      client.socket.send(formattedMessage);
     }
   });
 }

@@ -125,15 +125,22 @@ if (!token) {
     
             try {
                 const receivedData = JSON.parse(event.data);
+                console.log('Parsed message data:', receivedData); // Additional logging
     
                 // Handle different event types
                 if (receivedData.event === "chatMessage" && receivedData.data) {
-                    displayMessage(`${receivedData.data.username}: ${receivedData.data.message}`, "other");
+                    const username = receivedData.data.username;
+                    const message = receivedData.data.message;
+                    console.log(`Displaying chat message from ${username}: ${message}`);
+                    displayMessage(`${username}: ${message}`, "other");
                 } else if (receivedData.event === "systemMessage" && receivedData.data) {
+                    console.log(`Displaying system message: ${receivedData.data.message}`);
                     displayMessage(receivedData.data.message, "system");
                 } else if (receivedData.event === "movePlayed" && receivedData.data) {
                     // Handle game moves if needed
                     console.log(`Move played in game ${receivedData.data.gameId} by ${receivedData.data.username}: ${receivedData.data.move}`);
+                } else {
+                    console.warn("⚠️ Unknown message format:", receivedData);
                 }
             } catch (error) {
                 console.error("❌ JSON parsing error:", error);
@@ -151,11 +158,14 @@ if (!token) {
     
             if (message && ws.readyState === WebSocket.OPEN) {
                 // Send the message in the correct format expected by the server
-                ws.send(JSON.stringify({ 
+                const messageData = { 
                     event: "chatMessage", 
                     data: { message: message } 
-                }));
+                };
+                console.log('Sending message to server:', messageData);
+                ws.send(JSON.stringify(messageData));
                 
+                // Display the message locally immediately
                 displayMessage(`You: ${message}`, "self");
                 messageInput.value = '';
             } else if (ws.readyState !== WebSocket.OPEN) {
@@ -171,11 +181,18 @@ if (!token) {
 
     // Function to display messages in the chat
     function displayMessage(message, sender) {
+        console.log(`Displaying message as ${sender}: ${message}`);
         const messageContainer = document.getElementById('messages');
         
         if (!messageContainer) {
             console.error("❌ The #messages element doesn't exist in the DOM!");
             return;
+        }
+
+        // Remove the placeholder if it exists
+        const placeholder = messageContainer.querySelector('.placeholder');
+        if (placeholder) {
+            placeholder.remove();
         }
 
         const messageElement = document.createElement('div');
