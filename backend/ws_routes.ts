@@ -26,7 +26,19 @@ wsRouter.get("/ws", async (ctx) => {
   }
 
   try {
-    const payload = await verify(token, jwtKey, "HS256");
+    // Create the same CryptoKey used for signing in auth_routes.ts
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(jwtKey);
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      keyData,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    
+    // Verify with the CryptoKey
+    const payload = await verify(token, cryptoKey);
     console.log("✅ Token valid:", payload);
     
     if (typeof payload !== "object" || payload === null) {
