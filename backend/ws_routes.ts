@@ -26,7 +26,7 @@ wsRouter.get("/ws", async (ctx) => {
       // Verify the JWT token
       const payload = await verify(token, jwtKey, { alg: "HS256" });
       console.log("✅ Token valid:", payload);
-
+    
       const username = payload.username || payload.email; // Extract username or email from the token payload
       if (!username) {
         console.error("❌ Invalid token payload: Missing username or email");
@@ -34,10 +34,11 @@ wsRouter.get("/ws", async (ctx) => {
         ctx.response.body = { error: "Invalid token payload" };
         return;
       }
-
+    
       // Upgrade the connection to WebSocket
       const socket = ctx.upgrade();
       console.log(`✅ Client connected to WebSocket as ${username}!`);
+          
 
       // Add the client to the list of connected clients
       connectedClients.push({ socket, username });
