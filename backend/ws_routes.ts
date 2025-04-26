@@ -4,27 +4,34 @@ import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = []; // List of connected clients with usernames
 
-const jwtKey = Deno.env.get("JWT_SECRET") || "default_secret"; // Load JWT secret
+const jwtKey = Deno.env.get("JWT_SECRET"); // Load JWT_SECRET from the environment
+if (!jwtKey) {
+  console.error("❌ JWT_SECRET is not set in the environment variables.");
+  Deno.exit(1); // Exit if the secret is missing
+}
 
 wsRouter.get("/ws", async (ctx) => {
   if (ctx.isUpgradable) {
     const token = ctx.request.url.searchParams.get("token"); // Get the token from the query string
-    console.log("Received token:", token);
+    console.log("🔍 Received token:", token);
 
     if (!token) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized: Missing token" };
+      console.error("❌ Missing token in query string");
+      ctx.response.status = 400; // Bad Request
+      ctx.response.body = { error: "Missing token" };
       return;
     }
 
     try {
       // Verify the JWT token
       const payload = await verify(token, jwtKey, "HS256");
-      const username = payload.username; // Extract username from the token payload
+      console.log("✅ Token valid:", payload);
 
+      const username = payload.username || payload.email; // Extract username or email from the token payload
       if (!username) {
-        ctx.response.status = 401;
-        ctx.response.body = { error: "Unauthorized: Invalid token" };
+        console.error("❌ Invalid token payload: Missing username or email");
+        ctx.response.status = 401; // Unauthorized
+        ctx.response.body = { error: "Invalid token payload" };
         return;
       }
 
@@ -73,12 +80,13 @@ wsRouter.get("/ws", async (ctx) => {
         console.error(`❌ WebSocket error for ${username}:`, error);
       };
     } catch (err) {
-      console.error("❌ Invalid token:", err);
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized: Invalid token" };
+      console.error("❌ Invalid or expired token:", err.message);
+      ctx.response.status = 401; // Unauthorized
+      ctx.response.body = { error: "Invalid or expired token" };
     }
   } else {
-    ctx.response.status = 400;
+    console.error("❌ WebSocket upgrade not supported");
+    ctx.response.status = 400; // Bad Request
     ctx.response.body = { error: "WebSocket connection not supported." };
   }
 });
