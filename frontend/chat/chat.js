@@ -1,51 +1,46 @@
-// Retrieve the JWT token from localStorage (or wherever it's stored)
+// Retrieve the JWT token from localStorage
 const token = localStorage.getItem("authToken");
 
 if (!token) {
     console.error("❌ No JWT token found! Please log in first.");
 } else {
-    // Create a WebSocket connection to the server with the token in the query string
-    const ws = new WebSocket(`wss://lostcitiesbackend.onrender.com/ws?token=${token}`);
+    // Create a WebSocket connection with the token
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = 'lostcitiesbackend.onrender.com';
+    const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws?token=${token}`);
 
     // WebSocket open event
     ws.addEventListener('open', () => {
-        console.log("✅ WebSocket ouvert !");
-        // Send a message to confirm the connection
-        ws.send(JSON.stringify({ text: "Connexion réussie !" }));
+        console.log("✅ WebSocket connection established!");
+        // No need to send a confirmation message - the server doesn't handle it
     });
 
     // WebSocket message event
     ws.addEventListener('message', (event) => {
-        console.log('📩 Message reçu du serveur:', event.data);
+        console.log('📩 Message received from server:', event.data);
 
         try {
             const receivedData = JSON.parse(event.data);
 
             // Handle chat messages from other users
-            if (receivedData.event === "chatMessage" && receivedData.data.message) {
-                displayMessage(receivedData.data.message, "other");
-            }
-
-            // Handle acknowledgment for the sender
-            if (receivedData.event === "messageSent") {
-                console.log("✅ Message sent successfully:", receivedData.data.message);
+            if (receivedData.event === "chatMessage" && receivedData.data) {
+                displayMessage(`${receivedData.data.username}: ${receivedData.data.message}`, "other");
             }
         } catch (error) {
-            console.error("❌ Erreur de parsing JSON :", error);
+            console.error("❌ JSON parsing error:", error);
         }
     });
 
-    // WebSocket error event
+    // WebSocket error and close event handlers remain the same
     ws.addEventListener('error', (error) => {
         console.error("❌ WebSocket error:", error);
     });
 
-    // WebSocket close event
     ws.addEventListener('close', (event) => {
         if (event.wasClean) {
-            console.log(`✅ WebSocket fermé proprement, code: ${event.code}, raison: ${event.reason}`);
+            console.log(`✅ WebSocket closed cleanly, code: ${event.code}, reason: ${event.reason}`);
         } else {
-            console.error("❌ WebSocket fermé de manière anormale", event);
+            console.error("❌ WebSocket closed abnormally", event);
         }
     });
 
@@ -57,10 +52,14 @@ if (!token) {
         const message = messageInput.value.trim();
 
         if (message) {
-            // Send the message to the server via WebSocket
-            ws.send(JSON.stringify({ text: message })); 
-            displayMessage(message, "self"); // Display the message immediately for the sender
-            messageInput.value = ''; // Clear the input after sending
+            // Send the message in the correct format expected by the server
+            ws.send(JSON.stringify({ 
+                event: "chatMessage", 
+                data: { message: message } 
+            }));
+            
+            displayMessage(`You: ${message}`, "self");
+            messageInput.value = '';
         }
     });
 
@@ -69,39 +68,25 @@ if (!token) {
         const messageContainer = document.getElementById('messages');
         
         if (!messageContainer) {
-            console.error("❌ L'élément #messages n'existe pas dans le DOM !");
+            console.error("❌ The #messages element doesn't exist in the DOM!");
             return;
         }
 
-        // Create a new div element for each message
         const messageElement = document.createElement('div');
         messageElement.textContent = message;
-        messageElement.classList.add('message', sender); // Add CSS classes to differentiate messages
+        messageElement.classList.add('message', sender);
 
         messageContainer.appendChild(messageElement);
-        messageContainer.scrollTop = messageContainer.scrollHeight; // Auto-scroll to the bottom
+        messageContainer.scrollTop = messageContainer.scrollHeight;
     }
 
-    // Function to send a message
-    function sendMessage() {
-        const input = document.getElementById("messageInput");
-        if (input.value.trim() !== "") {
-            const message = { text: input.value };
-            ws.send(JSON.stringify(message)); // Use WebSocket to send the message
-
-            displayMessage(input.value, "self"); // Display the message immediately for the sender
-            input.value = ""; // Clear the input after sending
-        }
-    }
-
-    // Initialize chat elements on DOMContentLoaded
+    // Initialize chat elements
     document.addEventListener('DOMContentLoaded', () => {
         const chatForm = document.getElementById('chatForm');
         const messageInput = document.getElementById('messageInput');
 
-        // Ensure the form and input exist
         if (!chatForm || !messageInput) {
-            console.error("❌ L'élément #chatForm ou #messageInput n'existe pas dans le DOM !");
+            console.error("❌ The #chatForm or #messageInput element doesn't exist in the DOM!");
         }
     });
 }
