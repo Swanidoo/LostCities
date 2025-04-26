@@ -34,7 +34,6 @@ wsRouter.get("/ws", async (ctx) => {
       ctx.throw(401, "Invalid token payload structure");
     }
 
-    // Attention ici : dans ton JWT, c'est bien "username" que tu stockes ?
     const username = (payload as Record<string, unknown>).username || (payload as Record<string, unknown>).email;
     if (typeof username !== "string") {
       console.error("❌ Invalid token payload: Missing username or email");

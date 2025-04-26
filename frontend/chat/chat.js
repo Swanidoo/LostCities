@@ -4,6 +4,26 @@ const token = localStorage.getItem("authToken");
 if (!token) {
     console.error("❌ No JWT token found! Please log in first.");
 } else {
+    // Fetch the profile data
+    fetch("https://lostcitiesbackend.onrender.com/profile", {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${token}`, // Include the Authorization header
+        },
+    })
+    .then((response) => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then((data) => {
+        console.log("✅ Profile data:", data);
+    })
+    .catch((error) => {
+        console.error("❌ Error fetching profile:", error);
+    });
+
     // Create a WebSocket connection with the token
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = 'lostcitiesbackend.onrender.com';
@@ -21,7 +41,7 @@ if (!token) {
 
     ws.addEventListener('close', (event) => {
         if (!event.wasClean) {
-            console.error("❌ WebSocket closed anormally", event);
+            console.error("❌ WebSocket closed abnormally", event);
         } else {
             console.log(`✅ WebSocket closed cleanly, code: ${event.code}, reason: ${event.reason}`);
         }
