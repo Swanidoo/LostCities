@@ -24,7 +24,7 @@ wsRouter.get("/ws", async (ctx) => {
 
     try {
       // Verify the JWT token
-      const payload = await verify(token, jwtKey, "HS256");
+      const payload = await verify(token, jwtKey, { alg: "HS256" });
       console.log("✅ Token valid:", payload);
 
       const username = payload.username || payload.email; // Extract username or email from the token payload
