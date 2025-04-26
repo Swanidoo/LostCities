@@ -63,5 +63,6 @@ app.use(leaderboardRouter.allowedMethods());
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
 
-console.log("HTTP server running on port 3000");
-await app.listen({ port: 3000 });
+const port = parseInt(Deno.env.get("PORT") || "3000"); // Utilise le port donné par Render ou 3000 par défaut
+console.log(`HTTP server running on port ${port}`);
+await app.listen({ port });
