@@ -23,7 +23,14 @@ export const authMiddleware = async (ctx: any, next: any) => {
     const payload = await verify(token, Deno.env.get("JWT_SECRET")!, "HS256");
     console.log("✅ Token payload:", payload);
 
-    ctx.state.user = payload;
+    if (typeof payload !== "object" || payload === null) {
+      console.error("❌ Invalid token payload structure");
+      ctx.response.status = 401;
+      ctx.response.body = { error: "Unauthorized: Invalid token payload structure" };
+      return;
+    }
+
+    ctx.state.user = payload; // Attach the payload to the context state
     await next();
   } catch (err) {
     console.error("❌ Invalid or expired token:", err.message);

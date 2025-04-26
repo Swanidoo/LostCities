@@ -42,38 +42,6 @@ wsRouter.get("/ws", async (ctx) => {
 
     const socket = ctx.upgrade();
     console.log(`✅ Client connected to WebSocket as ${username}!`);
-
-    connectedClients.push({ socket, username });
-
-    socket.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log("📩 Message received:", message);
-
-        switch (message.event) {
-          case "chatMessage":
-            handleChatMessage(message.data, socket, username);
-            break;
-          case "movePlayed":
-            handleMovePlayed(message.data, socket, username);
-            break;
-          default:
-            console.warn("⚠️ Unknown event:", message.event);
-        }
-      } catch (err) {
-        console.error("❌ Error parsing message:", err);
-      }
-    };
-
-    socket.onclose = () => {
-      console.log(`❌ Client ${username} disconnected!`);
-      const index = connectedClients.findIndex((client) => client.socket === socket);
-      if (index !== -1) connectedClients.splice(index, 1);
-    };
-
-    socket.onerror = (error) => {
-      console.error(`❌ WebSocket error for ${username}:`, error);
-    };
   } catch (err) {
     console.error("❌ Invalid or expired token:", err.message);
     ctx.throw(401, "Invalid or expired token");

@@ -101,7 +101,18 @@ authRouter.post("/login", async (ctx) => {
 
 // Protected route for user profile
 authRouter.get("/profile", authMiddleware, (ctx) => {
-  ctx.response.body = { message: "Welcome to your profile!", user: ctx.state.user };
+  console.log("🔍 ctx.state.user:", ctx.state.user); // Debugging log
+
+  if (!ctx.state.user) {
+    ctx.response.status = 401;
+    ctx.response.body = { error: "Unauthorized: User not authenticated" };
+    return;
+  }
+
+  ctx.response.body = { 
+    message: "Welcome to your profile!", 
+    user: ctx.state.user 
+  };
 });
 
 export default authRouter;
