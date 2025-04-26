@@ -29,16 +29,21 @@ const isProduction = Deno.env.get("ENV") === "production";
 
 const client = new Client({
   connectionString: DATABASE_URL,
-  tls: isProduction ? { enforce: true } : { enforce: false }, // Enable SSL in production
+  tls: isProduction
+    ? { enforce: true, caCertificates: undefined } // Allow insecure certificates in production
+    : { enforce: false }, // Disable SSL locally
 });
 
 try {
+  console.log("🔧 Connecting to the database...");
+  console.log(`🔧 DATABASE_URL: ${DATABASE_URL}`);
+  console.log(`🔧 TLS Configuration: ${JSON.stringify(isProduction ? { enforce: true, caCertificates: undefined } : { enforce: false })}`);
   await client.connect();
   console.log("✅ Database connection established successfully.");
 } catch (err) {
   console.error("❌ Database connection failed:", err.message);
+  console.error(err.stack);
 }
-
 // Apply CORS middleware first so all responses include CORS headers
 app.use(corsMiddleware);
 
