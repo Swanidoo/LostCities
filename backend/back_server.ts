@@ -32,11 +32,11 @@ app.use(corsMiddleware);
 
 // Global middlewares
 app.use(securityHeadersMiddleware);  // Add secure headers
-
-app.use(errorMiddleware);             // Global error handling
-app.use(securityHeadersMiddleware);  // Add secure headers
 app.use(loggingMiddleware);          // Log all incoming requests
 app.use(rateLimitingMiddleware);     // Limit requests to prevent abuse
+
+// Error middleware should be last among global middlewares
+app.use(errorMiddleware);            // Global error handling
 
 // Public routes (no auth required)
 app.use(welcomeRouter.routes());
