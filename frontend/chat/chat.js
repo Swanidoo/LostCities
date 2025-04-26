@@ -40,7 +40,7 @@ if (!token) {
         if (event.wasClean) {
             console.log(`✅ WebSocket closed cleanly, code: ${event.code}, reason: ${event.reason}`);
         } else {
-            console.error("❌ WebSocket closed abnormally", event);
+            console.error("❌ WebSocket closed anormally", event);
         }
     });
 

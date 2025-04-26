@@ -9,6 +9,7 @@ const jwtKey = Deno.env.get("JWT_SECRET") || "default_secret"; // Load JWT secre
 wsRouter.get("/ws", async (ctx) => {
   if (ctx.isUpgradable) {
     const token = ctx.request.url.searchParams.get("token"); // Get the token from the query string
+    console.log("Received token:", token);
 
     if (!token) {
       ctx.response.status = 401;
