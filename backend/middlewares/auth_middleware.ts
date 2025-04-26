@@ -1,39 +1,44 @@
 import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 export const authMiddleware = async (ctx: any, next: any) => {
-  const authHeader = ctx.request.headers.get("Authorization");
-  console.log("🔍 Authorization header:", authHeader);
-
-  if (!authHeader) {
-    console.error("❌ Missing Authorization header");
-    ctx.response.status = 401;
-    ctx.response.body = { error: "Unauthorized: Missing Authorization header" };
-    return;
-  }
-
-  const token = authHeader.split(" ")[1];
-  if (!token) {
-    console.error("❌ Missing token in Authorization header");
-    ctx.response.status = 401;
-    ctx.response.body = { error: "Unauthorized: Missing token" };
-    return;
-  }
-
   try {
-    const payload = await verify(token, Deno.env.get("JWT_SECRET")!, "HS256");
-    console.log("✅ Token payload:", payload);
+    const authHeader = ctx.request.headers.get("Authorization");
+    console.log("🔍 Authorization header:", authHeader);
 
-    if (typeof payload !== "object" || payload === null) {
-      console.error("❌ Invalid token payload structure");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized: Invalid token payload structure" };
+      ctx.response.body = { error: "Unauthorized: Invalid Authorization header format" };
       return;
     }
 
-    ctx.state.user = payload; // Attach the payload to the context state
+    const token = authHeader.split(" ")[1];
+    
+    // Get the JWT_SECRET
+    const jwtKey = Deno.env.get("JWT_SECRET");
+    if (!jwtKey) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: "Server configuration error" };
+      return;
+    }
+    
+    // Create the same CryptoKey used for signing
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(jwtKey);
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      keyData,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    
+    // Verify with the CryptoKey
+    const payload = await verify(token, cryptoKey);
+    
+    ctx.state.user = payload;
     await next();
   } catch (err) {
-    console.error("❌ Invalid or expired token:", err.message);
+    console.error("❌ Auth middleware error:", err);
     ctx.response.status = 401;
     ctx.response.body = { error: "Unauthorized: Invalid or expired token" };
   }
