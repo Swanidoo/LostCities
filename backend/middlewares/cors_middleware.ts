@@ -4,5 +4,5 @@ export const corsMiddleware = oakCors({
   origin: ["http://localhost:8080", "https://localhost", "https://lostcitiesfrontend.onrender.com"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Upgrade", "Connection"],
 });
