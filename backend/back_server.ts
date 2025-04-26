@@ -18,23 +18,17 @@ import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
 const app = new Application();
 
-const DATABASE_URL = Deno.env.get("DATABASE_URL");
-if (!DATABASE_URL) {
+// 🔥 Partie Database propre 🔥
+const rawDatabaseUrl = Deno.env.get("DATABASE_URL");
+if (!rawDatabaseUrl) {
   console.error("❌ DATABASE_URL is not set in the environment variables.");
   Deno.exit(1);
 }
 
-const client = new Client({
-  connectionString: DATABASE_URL,
-  tls: {
-    enabled: true,
-    enforce: false, // IMPORTANT pour Render
-  },
-});
+const client = new Client(rawDatabaseUrl); // Pas d'options TLS manuelles
 
 try {
   console.log("🔧 Connecting to the database...");
-  console.log(`🔧 DATABASE_URL: ${DATABASE_URL}`);
   await client.connect();
   console.log("✅ Database connection established successfully.");
 } catch (err) {
@@ -42,25 +36,27 @@ try {
   console.error(err.stack);
 }
 
-// Middlewares
+// 🛡️ Middlewares globaux
 app.use(corsMiddleware);
 app.use(loggingMiddleware);
 app.use(securityHeadersMiddleware);
 app.use(rateLimitingMiddleware);
 app.use(errorMiddleware);
 
-// Routes publiques
+// 🛣️ Routes publiques
 app.use(welcomeRouter.routes());
 app.use(welcomeRouter.allowedMethods());
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
 
-// WS avant l'auth
+// 📡 WebSocket routes (avant auth)
 app.use(wsRouter.routes());
 app.use(wsRouter.allowedMethods());
 
-// Routes protégées
+// 🔒 Auth middleware pour routes protégées
 app.use(authMiddleware);
+
+// 🔒 Routes protégées
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
 app.use(userRouter.routes());
@@ -72,7 +68,7 @@ app.use(leaderboardRouter.allowedMethods());
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
 
-// Lancer le serveur
+// 🚀 Lancer le serveur
 const port = parseInt(Deno.env.get("PORT") || "3000");
 console.log(`🚀 HTTP server running on port ${port}`);
 await app.listen({ port });
