@@ -24,51 +24,43 @@ if (!DATABASE_URL) {
   Deno.exit(1);
 }
 
-// Determine if the app is running in production
-const isProduction = Deno.env.get("ENV") === "production";
-
 const client = new Client({
   connectionString: DATABASE_URL,
-  tls: isProduction
-    ? { enforce: true, caCertificates: undefined } // Allow insecure certificates in production
-    : { enforce: false }, // Disable SSL locally
+  tls: {
+    enabled: true,
+    enforce: false, // IMPORTANT pour Render
+  },
 });
 
 try {
   console.log("🔧 Connecting to the database...");
   console.log(`🔧 DATABASE_URL: ${DATABASE_URL}`);
-  console.log(`🔧 TLS Configuration: ${JSON.stringify(isProduction ? { enforce: true, caCertificates: undefined } : { enforce: false })}`);
   await client.connect();
   console.log("✅ Database connection established successfully.");
 } catch (err) {
   console.error("❌ Database connection failed:", err.message);
   console.error(err.stack);
 }
-// Apply CORS middleware first so all responses include CORS headers
+
+// Middlewares
 app.use(corsMiddleware);
+app.use(loggingMiddleware);
+app.use(securityHeadersMiddleware);
+app.use(rateLimitingMiddleware);
+app.use(errorMiddleware);
 
-// Global middlewares
-app.use(loggingMiddleware); // Log all incoming requests
-app.use(securityHeadersMiddleware); // Add secure headers
-app.use(rateLimitingMiddleware); // Limit requests to prevent abuse
-
-// Error middleware should be last among global middlewares
-app.use(errorMiddleware); // Global error handling
-
-// Public routes (no auth required)
+// Routes publiques
 app.use(welcomeRouter.routes());
 app.use(welcomeRouter.allowedMethods());
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
 
-// WS route must come BEFORE authMiddleware to avoid 'Missing Authorization header'
+// WS avant l'auth
 app.use(wsRouter.routes());
 app.use(wsRouter.allowedMethods());
 
-// Auth middleware (protects all routes below)
+// Routes protégées
 app.use(authMiddleware);
-
-// Protected routes
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
 app.use(userRouter.routes());
@@ -80,6 +72,7 @@ app.use(leaderboardRouter.allowedMethods());
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
 
-const port = parseInt(Deno.env.get("PORT") || "3000"); // Utilise le port donné par Render ou 3000 par défaut
-console.log(`HTTP server running on port ${port}`);
+// Lancer le serveur
+const port = parseInt(Deno.env.get("PORT") || "3000");
+console.log(`🚀 HTTP server running on port ${port}`);
 await app.listen({ port });
