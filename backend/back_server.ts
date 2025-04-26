@@ -7,6 +7,7 @@ import userRouter from "./user_routes.ts";
 import settingsRouter from "./settings_routes.ts";
 import leaderboardRouter from "./leaderboard_routes.ts";
 import adminRouter from "./admin_routes.ts";
+import { corsMiddleware } from "./middlewares/cors_middleware.ts";
 import { errorMiddleware } from "./middlewares/error_middleware.ts";
 import { loggingMiddleware } from "./middlewares/logging_middleware.ts";
 import { securityHeadersMiddleware } from "./middlewares/security_headers_middleware.ts";
@@ -14,11 +15,10 @@ import { rateLimitingMiddleware } from "./middlewares/rate_limiting_middleware.t
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import "https://deno.land/x/dotenv@v3.2.2/load.ts";
-import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 
 const app = new Application();
-const DATABASE_URL = Deno.env.get("DATABASE_URL");
 
+const DATABASE_URL = Deno.env.get("DATABASE_URL");
 if (!DATABASE_URL) {
   console.error("DATABASE_URL is not set in the environment variables.");
   Deno.exit(1);
@@ -27,36 +27,16 @@ if (!DATABASE_URL) {
 const client = new Client(DATABASE_URL);
 await client.connect();
 
-// Apply CORS middleware
-app.use(
-  oakCors({
-    origin: (requestOrigin) => {
-      console.log("CORS request from:", requestOrigin || "null (no origin)");
-      const allowedOrigins = [
-        "http://localhost:8080",
-        "https://localhost",
-        "https://lostcitiesfrontend.onrender.com",
-      ];
-      if (allowedOrigins.includes(requestOrigin || "")) {
-        console.log("Is origin allowed? true");
-        return requestOrigin;
-      }
-      console.log("Is origin allowed? false");
-      return false;
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+// Apply CORS middleware first so all responses include CORS headers
+app.use(corsMiddleware);
 
 // Global middlewares
-app.use(securityHeadersMiddleware);  // Add secure headers
-app.use(loggingMiddleware);          // Log all incoming requests
-app.use(rateLimitingMiddleware);     // Limit requests to prevent abuse
+app.use(securityHeadersMiddleware); // Add secure headers
+app.use(loggingMiddleware); // Log all incoming requests
+app.use(rateLimitingMiddleware); // Limit requests to prevent abuse
 
 // Error middleware should be last among global middlewares
-app.use(errorMiddleware);            // Global error handling
+app.use(errorMiddleware); // Global error handling
 
 // Public routes (no auth required)
 app.use(welcomeRouter.routes());
