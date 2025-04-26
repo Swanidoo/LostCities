@@ -31,8 +31,8 @@ await client.connect();
 app.use(corsMiddleware);
 
 // Global middlewares
-app.use(securityHeadersMiddleware); // Add secure headers
 app.use(loggingMiddleware); // Log all incoming requests
+app.use(securityHeadersMiddleware); // Add secure headers
 app.use(rateLimitingMiddleware); // Limit requests to prevent abuse
 
 // Error middleware should be last among global middlewares
