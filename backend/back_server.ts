@@ -20,12 +20,24 @@ const app = new Application();
 
 const DATABASE_URL = Deno.env.get("DATABASE_URL");
 if (!DATABASE_URL) {
-  console.error("DATABASE_URL is not set in the environment variables.");
+  console.error("❌ DATABASE_URL is not set in the environment variables.");
   Deno.exit(1);
 }
 
-const client = new Client(DATABASE_URL);
-await client.connect();
+// Determine if the app is running in production
+const isProduction = Deno.env.get("ENV") === "production";
+
+const client = new Client({
+  connectionString: DATABASE_URL,
+  tls: isProduction ? { enforce: true } : { enforce: false }, // Enable SSL in production
+});
+
+try {
+  await client.connect();
+  console.log("✅ Database connection established successfully.");
+} catch (err) {
+  console.error("❌ Database connection failed:", err.message);
+}
 
 // Apply CORS middleware first so all responses include CORS headers
 app.use(corsMiddleware);
