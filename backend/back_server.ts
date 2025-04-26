@@ -44,14 +44,16 @@ app.use(welcomeRouter.allowedMethods());
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
 
+// WS route must come BEFORE authMiddleware to avoid 'Missing Authorization header'
+app.use(wsRouter.routes());
+app.use(wsRouter.allowedMethods());
+
 // Auth middleware (protects all routes below)
 app.use(authMiddleware);
 
 // Protected routes
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
-app.use(wsRouter.routes());
-app.use(wsRouter.allowedMethods());
 app.use(userRouter.routes());
 app.use(userRouter.allowedMethods());
 app.use(settingsRouter.routes());
