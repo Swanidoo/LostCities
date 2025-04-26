@@ -78,7 +78,7 @@ authRouter.post("/login", async (ctx) => {
     // Create the JWT token
     const payload = {
       id: dbUser.id,
-      username: user.username,
+      username: dbUser.username,
       email: dbUser.email,
       role: dbUser.role, // Inclure le rôle dans le JWT
       exp: Math.floor(Date.now() / 1000) + 60 * 60, // Expiration dans 1 heure
