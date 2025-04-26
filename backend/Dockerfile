@@ -13,5 +13,5 @@ RUN deno cache /app/back_server.ts
 # Step 5: Expose the port where your server will run
 EXPOSE 3000
 
-# Step 6: Run the Deno server
+# Step 6: Run the Deno server with all required permissions
 CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-env", "/app/back_server.ts"]

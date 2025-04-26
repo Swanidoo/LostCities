@@ -11,8 +11,21 @@ if (!token) {
     const cleanToken = token.trim();
     console.log("Using cleaned token length:", cleanToken.length);
 
+    // Determine API URL based on environment
+    const isLocalhost = window.location.hostname === "localhost";
+    
+    // For development, detect if backend is using HTTPS or HTTP
+    // This should match the ENABLE_TLS setting in your .env file
+    const localUseHttps = false; // Set to true if you enable TLS in your local backend
+    
+    const API_URL = isLocalhost
+        ? (localUseHttps ? "https" : "http") + "://localhost:3000"
+        : "https://lostcitiesbackend.onrender.com";
+    
+    console.log("Using API URL:", API_URL);
+
     // Fetch the profile data with additional error handling
-    fetch("https://lostcitiesbackend.onrender.com/profile", {
+    fetch(`${API_URL}/profile`, {
         method: "GET",
         headers: {
             "Authorization": `Bearer ${cleanToken}`,
@@ -50,8 +63,9 @@ if (!token) {
     });
 
     // Create a WebSocket connection with properly encoded token
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = 'lostcitiesbackend.onrender.com';
+    // WebSocket protocol should match the API protocol
+    const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
+    const wsHost = isLocalhost ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
     const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(cleanToken)}`;
     console.log("Connecting to WebSocket URL:", wsUrl.substring(0, wsUrl.indexOf('?') + 15) + "...");
     

@@ -70,5 +70,36 @@ app.use(adminRouter.allowedMethods());
 
 // 🚀 Lancer le serveur
 const port = parseInt(Deno.env.get("PORT") || "3000");
-console.log(`🚀 HTTP server running on port ${port}`);
-await app.listen({ port });
+const isLocalDev = Deno.env.get("ENV") !== "production";
+const enableTls = Deno.env.get("ENABLE_TLS") === "true";
+
+// Determine the server configuration based on environment
+if (isLocalDev && enableTls) {
+  try {
+    // For local development with HTTPS
+    const certFile = Deno.env.get("CERT_FILE") || "./localhost+1.pem";
+    const keyFile = Deno.env.get("KEY_FILE") || "./localhost+1-key.pem";
+    
+    console.log("🔒 Starting HTTPS server for local development");
+    console.log(`🔒 Port: ${port}`);
+    console.log(`🔒 Certificate: ${certFile}`);
+    console.log(`🔒 Key: ${keyFile}`);
+    
+    await app.listen({
+      port,
+      secure: true,
+      certFile,
+      keyFile
+    });
+  } catch (error) {
+    console.error("❌ Failed to start HTTPS server:", error);
+    console.log("⚠️ Falling back to HTTP...");
+    console.log(`🚀 HTTP server running on port ${port}`);
+    await app.listen({ port });
+  }
+} else {
+  // For production or local HTTP
+  console.log(`🚀 HTTP server running on port ${port}`);
+  console.log(`🌐 Environment: ${isLocalDev ? 'development' : 'production'}`);
+  await app.listen({ port });
+}
