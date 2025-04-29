@@ -2,7 +2,12 @@ import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 const wsRouter = new Router();
-const connectedClients: { socket: WebSocket; username: string }[] = [];
+const connectedClients: { 
+  socket: WebSocket; 
+  username: string; 
+  userId: string;
+  gameSubscriptions: string[];
+}[] = [];
 
 const jwtKey = Deno.env.get("JWT_SECRET");
 if (!jwtKey) {
@@ -14,7 +19,10 @@ if (!jwtKey) {
 function logConnectedClients() {
   console.log(`=== CONNECTED CLIENTS (${connectedClients.length}) ===`);
   connectedClients.forEach((client, index) => {
-    console.log(`  ${index + 1}. ${client.username} - Ready state: ${client.socket.readyState}`);
+    console.log(`  ${index + 1}. ${client.username} (ID: ${client.userId}) - Ready state: ${client.socket.readyState}`);
+    if (client.gameSubscriptions.length > 0) {
+      console.log(`     Subscribed to games: ${client.gameSubscriptions.join(', ')}`);
+    }
   });
   console.log("======================================");
 }
@@ -79,18 +87,25 @@ wsRouter.get("/ws", async (ctx) => {
         ctx.throw(401, "Invalid token payload");
       }
       
+      // Extract user ID
+      const userId = (payload as Record<string, unknown>).id as string;
+      if (!userId) {
+        console.error("❌ Invalid token payload: Missing user ID");
+        ctx.throw(401, "Invalid token payload");
+      }
+      
       // Upgrade the connection
       let socket;
       try {
         socket = ctx.upgrade();
-        console.log(`✅ Client connected to WebSocket as ${username}!`);
+        console.log(`✅ Client connected to WebSocket as ${username} (ID: ${userId})!`);
       } catch (error) {
         console.error(`❌ Failed to upgrade connection for ${username}:`, error);
         ctx.throw(500, "Failed to upgrade connection");
       }
       
-      // Check for existing connections with the same username and remove them
-      const existingIndex = connectedClients.findIndex(client => client.username === username);
+      // Check for existing connections with the same user ID and remove them
+      const existingIndex = connectedClients.findIndex(client => client.userId === userId);
       if (existingIndex !== -1) {
         console.log(`⚠️ Found existing connection for ${username}, closing it.`);
         try {
@@ -102,7 +117,12 @@ wsRouter.get("/ws", async (ctx) => {
       }
       
       // Add the new client to the connected clients array
-      connectedClients.push({ socket, username });
+      connectedClients.push({ 
+        socket, 
+        username, 
+        userId, 
+        gameSubscriptions: [] 
+      });
       console.log(`👥 Current connected clients: ${connectedClients.length}`);
       logConnectedClients();
       
@@ -129,6 +149,12 @@ wsRouter.get("/ws", async (ctx) => {
             handleChatMessage(data.data, socket, username);
           } else if (data.event === "movePlayed" && data.data?.gameId && data.data?.move) {
             handleMovePlayed(data.data, socket, username);
+          } else if (data.event === "subscribeGame" && data.data?.gameId) {
+            handleGameSubscription(data.data.gameId, socket, userId, username);
+          } else if (data.event === "unsubscribeGame" && data.data?.gameId) {
+            handleGameUnsubscription(data.data.gameId, socket, userId, username);
+          } else if (data.event === "gameAction" && data.data?.gameId && data.data?.action) {
+            handleGameAction(data.data, socket, userId, username);
           } else {
             console.warn("⚠️ Unknown message type or missing data:", data);
           }
@@ -230,6 +256,78 @@ function handleChatMessage(
   console.log(`✅ Message sent to ${sentCount} clients`);
 }
 
+// Handle game subscription requests
+function handleGameSubscription(
+  gameId: string,
+  socket: WebSocket,
+  userId: string,
+  username: string
+) {
+  console.log(`🎮 User ${username} (ID: ${userId}) subscribing to game ${gameId}`);
+  
+  // Find the client
+  const clientIndex = connectedClients.findIndex(client => client.socket === socket);
+  if (clientIndex === -1) {
+    console.error(`❌ Could not find client for ${username} in connected clients array!`);
+    return;
+  }
+  
+  // Check if already subscribed
+  if (!connectedClients[clientIndex].gameSubscriptions.includes(gameId)) {
+    connectedClients[clientIndex].gameSubscriptions.push(gameId);
+    console.log(`✅ ${username} subscribed to game ${gameId}`);
+    
+    // Send confirmation
+    try {
+      socket.send(JSON.stringify({
+        event: "gameSubscribed",
+        data: { gameId, message: `You are now subscribed to game ${gameId}` }
+      }));
+    } catch (error) {
+      console.error(`❌ Error sending subscription confirmation to ${username}:`, error);
+    }
+  } else {
+    console.log(`ℹ️ ${username} was already subscribed to game ${gameId}`);
+  }
+}
+
+// Handle game unsubscription requests
+function handleGameUnsubscription(
+  gameId: string,
+  socket: WebSocket,
+  userId: string,
+  username: string
+) {
+  console.log(`🎮 User ${username} (ID: ${userId}) unsubscribing from game ${gameId}`);
+  
+  // Find the client
+  const clientIndex = connectedClients.findIndex(client => client.socket === socket);
+  if (clientIndex === -1) {
+    console.error(`❌ Could not find client for ${username} in connected clients array!`);
+    return;
+  }
+  
+  // Remove from subscriptions
+  const subscriptions = connectedClients[clientIndex].gameSubscriptions;
+  const gameIndex = subscriptions.indexOf(gameId);
+  if (gameIndex !== -1) {
+    subscriptions.splice(gameIndex, 1);
+    console.log(`✅ ${username} unsubscribed from game ${gameId}`);
+    
+    // Send confirmation
+    try {
+      socket.send(JSON.stringify({
+        event: "gameUnsubscribed",
+        data: { gameId, message: `You are now unsubscribed from game ${gameId}` }
+      }));
+    } catch (error) {
+      console.error(`❌ Error sending unsubscription confirmation to ${username}:`, error);
+    }
+  } else {
+    console.log(`ℹ️ ${username} was not subscribed to game ${gameId}`);
+  }
+}
+
 // Handle moves played in the game
 function handleMovePlayed(
   data: { gameId: string; move: string },
@@ -248,7 +346,9 @@ function handleMovePlayed(
   let sentCount = 0;
   connectedClients.forEach((client) => {
     try {
-      if (client.socket !== sender && client.socket.readyState === WebSocket.OPEN) {
+      if (client.socket !== sender && 
+          client.socket.readyState === WebSocket.OPEN && 
+          client.gameSubscriptions.includes(data.gameId)) {
         client.socket.send(formattedMessage);
         sentCount++;
       }
@@ -258,6 +358,104 @@ function handleMovePlayed(
   });
   
   console.log(`✅ Move sent to ${sentCount} clients`);
+}
+
+// Handle game actions (playing cards, drawing, etc.)
+function handleGameAction(
+  data: { gameId: string; action: string; cardId?: string; color?: string; source?: string },
+  sender: WebSocket,
+  userId: string,
+  username: string
+) {
+  console.log(`🎮 Game action in game ${data.gameId} by ${username}: ${data.action}`);
+  
+  // Create the message to broadcast
+  const actionMessage = JSON.stringify({
+    event: "gameAction",
+    data: {
+      gameId: data.gameId,
+      playerId: userId,
+      username,
+      action: data.action,
+      cardId: data.cardId,
+      color: data.color,
+      source: data.source,
+      timestamp: new Date().toISOString()
+    }
+  });
+  
+  // Broadcast to other players subscribed to this game
+  let sentCount = 0;
+  connectedClients.forEach((client) => {
+    try {
+      if (client.socket !== sender && 
+          client.socket.readyState === WebSocket.OPEN && 
+          client.gameSubscriptions.includes(data.gameId)) {
+        client.socket.send(actionMessage);
+        sentCount++;
+      }
+    } catch (error) {
+      console.error(`❌ Error sending game action to ${client.username}:`, error);
+    }
+  });
+  
+  console.log(`✅ Game action sent to ${sentCount} clients`);
+}
+
+// Function to notify players of game updates (can be called from game_routes.ts)
+export function notifyGameUpdate(gameId: string, gameState: any) {
+  console.log(`🎮 Notifying players of updates in game ${gameId}`);
+  
+  // Create the update message
+  const updateMessage = JSON.stringify({
+    event: "gameUpdated",
+    data: {
+      gameId,
+      gameState,
+      timestamp: new Date().toISOString()
+    }
+  });
+  
+  // Send to all clients subscribed to this game
+  let sentCount = 0;
+  connectedClients.forEach((client) => {
+    try {
+      if (client.socket.readyState === WebSocket.OPEN && 
+          client.gameSubscriptions.includes(gameId)) {
+        client.socket.send(updateMessage);
+        sentCount++;
+      }
+    } catch (error) {
+      console.error(`❌ Error sending game update to ${client.username}:`, error);
+    }
+  });
+  
+  console.log(`✅ Game update sent to ${sentCount} clients`);
+}
+
+// Function to notify a specific player
+export function notifyPlayer(userId: string, eventType: string, data: any) {
+  console.log(`🔔 Notifying player ${userId} of ${eventType}`);
+  
+  // Find the client
+  const client = connectedClients.find(client => client.userId === userId);
+  if (!client || client.socket.readyState !== WebSocket.OPEN) {
+    console.log(`ℹ️ Player ${userId} not connected or socket not open`);
+    return false;
+  }
+  
+  // Send notification
+  try {
+    client.socket.send(JSON.stringify({
+      event: eventType,
+      data
+    }));
+    console.log(`✅ Notification sent to ${client.username}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error sending notification to ${client.username}:`, error);
+    return false;
+  }
 }
 
 export default wsRouter;

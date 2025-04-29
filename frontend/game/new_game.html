@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Game - Lost Cities: Le Duel</title>
+    <link rel="stylesheet" href="/shared/global.css">
+    <style>
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #5b3d2b;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        select, input[type="checkbox"] {
+            padding: 8px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .checkbox-container input {
+            width: auto;
+            margin-right: 10px;
+        }
+        
+        .error-message {
+            color: red;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #ffeeee;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .button-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #5b3d2b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #7a5038;
+        }
+        
+        .game-info {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .game-info h2 {
+            margin-top: 0;
+            font-size: 18px;
+            color: #5b3d2b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>New Lost Cities Game</h1>
+        
+        <div class="game-info">
+            <h2>About Lost Cities: Le Duel</h2>
+            <p>
+                In Lost Cities, you and your opponent engage in expeditions across different terrains.
+                Your goal is to score the most points by playing cards in ascending order, placing
+                strategic wagers, and managing your resources efficiently.
+            </p>
+        </div>
+        
+        <div class="error-message" id="error-message">
+            Failed to create game. Please try again.
+        </div>
+        
+        <form action="/new-game" method="POST">
+            <div class="form-group">
+                <label for="opponent_id">Select Opponent</label>
+                <select name="opponent_id" id="opponent_id" required>
+                    <option value="">Select an opponent</option>
+                    <!-- Opponent options will be loaded dynamically -->
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-container">
+                    <input type="checkbox" name="use_purple" id="use_purple">
+                    <label for="use_purple">Include Purple Expedition (Advanced Variant)</label>
+                </div>
+            </div>
+            
+            <div class="button-container">
+                <button type="submit">Create Game</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Check for error parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error') === 'failed') {
+            document.getElementById('error-message').style.display = 'block';
+        }
+        
+        // Load available opponents
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/users');
+                if (response.ok) {
+                    const users = await response.json();
+                    const select = document.getElementById('opponent_id');
+                    
+                    users.forEach(user => {
+                        // Don't include current user
+                        if (user.id !== parseInt(localStorage.getItem('user_id'))) {
+                            const option = document.createElement('option');
+                            option.value = user.id;
+                            option.textContent = user.username;
+                            select.appendChild(option);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        });
+    </script>
+</body>
+</html>
