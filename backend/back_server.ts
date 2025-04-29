@@ -1,4 +1,4 @@
-import { Application } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { Application, Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import authRouter from "./auth_routes.ts";
 import gameRouter from "./game_routes.ts";
 import wsRouter from "./ws_routes.ts";
