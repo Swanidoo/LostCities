@@ -29,6 +29,23 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
         if (data.message === "Login successful") {
             // Store the JWT token in localStorage
             localStorage.setItem("authToken", data.token);
+            
+            // NEW CODE: Decode the JWT token to extract user information
+            // JWT tokens have three parts split by dots
+            const tokenParts = data.token.split('.');
+            if (tokenParts.length === 3) {
+                // The second part contains the payload (user data)
+                const payload = JSON.parse(atob(tokenParts[1]));
+                console.log("Token payload:", payload);
+                
+                // Store user ID and username in localStorage
+                if (payload.id) {
+                    localStorage.setItem("user_id", payload.id);
+                }
+                if (payload.username) {
+                    localStorage.setItem("username", payload.username);
+                }
+            }
 
             alert("Login successful!");
             window.location.href = '/chat.html'; // Redirect to chat page

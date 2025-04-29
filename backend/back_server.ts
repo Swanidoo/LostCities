@@ -53,6 +53,22 @@ app.use(authRouter.allowedMethods());
 app.use(wsRouter.routes());
 app.use(wsRouter.allowedMethods());
 
+// Add public user routes without authentication requirement
+// ⚠️ IMPORTANT: Add this BEFORE the auth middleware
+const publicUserRouter = new Router();
+publicUserRouter.get("/api/users", async (ctx) => {
+  try {
+    const users = await client.queryObject("SELECT id, username FROM users");
+    ctx.response.body = users.rows;
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+});
+app.use(publicUserRouter.routes());
+app.use(publicUserRouter.allowedMethods());
+
 // 🔒 Auth middleware pour routes protégées
 app.use(authMiddleware);
 

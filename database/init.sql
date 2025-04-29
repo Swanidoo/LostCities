@@ -1,12 +1,38 @@
--- Update the Game table structure to add turn tracking
-ALTER TABLE Game ADD COLUMN current_turn_player_id INTEGER REFERENCES User(id);
-ALTER TABLE Game ADD COLUMN turn_phase TEXT CHECK (turn_phase IN ('play', 'draw')) DEFAULT 'play';
-ALTER TABLE Game ADD COLUMN current_round INTEGER DEFAULT 1;
+-- Create basic tables first
+
+-- Create users table if it doesn't exist
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    avatar_url TEXT,
+    bio TEXT,
+    role TEXT DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create games table if it doesn't exist
+CREATE TABLE IF NOT EXISTS games (
+    id SERIAL PRIMARY KEY,
+    player1_id INTEGER NOT NULL,
+    player2_id INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('waiting', 'in_progress', 'finished')),
+    winner_id INTEGER,
+    score_player1 INTEGER DEFAULT 0,
+    score_player2 INTEGER DEFAULT 0,
+    current_turn_player_id INTEGER,
+    turn_phase TEXT CHECK (turn_phase IN ('play', 'draw')) DEFAULT 'play',
+    current_round INTEGER DEFAULT 1,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    settings_id INTEGER
+);
 
 -- Board table for game configuration and state
-CREATE TABLE Board (
+CREATE TABLE IF NOT EXISTS board (
     id SERIAL PRIMARY KEY,
-    game_id INTEGER REFERENCES Game(id) ON DELETE CASCADE,
+    game_id INTEGER,
     use_purple_expedition BOOLEAN DEFAULT FALSE,
     remaining_cards_in_deck INTEGER DEFAULT 60,
     current_round INTEGER DEFAULT 1,
@@ -21,7 +47,7 @@ CREATE TABLE Board (
 );
 
 -- Card table - reference for all cards in the game
-CREATE TABLE Card (
+CREATE TABLE IF NOT EXISTS card (
     id VARCHAR(20) PRIMARY KEY,  -- e.g. "red_5", "yellow_wager_2"
     color TEXT NOT NULL CHECK (color IN ('red', 'green', 'white', 'blue', 'yellow', 'purple')),
     type TEXT NOT NULL CHECK (type IN ('expedition', 'wager')),
@@ -29,58 +55,142 @@ CREATE TABLE Card (
     image_path TEXT
 );
 
--- GameCard table - links cards to specific games and tracks their location
-CREATE TABLE GameCard (
-    id SERIAL PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES Game(id) ON DELETE CASCADE,
-    card_id VARCHAR(20) NOT NULL REFERENCES Card(id),
-    location TEXT NOT NULL CHECK (location IN ('deck', 'player1_hand', 'player2_hand', 'player1_expedition', 'player2_expedition', 'discard_pile', 'removed')),
-    expedition_id INTEGER REFERENCES Expedition(id),
-    pile_id INTEGER REFERENCES DiscardPile(id),
-    position INTEGER NOT NULL,
-    played_at TIMESTAMP,
-    UNIQUE (game_id, card_id)
-);
-
 -- Expedition table - tracks each player's expeditions
-CREATE TABLE Expedition (
+CREATE TABLE IF NOT EXISTS expedition (
     id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES Board(id) ON DELETE CASCADE,
-    player_id INTEGER NOT NULL REFERENCES User(id),
+    board_id INTEGER,
+    player_id INTEGER,
     color TEXT NOT NULL CHECK (color IN ('red', 'green', 'white', 'blue', 'yellow', 'purple')),
     wager_count INTEGER DEFAULT 0,
     card_count INTEGER DEFAULT 0,
     total_value INTEGER DEFAULT 0,
     score INTEGER DEFAULT 0,
-    has_started BOOLEAN DEFAULT FALSE,
-    UNIQUE (board_id, player_id, color)
+    has_started BOOLEAN DEFAULT FALSE
 );
 
 -- DiscardPile table - tracks discard piles
-CREATE TABLE DiscardPile (
+CREATE TABLE IF NOT EXISTS discard_pile (
     id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES Board(id) ON DELETE CASCADE,
+    board_id INTEGER,
     color TEXT NOT NULL CHECK (color IN ('red', 'green', 'white', 'blue', 'yellow', 'purple')),
-    top_card_id VARCHAR(20) REFERENCES Card(id),
-    UNIQUE (board_id, color)
+    top_card_id VARCHAR(20)
+);
+
+-- GameCard table - links cards to specific games and tracks their location
+CREATE TABLE IF NOT EXISTS game_card (
+    id SERIAL PRIMARY KEY,
+    game_id INTEGER NOT NULL,
+    card_id VARCHAR(20) NOT NULL,
+    location TEXT NOT NULL CHECK (location IN ('deck', 'player1_hand', 'player2_hand', 'player1_expedition', 'player2_expedition', 'discard_pile', 'removed')),
+    expedition_id INTEGER,
+    pile_id INTEGER,
+    position INTEGER NOT NULL,
+    played_at TIMESTAMP
 );
 
 -- Move table - tracks game moves for replay and analysis
-CREATE TABLE Move (
+CREATE TABLE IF NOT EXISTS move (
     id SERIAL PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES Game(id) ON DELETE CASCADE,
-    player_id INTEGER NOT NULL REFERENCES User(id),
+    game_id INTEGER NOT NULL,
+    player_id INTEGER NOT NULL,
     turn_number INTEGER NOT NULL,
     action TEXT NOT NULL CHECK (action IN ('play_card', 'discard_card', 'draw_card')),
-    card_id VARCHAR(20) REFERENCES Card(id),
+    card_id VARCHAR(20),
     destination TEXT CHECK (destination IN ('expedition', 'discard_pile')),
     source TEXT CHECK (source IN ('hand', 'discard_pile', 'deck')),
     color TEXT CHECK (color IN ('red', 'green', 'white', 'blue', 'yellow', 'purple')),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Now add the foreign key constraints (without IF NOT EXISTS which isn't supported in older PostgreSQL)
+-- We'll check for constraint existence before adding
+DO $$
+BEGIN
+    -- Add constraints for games table
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_games_player1') THEN
+        ALTER TABLE games ADD CONSTRAINT fk_games_player1 FOREIGN KEY (player1_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_games_player2') THEN
+        ALTER TABLE games ADD CONSTRAINT fk_games_player2 FOREIGN KEY (player2_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_games_winner') THEN
+        ALTER TABLE games ADD CONSTRAINT fk_games_winner FOREIGN KEY (winner_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_games_current_turn_player') THEN
+        ALTER TABLE games ADD CONSTRAINT fk_games_current_turn_player FOREIGN KEY (current_turn_player_id) REFERENCES users(id);
+    END IF;
+    
+    -- Add constraints for board table
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_board_game') THEN
+        ALTER TABLE board ADD CONSTRAINT fk_board_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
+    END IF;
+    
+    -- Add constraints for expedition table
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_expedition_board') THEN
+        ALTER TABLE expedition ADD CONSTRAINT fk_expedition_board FOREIGN KEY (board_id) REFERENCES board(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_expedition_player') THEN
+        ALTER TABLE expedition ADD CONSTRAINT fk_expedition_player FOREIGN KEY (player_id) REFERENCES users(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_expedition_board_player_color') THEN
+        ALTER TABLE expedition ADD CONSTRAINT uq_expedition_board_player_color UNIQUE (board_id, player_id, color);
+    END IF;
+    
+    -- Add constraints for discard_pile table
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_discard_pile_board') THEN
+        ALTER TABLE discard_pile ADD CONSTRAINT fk_discard_pile_board FOREIGN KEY (board_id) REFERENCES board(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_discard_pile_card') THEN
+        ALTER TABLE discard_pile ADD CONSTRAINT fk_discard_pile_card FOREIGN KEY (top_card_id) REFERENCES card(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_discard_pile_board_color') THEN
+        ALTER TABLE discard_pile ADD CONSTRAINT uq_discard_pile_board_color UNIQUE (board_id, color);
+    END IF;
+    
+    -- Add constraints for game_card table
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_game_card_game') THEN
+        ALTER TABLE game_card ADD CONSTRAINT fk_game_card_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_game_card_card') THEN
+        ALTER TABLE game_card ADD CONSTRAINT fk_game_card_card FOREIGN KEY (card_id) REFERENCES card(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_game_card_expedition') THEN
+        ALTER TABLE game_card ADD CONSTRAINT fk_game_card_expedition FOREIGN KEY (expedition_id) REFERENCES expedition(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_game_card_pile') THEN
+        ALTER TABLE game_card ADD CONSTRAINT fk_game_card_pile FOREIGN KEY (pile_id) REFERENCES discard_pile(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_game_card_game_card') THEN
+        ALTER TABLE game_card ADD CONSTRAINT uq_game_card_game_card UNIQUE (game_id, card_id);
+    END IF;
+    
+    -- Add constraints for move table
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_move_game') THEN
+        ALTER TABLE move ADD CONSTRAINT fk_move_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_move_player') THEN
+        ALTER TABLE move ADD CONSTRAINT fk_move_player FOREIGN KEY (player_id) REFERENCES users(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_move_card') THEN
+        ALTER TABLE move ADD CONSTRAINT fk_move_card FOREIGN KEY (card_id) REFERENCES card(id);
+    END IF;
+END $$;
+
 -- Populate the Card table with all possible cards
-INSERT INTO Card (id, color, type, value, image_path) VALUES
+INSERT INTO card (id, color, type, value, image_path) VALUES
 -- Red cards
 ('red_2', 'red', 'expedition', 2, '/assets/cards/red_2.png'),
 ('red_3', 'red', 'expedition', 3, '/assets/cards/red_3.png'),
@@ -163,14 +273,15 @@ INSERT INTO Card (id, color, type, value, image_path) VALUES
 ('purple_10', 'purple', 'expedition', 10, '/assets/cards/purple_10.png'),
 ('purple_wager_0', 'purple', 'wager', NULL, '/assets/cards/purple_wager_0.png'),
 ('purple_wager_1', 'purple', 'wager', NULL, '/assets/cards/purple_wager_1.png'),
-('purple_wager_2', 'purple', 'wager', NULL, '/assets/cards/purple_wager_2.png');
+('purple_wager_2', 'purple', 'wager', NULL, '/assets/cards/purple_wager_2.png')
+ON CONFLICT (id) DO NOTHING;
 
 -- Create indexes for performance
-CREATE INDEX idx_gamecards_game_id ON GameCard(game_id);
-CREATE INDEX idx_gamecards_location ON GameCard(location);
-CREATE INDEX idx_gamecards_expedition_id ON GameCard(expedition_id);
-CREATE INDEX idx_expedition_board_id ON Expedition(board_id);
-CREATE INDEX idx_expedition_player_id ON Expedition(player_id);
-CREATE INDEX idx_discardpile_board_id ON DiscardPile(board_id);
-CREATE INDEX idx_move_game_id ON Move(game_id);
-CREATE INDEX idx_move_player_id ON Move(player_id);
+CREATE INDEX IF NOT EXISTS idx_gamecards_game_id ON game_card(game_id);
+CREATE INDEX IF NOT EXISTS idx_gamecards_location ON game_card(location);
+CREATE INDEX IF NOT EXISTS idx_gamecards_expedition_id ON game_card(expedition_id);
+CREATE INDEX IF NOT EXISTS idx_expedition_board_id ON expedition(board_id);
+CREATE INDEX IF NOT EXISTS idx_expedition_player_id ON expedition(player_id);
+CREATE INDEX IF NOT EXISTS idx_discardpile_board_id ON discard_pile(board_id);
+CREATE INDEX IF NOT EXISTS idx_move_game_id ON move(game_id);
+CREATE INDEX IF NOT EXISTS idx_move_player_id ON move(player_id);

@@ -85,6 +85,20 @@
             font-size: 18px;
             color: #5b3d2b;
         }
+
+        .debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        #loading-message {
+            text-align: center;
+            padding: 10px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -104,7 +118,9 @@
             Failed to create game. Please try again.
         </div>
         
-        <form action="/new-game" method="POST">
+        <div id="loading-message">Loading available opponents...</div>
+        
+        <form action="/new-game" method="POST" id="newGameForm" style="display:none;">
             <div class="form-group">
                 <label for="opponent_id">Select Opponent</label>
                 <select name="opponent_id" id="opponent_id" required>
@@ -124,6 +140,13 @@
                 <button type="submit">Create Game</button>
             </div>
         </form>
+
+        <div class="debug-info" id="debug-info" style="display:none;">
+            <h3>Debug Information</h3>
+            <p>Current User ID: <span id="current-user-id">Not set</span></p>
+            <p>Auth Token Present: <span id="auth-token-status">No</span></p>
+            <button id="create-test-user">Create Test User</button>
+        </div>
     </div>
 
     <script>
@@ -133,26 +156,104 @@
             document.getElementById('error-message').style.display = 'block';
         }
         
+        // Show debug info in development
+        const showDebug = true; // Set to false in production
+        if (showDebug) {
+            document.getElementById('debug-info').style.display = 'block';
+            document.getElementById('current-user-id').textContent = localStorage.getItem('user_id') || 'Not set';
+            document.getElementById('auth-token-status').textContent = localStorage.getItem('authToken') ? 'Yes' : 'No';
+        }
+
+        const API_URL = window.location.hostname === "localhost"
+            ? "http://localhost:3000" // Local backend URL
+            : "https://lostcitiesbackend.onrender.com"; // Render backend URL
+        
+        // Function to create a test user
+        document.getElementById('create-test-user').addEventListener('click', async () => {
+            try {
+                const username = "player_" + Math.floor(Math.random() * 1000);
+                const email = username + "@example.com";
+                const password = "password123";
+                
+                const response = await fetch(`${API_URL}/register`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                if (response.ok) {
+                    alert(`Test user created: ${username} / ${password}`);
+                } else {
+                    const error = await response.json();
+                    alert(`Failed to create test user: ${error.error || "Unknown error"}`);
+                }
+            } catch (error) {
+                console.error("Error creating test user:", error);
+                alert("Error creating test user. See console for details.");
+            }
+        });
+        
         // Load available opponents
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                const response = await fetch('/api/users');
-                if (response.ok) {
-                    const users = await response.json();
-                    const select = document.getElementById('opponent_id');
-                    
-                    users.forEach(user => {
-                        // Don't include current user
-                        if (user.id !== parseInt(localStorage.getItem('user_id'))) {
-                            const option = document.createElement('option');
-                            option.value = user.id;
-                            option.textContent = user.username;
-                            select.appendChild(option);
-                        }
-                    });
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    document.getElementById('loading-message').textContent = "Please log in first";
+                    setTimeout(() => {
+                        window.location.href = '/login.html';
+                    }, 2000);
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/users`, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const users = await response.json();
+                console.log("Users retrieved:", users);
+                
+                if (users.length === 0) {
+                    document.getElementById('loading-message').textContent = "No other users available. Please create another account to play against.";
+                    return;
+                }
+                
+                const select = document.getElementById('opponent_id');
+                const currentUserId = localStorage.getItem('user_id');
+                
+                // Count how many opponents we add
+                let opponentCount = 0;
+                
+                users.forEach(user => {
+                    // Don't include current user
+                    if (user.id != currentUserId) {
+                        const option = document.createElement('option');
+                        option.value = user.id;
+                        option.textContent = user.username;
+                        select.appendChild(option);
+                        opponentCount++;
+                    }
+                });
+                
+                if (opponentCount > 0) {
+                    // Hide loading message and show form
+                    document.getElementById('loading-message').style.display = 'none';
+                    document.getElementById('newGameForm').style.display = 'block';
+                } else {
+                    document.getElementById('loading-message').textContent = 
+                        "No opponents available. Please create another account to play against.";
                 }
             } catch (error) {
                 console.error('Error loading users:', error);
+                document.getElementById('loading-message').textContent = 
+                    "Error loading opponents. Please try again later.";
             }
         });
     </script>

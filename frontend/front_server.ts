@@ -1,282 +1,101 @@
-// front_server.ts
-import { Application, Router, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { Application, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { Router } from "https://deno.land/x/oak@v12.6.1/router.ts";
 
-// Create the application
 const app = new Application();
-
-// Create routers
 const router = new Router();
-const gameRouter = new Router();
 
-// Basic routes
+// Définir la racine pour les fichiers statiques
+const ROOT = Deno.cwd(); // Ceci était utilisé dans le message de log mais n'était pas défini
+
+// Servir la page d'accueil
 router.get("/", async (ctx) => {
-  await send(ctx, "index.html", {
-    root: `${Deno.cwd()}`,
+  await ctx.send({
+    root: ROOT,
+    index: "index.html",
   });
 });
 
-// Login routes
+// Routes spécifiques pour les pages principales
 router.get("/login", async (ctx) => {
-  await send(ctx, "/login/login.html", {
-    root: `${Deno.cwd()}`,
-  });
+  ctx.response.redirect("/login/login.html");
 });
 
-// Chat routes
 router.get("/chat", async (ctx) => {
-  await send(ctx, "/chat/chat.html", {
-    root: `${Deno.cwd()}`,
+  ctx.response.redirect("/chat/chat.html");
+});
+
+router.get("/new-game", async (ctx) => {
+  ctx.response.redirect("/game/new_game.html");
+});
+
+// Ajout d'une route pour les jeux
+router.get("/game/:id", async (ctx) => {
+  await ctx.send({
+    root: ROOT,
+    path: "game/game.html" // On sert directement game.html avec les paramètres de l'URL préservés
   });
 });
 
-// Admin routes
-router.get("/admin", async (ctx) => {
-  await send(ctx, "/admin/admin.html", {
-    root: `${Deno.cwd()}`,
-  });
-});
-
-// Game routes
-gameRouter.get("/game/:id", async (ctx) => {
-  const gameId = ctx.params.id;
-  
-  // Get auth cookie
-  const cookies = await ctx.cookies;
-  const token = cookies.get("auth_token");
-  
-  // If no token, redirect to login
-  if (!token) {
-    ctx.response.redirect("/login");
-    return;
-  }
-  
-  // Fetch game data from API
-  try {
-    const response = await fetch(`http://backend:3000/lost-cities/games/${gameId}`, {
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) {
-      // If game not found or user not authorized, redirect to home
-      ctx.response.redirect("/");
-      return;
-    }
-    
-    const gameData = await response.json();
-    
-    // Get user info from API
-    const userResponse = await fetch("http://backend:3000/user", {
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
-    });
-    
-    if (!userResponse.ok) {
-      ctx.response.redirect("/login");
-      return;
-    }
-    
-    const userData = await userResponse.json();
-    
-    // Determine player names
-    let player1Name = "Player 1";
-    let player2Name = "Player 2";
-    
-    if (gameData.player1.id === userData.id) {
-      player1Name = userData.username;
-      
-      // Fetch opponent name
-      const opponentResponse = await fetch(`http://backend:3000/users/${gameData.player2.id}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-      
-      if (opponentResponse.ok) {
-        const opponentData = await opponentResponse.json();
-        player2Name = opponentData.username;
-      }
-    } else {
-      player2Name = userData.username;
-      
-      // Fetch opponent name
-      const opponentResponse = await fetch(`http://backend:3000/users/${gameData.player1.id}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-      
-      if (opponentResponse.ok) {
-        const opponentData = await opponentResponse.json();
-        player1Name = opponentData.username;
-      }
-    }
-    
-    // Render game page with template data
-    const html = await Deno.readTextFile("./game/game.html");
-    const renderedHtml = html
-      .replace("{{userId}}", userData.id)
-      .replace("{{gameId}}", gameId)
-      .replace("{{player1Name}}", player1Name)
-      .replace("{{player2Name}}", player2Name);
-    
-    ctx.response.type = "text/html";
-    ctx.response.body = renderedHtml;
-    
-  } catch (error) {
-    console.error("Error loading game:", error);
-    ctx.response.redirect("/");
-  }
-});
-
-// Route to create a new game
-gameRouter.get("/new-game", async (ctx) => {
-  // Get auth cookie
-  const cookies = await ctx.cookies;
-  const token = cookies.get("auth_token");
-  
-  // If no token, redirect to login
-  if (!token) {
-    ctx.response.redirect("/login");
-    return;
-  }
-  
-  // Render new game form
-  const html = await Deno.readTextFile("./game/new_game.html");
-  
-  ctx.response.type = "text/html";
-  ctx.response.body = html;
-});
-
-// Route to process new game form
-gameRouter.post("/new-game", async (ctx) => {
-  const cookies = await ctx.cookies;
-  const token = cookies.get("auth_token");
-  
-  // If no token, redirect to login
-  if (!token) {
-    ctx.response.redirect("/login");
-    return;
-  }
-  
-  try {
-    const formData = await ctx.request.body({ type: "form" }).value;
-    const opponentId = formData.get("opponent_id");
-    const usePurple = formData.get("use_purple") === "on";
-    
-    // Create game via API
-    const response = await fetch("http://backend:3000/lost-cities/games", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        opponentId,
-        usePurpleExpedition: usePurple
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error("Failed to create game");
-    }
-    
-    const responseData = await response.json();
-    const gameId = responseData.gameId;
-    
-    // Redirect to the new game
-    ctx.response.redirect(`/game/${gameId}`);
-    
-  } catch (error) {
-    console.error("Error creating game:", error);
-    ctx.response.redirect("/new-game?error=failed");
-  }
-});
-
-// Add the routers to the application
+// Router doit être utilisé avant le middleware de fichiers statiques
 app.use(router.routes());
 app.use(router.allowedMethods());
-app.use(gameRouter.routes());
-app.use(gameRouter.allowedMethods());
 
-// Create a specific middleware to handle static files like CSS and JS
+// Middleware pour servir les fichiers statiques
 app.use(async (ctx, next) => {
   try {
-    const path = ctx.request.url.pathname;
+    // Essayer de servir un fichier statique
+    const filePath = ctx.request.url.pathname;
     
-    // Serve static files from the correct directories
-    if (
-      path.endsWith('.css') || 
-      path.endsWith('.js') || 
-      path.endsWith('.html') || 
-      path.endsWith('.png') || 
-      path.endsWith('.jpg') || 
-      path.endsWith('.ico')
-    ) {
-      await send(ctx, path, {
-        root: `${Deno.cwd()}`,
-        index: "index.html",
-      });
-      return;
-    }
-    
-    // Special handling for game assets
-    if (path.startsWith('/game/') && !path.includes(':')) {
-      await send(ctx, path, {
-        root: `${Deno.cwd()}`,
-      });
-      return;
-    }
-    
-    // If we get here, proceed to the next middleware
-    await next();
+    // Servir tout fichier demandé directement
+    await send(ctx, filePath, {
+      root: ROOT,
+    });
   } catch (err) {
-    console.error(`Error serving static file: ${err.message}`);
+    // Si le fichier n'est pas trouvé, passer au middleware suivant
     await next();
   }
 });
 
-// Log each request
-app.use(async (ctx, next) => {
-  console.log(`Request: ${ctx.request.method} ${ctx.request.url.pathname}`);
-  await next();
-  console.log(`Response: ${ctx.response.status}`);
+// Middleware de fallback pour les routes non gérées
+app.use(async (ctx) => {
+  try {
+    // Si aucune route n'a été trouvée, on essaie de servir index.html
+    await ctx.send({
+      root: ROOT,
+      path: "index.html",
+    });
+  } catch (err) {
+    // Si même index.html n'est pas trouvé, on renvoie une 404
+    ctx.response.status = 404;
+    ctx.response.body = "Page not found";
+  }
 });
 
-// Create a fallback index page for development
-if (!await Deno.stat("./index.html").catch(() => null)) {
-  await Deno.writeTextFile("./index.html", `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Lost Cities: Le Duel</title>
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-        nav { margin: 20px 0; }
-        a { margin: 0 10px; color: #007BFF; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-      </style>
-    </head>
-    <body>
-      <h1>Lost Cities: Le Duel</h1>
-      <p>Welcome to the Lost Cities card game!</p>
-      <nav>
-        <a href="/login">Login</a>
-        <a href="/chat">Chat</a>
-        <a href="/new-game">New Game</a>
-      </nav>
-    </body>
-    </html>
-  `);
+// Configuration du port et des options SSL
+const port = parseInt(Deno.args[0]) || 8080; // Ajout d'une valeur par défaut
+const options: any = { port };
+
+// Configuration SSL si des arguments sont fournis
+if (Deno.args.length >= 3) {
+  try {
+    options.secure = true;
+    options.certFile = Deno.args[1]; // Utiliser certFile au lieu de cert
+    options.keyFile = Deno.args[2];  // Utiliser keyFile au lieu de key
+    console.log(`SSL conf ready (use https)`);
+  } catch (error) {
+    console.error("Error loading SSL certificates:", error);
+    console.log("Starting server without SSL...");
+  }
 }
 
-// Get port from command line argument or default to 8080
-const port = parseInt(Deno.args[0] || "8080");
+console.log(`Oak static server running on port ${options.port} for the files in ${ROOT}`);
+console.log(`Routes available:`);
+console.log(`- /login`);
+console.log(`- /chat`);
+console.log(`- /new-game`);
+console.log(`- /game/:id`);
+console.log(`- /admin`);
+console.log(`- /shared`);
 
-// Log that we're starting
-console.log(`Starting server on port ${port}...`);
-
-// Start the server - THIS IS THE CRUCIAL LINE THAT WAS MISSING
-await app.listen({ port });
+// Démarrer le serveur
+await app.listen(options);

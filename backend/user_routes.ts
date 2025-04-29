@@ -3,6 +3,18 @@ import { client } from "./db_client.ts";
 
 const userRouter = new Router();
 
+// NEW ENDPOINT - Get all users for game opponent selection
+userRouter.get("/api/users", async (ctx) => {
+  try {
+    const users = await client.queryObject("SELECT id, username FROM users");
+    ctx.response.body = users.rows;
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+});
+
 // GET /api/users/:id - Récupérer un utilisateur par ID
 userRouter.get("/api/users/:id", async (ctx) => {
   const id = ctx.params.id;
