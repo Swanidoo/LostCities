@@ -2,6 +2,8 @@ import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { client } from "./db_client.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { LostCitiesGame } from "./lost_cities/lost_cities_controller.ts";
+import { notifyGamePlayers } from "./ws_routes.ts";
+import { notifyGameUpdate } from "./ws_routes.ts";
 
 const gameRouter = new Router();
 
@@ -129,7 +131,6 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
     game.initGame(userId, opponentId);
     
     // Save game state to database
-    const serializedState = game.serialize();
     await client.queryObject(
       `UPDATE games SET 
        current_turn_player_id = $1,
@@ -290,18 +291,7 @@ gameRouter.post("/lost-cities/games/:id/moves", authMiddleware, async (ctx) => {
       case 'draw_card':
         if (move.source === 'deck') {
           success = game.drawCardFromDeck(userId);
-        } else {
-        await client.queryObject(`
-          UPDATE discard_pile
-          SET top_card_id = NULL
-          WHERE id = $1
-        `, [pileId]);
-      }
-    }
-  }
-}
-
-export default gameRouter; if (move.source === 'discard_pile') {
+        } else if (move.source === 'discard_pile') {
           success = game.drawCardFromDiscardPile(userId, move.color);
         }
         break;
@@ -334,6 +324,18 @@ export default gameRouter; if (move.source === 'discard_pile') {
       move.destination || null,
       move.source || null
     ]);
+    
+    // Notify players of game update
+    if (typeof notifyGamePlayers === 'function') {
+      try {
+        notifyGamePlayers(String(gameId), game.getGameState());
+        console.log(`✅ Notified players of update for game ${gameId}`);
+      } catch (error) {
+        console.error(`❌ Failed to notify players of game update: ${error.message}`);
+      }
+    } else {
+      console.warn(`⚠️ WebSocket notification function not available`);
+    }
     
     // Return updated game state
     ctx.response.body = { 
@@ -425,7 +427,7 @@ gameRouter.post("/lost-cities/games/:id/chat", authMiddleware, async (ctx) => {
 });
 
 // Helper function to load game state from database
-async function loadGameState(gameId: string): Promise<LostCitiesGame> {
+async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
   // Get basic game info
   const gameResult = await client.queryObject(`
     SELECT g.*, b.use_purple_expedition, b.current_round
@@ -790,4 +792,16 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
           SET top_card_id = $1
           WHERE id = $2
         `, [topCard.id, pileId]);
-      } else
+      } else {
+        await client.queryObject(`
+          UPDATE discard_pile
+          SET top_card_id = NULL
+          WHERE id = $1
+        `, [pileId]);
+      }
+    }
+  }
+}
+
+export default gameRouter;
+
