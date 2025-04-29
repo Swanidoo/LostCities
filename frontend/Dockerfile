@@ -11,4 +11,4 @@ COPY . /app
 EXPOSE 8080
 
 # Step 5: Run the Deno server
-CMD ["deno", "run", "--allow-net","--allow-env", "--allow-read", "/app/front_server.ts", "8080"]
+CMD ["deno", "run", "--allow-net","--allow-env", "--allow-read", "--allow-write", "/app/front_server.ts", "8080"]

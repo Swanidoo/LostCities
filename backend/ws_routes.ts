@@ -427,12 +427,45 @@ function cleanupGameSubscriptions(): void {
   }
 }
 
-// Export function for game routes to use
+// Function to notify game players about updates
 export function notifyGamePlayers(gameId: string, gameState: any): void {
-  notifyGameUpdate(String(gameId), gameState);
+  console.log(`🎮 Notifying update for game ${gameId}`);
+  
+  const subscribers = gameSubscriptions.get(String(gameId));
+  if (!subscribers || subscribers.size === 0) {
+    console.log(`ℹ️ No subscribers for game ${gameId}`);
+    return;
+  }
+  
+  console.log(`📤 Sending game update to ${subscribers.size} subscribers`);
+  
+  const message = JSON.stringify({
+    event: 'gameUpdated',
+    data: { 
+      gameId,
+      gameState
+    }
+  });
+  
+  let sentCount = 0;
+  subscribers.forEach(socket => {
+    try {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(message);
+        sentCount++;
+      } else {
+        // Remove closed sockets
+        subscribers.delete(socket);
+      }
+    } catch (error) {
+      console.error('❌ Error sending game update:', error);
+      // Remove socket on error
+      subscribers.delete(socket);
+    }
+  });
+  
+  console.log(`✅ Game update sent to ${sentCount} subscribers`);
 }
 
-// Also export notifyGameUpdate directly
-export { notifyGameUpdate };
 
 export default wsRouter;

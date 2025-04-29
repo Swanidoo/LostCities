@@ -1,79 +1,130 @@
 @startuml LostCities UML
 title Base de données - Lost Cities: Le Duel 🗃️
-
 skinparam class {
-  BackgroundColor #FDF6E3
-  ArrowColor #268BD2
-  BorderColor #657B83
-  FontName "Segoe UI"
+BackgroundColor #FDF6E3
+ArrowColor #268BD2
+BorderColor #657B83
+FontName "Segoe UI"
 }
-
 '-------------------------------
 class User {
-  +id: INTEGER [PK]
-  +username: TEXT
-  +email: TEXT [UNIQUE]
-  +password: TEXT
-  +avatar_url: TEXT
-  +bio: TEXT
-  +created_at: TIMESTAMP
-  +role: TEXT ("user", "admin") [DEFAULT: "user"]
++id: INTEGER [PK]
++username: TEXT
++email: TEXT [UNIQUE]
++password: TEXT
++avatar_url: TEXT
++bio: TEXT
++created_at: TIMESTAMP
++role: TEXT ("user", "admin") [DEFAULT: "user"]
 }
 
 class Game {
-  +id: INTEGER [PK]
-  +player1_id: INTEGER [FK → User]
-  +player2_id: INTEGER [FK → User]
-  +status: TEXT ("waiting", "in_progress", "finished")
-  +winner_id: INTEGER [FK → User, nullable]
-  +score_player1: INTEGER
-  +score_player2: INTEGER
-  +started_at: TIMESTAMP
-  +ended_at: TIMESTAMP
-  +settings_id: INTEGER [FK → GameSettings]
++id: INTEGER [PK]
++player1_id: INTEGER [FK → User]
++player2_id: INTEGER [FK → User]
++status: TEXT ("waiting", "in_progress", "finished")
++winner_id: INTEGER [FK → User, nullable]
++score_player1: INTEGER
++score_player2: INTEGER
++current_turn_player_id: INTEGER [FK → User]
++turn_count: INTEGER
++started_at: TIMESTAMP
++ended_at: TIMESTAMP
++current_round: INTEGER [1-3]
++board_id: INTEGER [FK → Board]
 }
 
-class GameSettings {
-  +id: INTEGER [PK]
-  +use_purple_cards: BOOLEAN
-  +other_variants: TEXT
+class Board {
++id: INTEGER [PK]
++game_id: INTEGER [FK → Game]
++use_purple_expedition: BOOLEAN [DEFAULT: false]
++remaining_cards_in_deck: INTEGER
++current_round: INTEGER [1-3]
++round1_score_player1: INTEGER [DEFAULT: 0]
++round1_score_player2: INTEGER [DEFAULT: 0]
++round2_score_player1: INTEGER [DEFAULT: 0]
++round2_score_player2: INTEGER [DEFAULT: 0]
++round3_score_player1: INTEGER [DEFAULT: 0]
++round3_score_player2: INTEGER [DEFAULT: 0]
++created_at: TIMESTAMP
++updated_at: TIMESTAMP
+}
+
+class DiscardPile {
++id: INTEGER [PK]
++board_id: INTEGER [FK → Board]
++color: TEXT ("red", "green", "white", "blue", "yellow", "purple")
++top_card_id: INTEGER [FK → Card, nullable]
+}
+
+class Card {
++id: INTEGER [PK]
++color: TEXT ("red", "green", "white", "blue", "yellow", "purple")
++type: TEXT ("expedition", "wager")
++value: INTEGER
++image_path: TEXT
+}
+
+class GameCard {
++id: INTEGER [PK]
++game_id: INTEGER [FK → Game]
++card_id: INTEGER [FK → Card]
++location: TEXT ("deck", "player1_hand", "player2_hand", "player1_expedition", "player2_expedition", "discard_pile")
++pile_id: INTEGER [FK → DiscardPile, nullable]
++expedition_id: INTEGER [FK → Expedition, nullable]
++position: INTEGER
++played_at: TIMESTAMP [nullable]
+}
+
+class Expedition {
++id: INTEGER [PK]
++board_id: INTEGER [FK → Board]
++player_id: INTEGER [FK → User]
++color: TEXT ("red", "green", "white", "blue", "yellow", "purple")
++wager_count: INTEGER [DEFAULT: 0]
++card_count: INTEGER [DEFAULT: 0]
++total_value: INTEGER [DEFAULT: 0]
++score: INTEGER [DEFAULT: 0]
++has_started: BOOLEAN [DEFAULT: false]
 }
 
 class Move {
-  +id: INTEGER [PK]
-  +game_id: INTEGER [FK → Game]
-  +player_id: INTEGER [FK → User]
-  +turn_number: INTEGER
-  +action: TEXT
-  +card_played: TEXT
-  +pile_color: TEXT
-  +timestamp: TIMESTAMP
++id: INTEGER [PK]
++game_id: INTEGER [FK → Game]
++player_id: INTEGER [FK → User]
++turn_number: INTEGER
++action: TEXT ("play_card", "discard_card", "draw_card")
++card_id: INTEGER [FK → Card]
++destination: TEXT ("expedition", "discard_pile")
++source: TEXT ("hand", "discard_pile", "deck")
++timestamp: TIMESTAMP
 }
 
 class ChatMessage {
-  +id: INTEGER [PK]
-  +game_id: INTEGER [FK → Game, nullable]
-  +sender_id: INTEGER [FK → User]
-  +message: TEXT
-  +timestamp: TIMESTAMP
++id: INTEGER [PK]
++game_id: INTEGER [FK → Game, nullable]
++sender_id: INTEGER [FK → User]
++message: TEXT
++timestamp: TIMESTAMP
 }
 
 class Leaderboard {
-  +id: INTEGER [PK]
-  +user_id: INTEGER [FK → User]
-  +score: INTEGER
-  +month: INTEGER 
-  +year: INTEGER
-  +created_at: TIMESTAMP
++id: INTEGER [PK]
++user_id: INTEGER [FK → User]
++score: INTEGER
++month: INTEGER
++year: INTEGER
++created_at: TIMESTAMP
 }
-
 '-------------------------------
 User "1" -- "0..*" Game : joue
+Game "1" -- "1" Board : configure
+Board "1" -- "0..*" Expedition : contient
+Board "1" -- "5..6" DiscardPile : contient
 Game "1" -- "0..*" Move : contient
 Game "1" -- "0..*" ChatMessage : lié à
 User "1" -- "0..*" ChatMessage : envoie
 User "1" -- "0..*" Leaderboard : classé dans
-Game "1" -- "1" GameSettings : configuration
-Move "1" -- "1" User : joué par
-
+Game "1" -- "0..*" GameCard : contient
+Card "1" -- "0..*" GameCard : représente
 @enduml

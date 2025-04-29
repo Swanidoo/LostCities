@@ -3,7 +3,6 @@ import { client } from "./db_client.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { LostCitiesGame } from "./lost_cities/lost_cities_controller.ts";
 import { notifyGamePlayers } from "./ws_routes.ts";
-import { notifyGameUpdate } from "./ws_routes.ts";
 
 const gameRouter = new Router();
 

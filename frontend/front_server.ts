@@ -1,13 +1,42 @@
-// Add these imports and routes to your front_server.ts file
+// front_server.ts
+import { Application, Router, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 
-// Import necessary modules
-import { Router } from "https://deno.land/x/oak@v12.6.1/router.ts";
-import { Application, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+// Create the application
+const app = new Application();
 
-// Game routes
+// Create routers
+const router = new Router();
 const gameRouter = new Router();
 
-// Route to serve the game page
+// Basic routes
+router.get("/", async (ctx) => {
+  await send(ctx, "index.html", {
+    root: `${Deno.cwd()}`,
+  });
+});
+
+// Login routes
+router.get("/login", async (ctx) => {
+  await send(ctx, "/login/login.html", {
+    root: `${Deno.cwd()}`,
+  });
+});
+
+// Chat routes
+router.get("/chat", async (ctx) => {
+  await send(ctx, "/chat/chat.html", {
+    root: `${Deno.cwd()}`,
+  });
+});
+
+// Admin routes
+router.get("/admin", async (ctx) => {
+  await send(ctx, "/admin/admin.html", {
+    root: `${Deno.cwd()}`,
+  });
+});
+
+// Game routes
 gameRouter.get("/game/:id", async (ctx) => {
   const gameId = ctx.params.id;
   
@@ -166,21 +195,88 @@ gameRouter.post("/new-game", async (ctx) => {
   }
 });
 
-// Add this to your existing app setup:
-// app.use(gameRouter.routes());
-// app.use(gameRouter.allowedMethods());
+// Add the routers to the application
+app.use(router.routes());
+app.use(router.allowedMethods());
+app.use(gameRouter.routes());
+app.use(gameRouter.allowedMethods());
 
-// Add this to serve static game assets:
-// app.use(async (ctx, next) => {
-//   if (ctx.request.url.pathname.startsWith("/game/")) {
-//     try {
-//       await send(ctx, ctx.request.url.pathname, {
-//         root: `${Deno.cwd()}/frontend`,
-//       });
-//     } catch {
-//       await next();
-//     }
-//     return;
-//   }
-//   await next();
-// });
+// Create a specific middleware to handle static files like CSS and JS
+app.use(async (ctx, next) => {
+  try {
+    const path = ctx.request.url.pathname;
+    
+    // Serve static files from the correct directories
+    if (
+      path.endsWith('.css') || 
+      path.endsWith('.js') || 
+      path.endsWith('.html') || 
+      path.endsWith('.png') || 
+      path.endsWith('.jpg') || 
+      path.endsWith('.ico')
+    ) {
+      await send(ctx, path, {
+        root: `${Deno.cwd()}`,
+        index: "index.html",
+      });
+      return;
+    }
+    
+    // Special handling for game assets
+    if (path.startsWith('/game/') && !path.includes(':')) {
+      await send(ctx, path, {
+        root: `${Deno.cwd()}`,
+      });
+      return;
+    }
+    
+    // If we get here, proceed to the next middleware
+    await next();
+  } catch (err) {
+    console.error(`Error serving static file: ${err.message}`);
+    await next();
+  }
+});
+
+// Log each request
+app.use(async (ctx, next) => {
+  console.log(`Request: ${ctx.request.method} ${ctx.request.url.pathname}`);
+  await next();
+  console.log(`Response: ${ctx.response.status}`);
+});
+
+// Create a fallback index page for development
+if (!await Deno.stat("./index.html").catch(() => null)) {
+  await Deno.writeTextFile("./index.html", `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Lost Cities: Le Duel</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        nav { margin: 20px 0; }
+        a { margin: 0 10px; color: #007BFF; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+      </style>
+    </head>
+    <body>
+      <h1>Lost Cities: Le Duel</h1>
+      <p>Welcome to the Lost Cities card game!</p>
+      <nav>
+        <a href="/login">Login</a>
+        <a href="/chat">Chat</a>
+        <a href="/new-game">New Game</a>
+      </nav>
+    </body>
+    </html>
+  `);
+}
+
+// Get port from command line argument or default to 8080
+const port = parseInt(Deno.args[0] || "8080");
+
+// Log that we're starting
+console.log(`Starting server on port ${port}...`);
+
+// Start the server - THIS IS THE CRUCIAL LINE THAT WAS MISSING
+await app.listen({ port });
