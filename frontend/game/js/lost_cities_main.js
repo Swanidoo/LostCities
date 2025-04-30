@@ -6,14 +6,59 @@ import FallbackGameLogic from './lost_cities_fallback.js';
 
 class LostCitiesGameController {
     constructor() {
+        console.log("Initializing game controller");
+        
         // Get game ID and user ID from hidden inputs
-        this.gameId = document.getElementById('game-id').value;
-        this.userId = document.getElementById('current-user-id').value;
+        this.gameId = document.getElementById('game-id')?.value || '1';
+        this.userId = document.getElementById('current-user-id')?.value || '1';
         
         // Get player names from the HTML
-        this.playerName = document.querySelector('.player-info:first-child .player-name').textContent;
-        this.opponentName = document.querySelector('.player-info:last-child .player-name').textContent;
+        this.playerName = document.querySelector('.player-info:first-child .player-name')?.textContent || 'Player 1';
+        this.opponentName = document.querySelector('.player-info:last-child .player-name')?.textContent || 'Player 2';
         
+        console.log(`Game: ${this.gameId}, User: ${this.userId}`);
+        console.log(`Players: ${this.playerName} vs ${this.opponentName}`);
+        
+        // Track connection status
+        this.isConnected = false;
+        this.connectionAttempts = 0;
+        this.maxConnectionAttempts = 3;
+        this.usingFallback = false;
+        
+        // Initialize components
+        this.initializeComponents();
+        
+        // Set up event handlers
+        this.setupEventHandlers();
+        
+        // Initialize the UI
+        this.ui.initialize();
+        
+        // Connect to WebSocket
+        this.ws.connect();
+        
+        // Set timeout for fallback mode
+        this.connectionTimeout = setTimeout(() => {
+            if (!this.isConnected && !this.usingFallback) {
+                this.switchToFallbackMode();
+            }
+        }, 5000);
+    }
+    
+    initializeComponents() {
+        // Initialize fallback game logic
+        this.fallbackGameLogic = new FallbackGameLogic(
+            this.gameId,
+            this.userId,
+            this.opponentId,
+            this.playerName,
+            this.opponentName
+        );
+
+        // Generate initial hands for both players
+        this.player1Hand = this.fallbackGameLogic.generateInitialHand();
+        this.player2Hand = this.fallbackGameLogic.generateInitialHand();
+
         // Initialize UI controller
         this.ui = new GameUIController(this.gameId, this.userId);
         
@@ -28,52 +73,6 @@ class LostCitiesGameController {
             this.playerName,
             this.opponentName
         );
-        
-        // Track connection status
-        this.isConnected = false;
-        this.connectionAttempts = 0;
-        this.maxConnectionAttempts = 3;
-        this.usingFallback = false;
-        
-        // Set up event handlers
-        this.setupEventHandlers();
-        
-        // Initialize the UI
-        this.ui.initialize();
-        
-        // Connect to WebSocket
-        this.ws.connect();
-        
-        // Set a timeout to switch to fallback mode if connection fails
-        this.connectionTimeout = setTimeout(() => {
-            if (!this.isConnected && !this.usingFallback) {
-                this.switchToFallbackMode();
-            }
-    
-    // Switch to fallback mode when server connection fails
-    switchToFallbackMode() {
-        if (this.usingFallback) {
-            return; // Already using fallback
-        }
-        
-        console.log('Switching to fallback mode');
-        this.usingFallback = true;
-        
-        // Update UI to show fallback mode is active
-        this.ui.updateGameStatus('Unable to connect to game server. Running in offline mode.');
-        
-        // Initialize the fallback logic with a starting state
-        const initialState = this.fallbackLogic.getGameState();
-        this.ui.updateGameState(initialState);
-        
-        // Show a warning about fallback mode
-        setTimeout(() => {
-            alert('Unable to connect to the game server. The game will run in offline mode with a simulated opponent. Your progress will not be saved to the server.');
-        }, 500);
-    }
-        }, 5000);
-        
-        console.log(`Game controller initialized for game ${this.gameId} and user ${this.userId}`);
     }
     
     setupEventHandlers() {
@@ -132,10 +131,12 @@ class LostCitiesGameController {
             this.ui.updateGameState(gameState);
             
             // If opponent ID wasn't set yet, set it in fallback logic
-            if (gameState.player1.id !== this.userId) {
-                this.fallbackLogic.opponentId = gameState.player1.id;
-            } else if (gameState.player2.id !== this.userId) {
-                this.fallbackLogic.opponentId = gameState.player2.id;
+            if (gameState.player1 && gameState.player2) {
+                if (gameState.player1.id !== this.userId) {
+                    this.fallbackLogic.opponentId = gameState.player1.id;
+                } else if (gameState.player2.id !== this.userId) {
+                    this.fallbackLogic.opponentId = gameState.player2.id;
+                }
             }
         };
         
@@ -163,6 +164,11 @@ class LostCitiesGameController {
             }
         });
         
+        // Set up UI event handlers
+        this.setupUIEventHandlers();
+    }
+    
+    setupUIEventHandlers() {
         // UI event handlers
         this.ui.onPlayCard = (cardId, color) => {
             console.log(`Playing card ${cardId} to ${color} expedition`);
@@ -228,11 +234,33 @@ class LostCitiesGameController {
             }
         };
     }
+    
+    switchToFallbackMode() {
+        if (this.usingFallback) {
+            return; // Already using fallback
+        }
+        
+        console.log('Switching to fallback mode');
+        this.usingFallback = true;
+        
+        // Update UI to show fallback mode is active
+        this.ui.updateGameStatus('Unable to connect to game server. Running in offline mode.');
+        
+        // Initialize the fallback logic with a starting state
+        const initialState = this.fallbackLogic.getGameState();
+        this.ui.updateGameState(initialState);
+        
+        // Show a warning about fallback mode
+        setTimeout(() => {
+            alert('Unable to connect to the game server. The game will run in offline mode with a simulated opponent. Your progress will not be saved to the server.');
+        }, 500);
+    }
 }
 
 // Initialize the game controller when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        console.log("DOM loaded, creating game controller");
         window.gameController = new LostCitiesGameController();
     } catch (error) {
         console.error('Error initializing game controller:', error);

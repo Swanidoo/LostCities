@@ -9,19 +9,17 @@ const gameRouter = new Router();
 
 // Route to serve the game page
 gameRouter.get("/game/:id", async (ctx) => {
-  // In the gameRouter.get("/game/:id", ...) route handler:
   const gameId = ctx.params.id;
   try {
     // Read the HTML template
     const html = await Deno.readTextFile(`${ROOT}/game/game.html`);
     
-    // Replace template variables with default values or user data
-    // You can load actual user data from your authentication context when available
+    // Replace template variables with default values
     const modifiedHtml = html
-      .replace(/\{\{userId\}\}/g, "1") // Default user ID or get from auth
+      .replace(/\{\{userId\}\}/g, "1") // Default user ID
       .replace(/\{\{gameId\}\}/g, gameId)
-      .replace(/\{\{player1Name\}\}/g, "Player 1") // Or get from user database
-      .replace(/\{\{player2Name\}\}/g, "Player 2"); // Or get from user database
+      .replace(/\{\{player1Name\}\}/g, "Player 1")
+      .replace(/\{\{player2Name\}\}/g, "Player 2");
     
     ctx.response.type = "text/html";
     ctx.response.body = modifiedHtml;
@@ -52,40 +50,42 @@ const app = new Application();
 // IMPORTANT: Serve static files with correct MIME types
 app.use(async (ctx, next) => {
   const path = ctx.request.url.pathname;
-  try {
-    // Serve static files
-    if (
-      path.startsWith("/shared/") ||
-      path.startsWith("/game/") ||
-      path.startsWith("/login/") ||
-      path.startsWith("/admin/") ||
-      path.startsWith("/chat/")
-    ) {
+
+  // Exclude dynamic routes like /game/:id from static file handling
+  if (
+    path.startsWith("/shared/") ||
+    path.startsWith("/game/js/") || // Serve only JS files, not dynamic routes
+    path.startsWith("/login/") ||
+    path.startsWith("/admin/") ||
+    path.startsWith("/chat/")
+  ) {
+    try {
       // Set correct content type based on file extension
-      if (path.endsWith('.css')) {
+      if (path.endsWith(".css")) {
         ctx.response.headers.set("Content-Type", "text/css");
-      } else if (path.endsWith('.js')) {
+      } else if (path.endsWith(".js")) {
         ctx.response.headers.set("Content-Type", "application/javascript");
-      } else if (path.endsWith('.html')) {
+      } else if (path.endsWith(".html")) {
         ctx.response.headers.set("Content-Type", "text/html");
-      } else if (path.endsWith('.png')) {
+      } else if (path.endsWith(".png")) {
         ctx.response.headers.set("Content-Type", "image/png");
-      } else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+      } else if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
         ctx.response.headers.set("Content-Type", "image/jpeg");
       }
-      
+
       await send(ctx, path, {
         root: ROOT,
       });
       return;
+    } catch (err) {
+      if (err.name !== "NotFound") {
+        console.error(`Error serving static file ${path}:`, err);
+      }
     }
-    await next();
-  } catch (err) {
-    if (err.name !== 'NotFound') {
-      console.error(`Error serving static file ${path}:`, err);
-    }
-    await next();
   }
+
+  // Pass to the next middleware if not a static file
+  await next();
 });
 
 // Use the game router

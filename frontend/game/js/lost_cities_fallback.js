@@ -5,6 +5,7 @@
  * This provides a basic implementation that works locally when the server connection isn't ready
  */
 
+
 class FallbackGameLogic {
     constructor(gameId, userId, opponentId, playerName, opponentName) {
         this.gameId = gameId;
@@ -12,94 +13,44 @@ class FallbackGameLogic {
         this.opponentId = opponentId || 'opponent';
         this.playerName = playerName || 'You';
         this.opponentName = opponentName || 'Opponent';
-        
-        this.currentState = {
-            gameId: this.gameId,
-            status: 'in_progress',
-            currentRound: 1,
-            totalRounds: 3,
-            currentPlayerId: this.userId, // Start with player's turn
-            turnPhase: 'play',
-            usePurpleExpedition: false,
-            cardsInDeck: 44,
-            player1: {
-                id: this.userId,
-                hand: this.generateInitialHand(),
-                expeditions: {
-                    red: [],
-                    green: [],
-                    white: [],
-                    blue: [],
-                    yellow: [],
-                    purple: []
-                },
-                handSize: 8
-            },
-            player2: {
-                id: this.opponentId,
-                expeditions: {
-                    red: [],
-                    green: [],
-                    white: [],
-                    blue: [],
-                    yellow: [],
-                    purple: []
-                },
-                handSize: 8
-            },
-            discardPiles: {
-                red: [],
-                green: [],
-                white: [],
-                blue: [],
-                yellow: [],
-                purple: []
-            },
-            scores: {
-                player1: { round1: 0, round2: 0, round3: 0, total: 0 },
-                player2: { round1: 0, round2: 0, round3: 0, total: 0 }
-            },
-            winner: null
-        };
-        
+
+        // Initialize the deck
         this.deck = this.generateDeck();
-        this.onStateChange = null;
+
+        // Initialize other game state properties
+        this.player1Hand = [];
+        this.player2Hand = [];
+        this.discardPiles = {
+            red: [],
+            green: [],
+            white: [],
+            blue: [],
+            yellow: [],
+            purple: []
+        };
     }
-    
+
     // Generate a randomized deck of cards
     generateDeck() {
-        const colors = ['red', 'green', 'white', 'blue', 'yellow'];
+        const colors = ['red', 'green', 'white', 'blue', 'yellow', 'purple'];
         const deck = [];
-        
-        // Create all cards for each color
+
+        // Add cards 2-10 and 3 investment cards for each color
         colors.forEach(color => {
-            // Number cards (2-10)
-            for (let i = 2; i <= 10; i++) {
-                deck.push({
-                    id: `${color}_${i}`,
-                    color,
-                    type: 'expedition',
-                    value: i
-                });
+            for (let value = 2; value <= 10; value++) {
+                deck.push({ color, value });
             }
-            
-            // Wager cards (3 per color)
             for (let i = 0; i < 3; i++) {
-                deck.push({
-                    id: `${color}_wager_${i}`,
-                    color,
-                    type: 'wager',
-                    value: 'W'
-                });
+                deck.push({ color, value: 'investment' });
             }
         });
-        
+
         // Shuffle the deck
         for (let i = deck.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [deck[i], deck[j]] = [deck[j], deck[i]];
         }
-        
+
         return deck;
     }
     
@@ -498,4 +449,7 @@ class FallbackGameLogic {
     setOnStateChange(callback) {
         this.onStateChange = callback;
     }
+    
 }
+
+export default FallbackGameLogic;

@@ -415,3 +415,96 @@ export class LostCitiesGame {
     }
     
     /**
+ * Handle card selection
+ * @param {Object} card - The selected card object
+ * @param {string} source - The source of the card ('hand', 'discard', etc.)
+ */
+    selectCard(card, source) {
+        this.selectedCard = card;
+        this.selectedSource = source;
+
+        // Highlight the selected card in the UI
+        this.updateGameMessage(`Selected card: ${card.value} of ${card.color}`);
+    }
+
+    /**
+     * Play the selected card to an expedition
+     * @param {string} color - The color of the expedition
+     */
+    playCardToExpedition(color) {
+        if (!this.selectedCard || this.currentPhase !== 'play') {
+            this.updateGameMessage('You must select a card to play.');
+            return;
+        }
+
+        // Send the play card action to the server or handle locally
+        this.updateGameMessage(`Playing ${this.selectedCard.value} of ${this.selectedCard.color} to ${color} expedition.`);
+        this.selectedCard = null;
+        this.selectedSource = null;
+        this.currentPhase = 'draw'; // Move to the next phase
+    }
+
+    /**
+     * Discard the selected card
+     */
+    discardCard() {
+        if (!this.selectedCard || this.currentPhase !== 'play') {
+            this.updateGameMessage('You must select a card to discard.');
+            return;
+        }
+
+        // Send the discard action to the server or handle locally
+        this.updateGameMessage(`Discarding ${this.selectedCard.value} of ${this.selectedCard.color}.`);
+        this.selectedCard = null;
+        this.selectedSource = null;
+        this.currentPhase = 'draw'; // Move to the next phase
+    }
+
+    /**
+     * Draw a card from the deck
+     */
+    drawCardFromDeck() {
+        if (this.currentPhase !== 'draw') {
+            this.updateGameMessage('You must play or discard a card before drawing.');
+            return;
+        }
+
+        // Send the draw action to the server or handle locally
+        this.updateGameMessage('Drawing a card from the deck.');
+        this.currentPhase = 'play'; // Move to the next phase
+    }
+
+    /**
+     * Draw a card from a discard pile
+     * @param {string} color - The color of the discard pile
+     */
+    drawCardFromDiscardPile(color) {
+        if (this.currentPhase !== 'draw') {
+            this.updateGameMessage('You must play or discard a card before drawing.');
+            return;
+        }
+
+        // Send the draw action to the server or handle locally
+        this.updateGameMessage(`Drawing a card from the ${color} discard pile.`);
+        this.currentPhase = 'play'; // Move to the next phase
+    }
+
+    /**
+     * End the game and determine the winner
+     */
+    endGame() {
+        // Calculate final scores and determine the winner
+        const playerScore = this.calculateExpeditionScore(this.gameState.player1.expeditions);
+        const opponentScore = this.calculateExpeditionScore(this.gameState.player2.expeditions);
+
+        if (playerScore > opponentScore) {
+            this.updateGameMessage('You win!');
+        } else if (playerScore < opponentScore) {
+            this.updateGameMessage('Your opponent wins!');
+        } else {
+            this.updateGameMessage('It\'s a tie!');
+        }
+
+        this.gameState.status = 'finished';
+    }
+}
