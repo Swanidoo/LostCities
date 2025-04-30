@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,64 +7,169 @@
     <link rel="stylesheet" href="/shared/global.css">
     <style>
         body {
+            background: linear-gradient(135deg, #333333, #222222);
+            color: white;
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
         }
         
-        .container {
+        .header {
             text-align: center;
-            background-color: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 40px;
         }
         
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 20px;
+        .header h1 {
+            font-size: 3em;
+            margin: 0;
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
         
-        p {
-            color: #555;
-            margin-bottom: 30px;
+        .header p {
+            color: #DDD;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        
+        .menu-container {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 30px;
+            border-radius: 10px;
+            width: 300px;
+            text-align: center;
         }
         
         .menu {
             display: flex;
-            gap: 20px;
-            margin-top: 30px;
+            flex-direction: column;
+            gap: 15px;
         }
         
-        .menu a {
-            text-decoration: none;
-            padding: 10px 20px;
-            background-color: #5b3d2b;
+        .menu-button {
+            padding: 12px 20px;
+            background-color: #4CAF50;
             color: white;
-            border-radius: 4px;
-            transition: background-color 0.2s;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s;
         }
         
-        .menu a:hover {
-            background-color: #7a5038;
+        .menu-button:hover {
+            background-color: #45a049;
+        }
+        
+        .menu-button.secondary {
+            background-color: #555;
+        }
+        
+        .menu-button.secondary:hover {
+            background-color: #666;
+        }
+        
+        .user-info {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #AAA;
+        }
+        
+        #login-section, #user-section {
+            width: 100%;
+        }
+        
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Lost Cities: Le Duel</h1>
-        <p>Welcome to the Lost Cities card game!</p>
+    <div class="header">
+        <h1>LOST CITIES</h1>
+        <p>Le duel de cartes archéologique</p>
+    </div>
+    
+    <div class="menu-container">
+        <!-- Section visiteur (non connecté) -->
+        <div id="login-section">
+            <div class="menu">
+                <button class="menu-button" id="login-btn">Se connecter</button>
+                <button class="menu-button secondary" id="register-btn">S'inscrire</button>
+            </div>
+        </div>
         
-        <div class="menu">
-            <a href="/login/login.html">Login</a>
-            <a href="/chat/chat.html">Chat</a>
-            <a href="/game/new_game.html">New Game</a>
+        <!-- Section utilisateur (connecté) -->
+        <div id="user-section" class="hidden">
+            <div class="menu">
+                <button class="menu-button" id="play-btn">Jouer</button>
+                <button class="menu-button secondary" id="stats-btn">Statistiques</button>
+                <button class="menu-button secondary" id="chat-btn">Chat</button>
+                <button class="menu-button secondary" id="logout-btn">Déconnexion</button>
+            </div>
+            <div class="user-info">
+                Connecté en tant que <span id="username">Joueur</span>
+            </div>
         </div>
     </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginSection = document.getElementById('login-section');
+            const userSection = document.getElementById('user-section');
+            const usernameSpan = document.getElementById('username');
+            
+            // Vérifier si l'utilisateur est connecté
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                // Extraire le nom d'utilisateur du token JWT
+                try {
+                    const tokenParts = token.split('.');
+                    if (tokenParts.length === 3) {
+                        const payload = JSON.parse(atob(tokenParts[1]));
+                        usernameSpan.textContent = payload.username || payload.email;
+                    }
+                } catch (error) {
+                    console.error("Erreur lors de la lecture du token:", error);
+                }
+                
+                // Afficher la section utilisateur
+                loginSection.classList.add('hidden');
+                userSection.classList.remove('hidden');
+            }
+            
+            // Gestionnaires d'événements pour les boutons
+            document.getElementById('login-btn').addEventListener('click', () => {
+                window.location.href = '/login/login.html';
+            });
+            
+            document.getElementById('register-btn').addEventListener('click', () => {
+                window.location.href = '/login/register.html';
+            });
+            
+            document.getElementById('play-btn').addEventListener('click', () => {
+                window.location.href = '/matchmaking.html';
+            });
+            
+            document.getElementById('stats-btn').addEventListener('click', () => {
+                window.location.href = '/stats.html';
+            });
+            
+            document.getElementById('chat-btn').addEventListener('click', () => {
+                window.location.href = '/chat/chat.html';
+            });
+            
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                // Supprimer le token et rediriger vers la page d'accueil
+                localStorage.removeItem('authToken');
+                window.location.reload();
+            });
+        });
+    </script>
 </body>
 </html>

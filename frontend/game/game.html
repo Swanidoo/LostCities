@@ -1,142 +1,628 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lost Cities: Le Duel</title>
+    <title>Lost Cities - Partie en cours</title>
     <link rel="stylesheet" href="/shared/global.css">
-    <link rel="stylesheet" href="/game/game.css">
-    <link rel="stylesheet" href="/game/game_additional.css">
-    <link rel="stylesheet" href="game_fixes.css">
-    <script type="module" src="/game/js/lost_cities_main.js" defer></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #333333, #222222);
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-bottom: 2px solid #555;
+        }
+        
+        .player-info {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+        }
+        
+        .player-avatar {
+            width: 40px;
+            height: 40px;
+            background-color: #555;
+            border-radius: 50%;
+            margin-right: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .player-name {
+            font-weight: bold;
+        }
+        
+        .player-score {
+            margin-left: 10px;
+            color: #ffd700;
+        }
+        
+        .turn-indicator {
+            padding: 5px 10px;
+            background-color: #ff5722;
+            border-radius: 15px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .turn-indicator.active {
+            background-color: #4CAF50;
+            opacity: 1;
+        }
+        
+        .game-status {
+            text-align: center;
+            padding: 5px;
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+        
+        .board {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            padding: 10px;
+            position: relative;
+        }
+        
+        .opponent-area, .player-area {
+            height: 25%;
+            display: flex;
+            padding: 10px 0;
+        }
+        
+        .central-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        .expedition-slot {
+            width: 18%;
+            height: 100%;
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            margin: 0 1%;
+            position: relative;
+        }
+        
+        .expedition-slot.red { border-color: rgba(255, 59, 59, 0.5); }
+        .expedition-slot.green { border-color: rgba(76, 175, 80, 0.5); }
+        .expedition-slot.white { border-color: rgba(255, 255, 255, 0.5); }
+        .expedition-slot.blue { border-color: rgba(33, 150, 243, 0.5); }
+        .expedition-slot.yellow { border-color: rgba(255, 235, 59, 0.5); }
+        
+        .expedition-slot .card:not(:first-child) {
+            margin-top: -80px;
+        }
+        
+        .deck-area {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .deck, .discard-piles {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .discard-pile {
+            width: 70px;
+            height: 100px;
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            position: relative;
+        }
+        
+        .discard-pile.red { border-color: rgba(255, 59, 59, 0.5); }
+        .discard-pile.green { border-color: rgba(76, 175, 80, 0.5); }
+        .discard-pile.white { border-color: rgba(255, 255, 255, 0.5); }
+        .discard-pile.blue { border-color: rgba(33, 150, 243, 0.5); }
+        .discard-pile.yellow { border-color: rgba(255, 235, 59, 0.5); }
+        
+        .deck-pile {
+            width: 70px;
+            height: 100px;
+            background-color: #2c3e50;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        
+        .deck-pile:after {
+            content: attr(data-count);
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background-color: white;
+            color: black;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .hand-area {
+            height: 130px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding: 10px;
+            gap: 5px;
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+        
+        .card {
+            width: 70px;
+            height: 100px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            position: relative;
+            transition: transform 0.2s;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        
+        .card-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .card-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        .card.red .card-value { color: #ff3b3b; }
+        .card.green .card-value { color: #4CAF50; }
+        .card.white .card-value { color: #757575; }
+        .card.blue .card-value { color: #2196F3; }
+        .card.yellow .card-value { color: #FFC107; }
+        
+        .card.red { background-color: #ffebee; }
+        .card.green { background-color: #e8f5e9; }
+        .card.white { background-color: #fafafa; }
+        .card.blue { background-color: #e3f2fd; }
+        .card.yellow { background-color: #fffde7; }
+        
+        .card:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 15px;
+        }
+        
+        .card.red:before { background-color: #ff3b3b; }
+        .card.green:before { background-color: #4CAF50; }
+        .card.white:before { background-color: #9e9e9e; }
+        .card.blue:before { background-color: #2196F3; }
+        .card.yellow:before { background-color: #FFC107; }
+        
+        .card.wager .card-value:after {
+            content: "W";
+        }
+        
+        .card.selectable:hover {
+            transform: translateY(-15px);
+        }
+        
+        .card.selected {
+            transform: translateY(-15px);
+            box-shadow: 0 0 10px 2px gold;
+        }
+        
+        .card.opponent-card {
+            background-color: #2c3e50;
+        }
+        
+        .action-buttons {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            gap: 10px;
+            z-index: 10;
+        }
+        
+        .action-buttons.visible {
+            display: flex;
+        }
+        
+        .action-btn {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .action-btn.cancel {
+            background-color: #FF5722;
+        }
+        
+        .game-controls {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        .btn {
+            padding: 8px 15px;
+            background-color: #555;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .chat-area {
+            position: fixed;
+            bottom: 0;
+            right: -300px;
+            width: 300px;
+            height: 400px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-top-left-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            transition: right 0.3s;
+            z-index: 100;
+        }
+        
+        .chat-area.open {
+            right: 0;
+        }
+        
+        .chat-header {
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .chat-message {
+            padding: 5px 10px;
+            border-radius: 5px;
+            max-width: 80%;
+            word-break: break-word;
+        }
+        
+        .chat-message.self {
+            background-color: #2196F3;
+            align-self: flex-end;
+        }
+        
+        .chat-message.other {
+            background-color: #555;
+            align-self: flex-start;
+        }
+        
+        .chat-message.system {
+            background-color: rgba(255, 255, 255, 0.2);
+            align-self: center;
+            font-style: italic;
+            font-size: 12px;
+        }
+        
+        .chat-input {
+            display: flex;
+            padding: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 5px 0 0 5px;
+        }
+        
+        .chat-input button {
+            padding: 8px 15px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s;
+        }
+        
+        .modal.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-content {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .modal-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .spinner {
+            border: 6px solid rgba(255, 255, 255, 0.1);
+            border-top: 6px solid #4CAF50;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .phase-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
-    <!-- Hidden inputs for authentication and game data -->
-    <input type="hidden" id="current-user-id" value="{{userId}}">
-    <input type="hidden" id="game-id" value="{{gameId}}">
+    <!-- Éléments cachés pour stocker les données du jeu -->
+    <input type="hidden" id="game-id">
+    <input type="hidden" id="user-id">
     
     <div class="game-container">
-        <div class="game-info">
+        <div class="header">
             <div class="player-info">
-                <div class="player-avatar"></div>
+                <div class="player-avatar">P1</div>
                 <div>
-                    <div class="player-name">{{player1Name}}</div>
-                    <div class="player-score">Score: 0</div>
+                    <div class="player-name" id="player-name">Joueur 1</div>
+                    <div class="player-score" id="player-score">Score: 0</div>
                 </div>
-                <span class="player-turn-indicator">Your Turn</span>
+                <div class="turn-indicator" id="player-turn">Votre tour</div>
             </div>
             
-            <div class="game-stats">
-                Round: 1/3 | Cards in deck: 44
+            <div>
+                <span id="game-round">Manche: 1/3</span>
+                <span id="deck-count">Cartes: 44</span>
             </div>
             
             <div class="player-info">
-                <span class="player-turn-indicator">Waiting</span>
+                <div class="turn-indicator" id="opponent-turn">En attente</div>
                 <div>
-                    <div class="player-name">{{player2Name}}</div>
-                    <div class="player-score">Score: 0</div>
+                    <div class="player-name" id="opponent-name">Adversaire</div>
+                    <div class="player-score" id="opponent-score">Score: 0</div>
                 </div>
-                <div class="player-avatar"></div>
+                <div class="player-avatar">P2</div>
             </div>
         </div>
         
-        <div class="game-board">
-            <!-- Opponent's expedition area -->
-            <div class="expedition-area opponent-expeditions">
-                <div class="expedition-slot red">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
+        <div class="game-status" id="game-status">
+            En attente de l'autre joueur...
+        </div>
+        
+        <div class="board">
+            <div class="phase-indicator" id="phase-indicator">Phase: Jouer</div>
+            
+            <!-- Zone de l'adversaire -->
+            <div class="opponent-area" id="opponent-area">
+                <div class="expedition-slot red" data-color="red"></div>
+                <div class="expedition-slot green" data-color="green"></div>
+                <div class="expedition-slot white" data-color="white"></div>
+                <div class="expedition-slot blue" data-color="blue"></div>
+                <div class="expedition-slot yellow" data-color="yellow"></div>
+            </div>
+            
+            <!-- Zone centrale avec le deck et les défausses -->
+            <div class="central-area">
+                <div class="deck-area">
+                    <div class="discard-piles" id="discard-piles">
+                        <div class="discard-pile red" data-color="red"></div>
+                        <div class="discard-pile green" data-color="green"></div>
+                        <div class="discard-pile white" data-color="white"></div>
+                    </div>
+                    
+                    <div class="deck-pile" id="deck-pile" data-count="44"></div>
+                    
+                    <div class="discard-piles">
+                        <div class="discard-pile blue" data-color="blue"></div>
+                        <div class="discard-pile yellow" data-color="yellow"></div>
                     </div>
                 </div>
-                <div class="expedition-slot green">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot white">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot blue">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot yellow">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot purple">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
+                
+                <div class="action-buttons" id="action-buttons">
+                    <button class="action-btn" id="play-btn">Jouer</button>
+                    <button class="action-btn" id="discard-btn">Défausser</button>
+                    <button class="action-btn cancel" id="cancel-action-btn">Annuler</button>
                 </div>
             </div>
             
-            <!-- Center area with deck and discard piles -->
-            <div class="board-center">
-                <div class="deck-and-discards">
-                    <div class="discard-pile red"></div>
-                    <div class="discard-pile green"></div>
-                    <div class="discard-pile white"></div>
-                    <div class="deck" data-count="44"></div>
-                    <div class="discard-pile blue"></div>
-                    <div class="discard-pile yellow"></div>
-                    <div class="discard-pile purple"></div>
-                </div>
+            <!-- Zone du joueur -->
+            <div class="player-area" id="player-area">
+                <div class="expedition-slot red" data-color="red"></div>
+                <div class="expedition-slot green" data-color="green"></div>
+                <div class="expedition-slot white" data-color="white"></div>
+                <div class="expedition-slot blue" data-color="blue"></div>
+                <div class="expedition-slot yellow" data-color="yellow"></div>
             </div>
             
-            <!-- Player's expedition area -->
-            <div class="expedition-area player-expeditions">
-                <div class="expedition-slot red">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot green">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot white">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot blue">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot yellow">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-                <div class="expedition-slot purple">
-                    <div class="expedition-stack">
-                        <!-- Cards will be added dynamically -->
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Player's hand -->
-            <div class="player-hand">
-                <!-- Cards will be added dynamically -->
-            </div>
-            
-            <div class="game-message">
-                Your turn. Play a card or discard, then draw a card.
+            <!-- Main du joueur -->
+            <div class="hand-area" id="player-hand">
+                <!-- Les cartes seront ajoutées dynamiquement ici -->
             </div>
         </div>
         
         <div class="game-controls">
-            <button id="btn-surrender">Surrender</button>
-            <button id="btn-help">Game Rules</button>
-            <button id="btn-chat">Chat</button>
+            <button class="btn" id="rules-btn">Règles</button>
+            <button class="btn" id="surrender-btn">Abandonner</button>
+            <button class="btn" id="chat-btn">Chat</button>
         </div>
     </div>
+    
+    <!-- Chat -->
+    <div class="chat-area" id="chat-area">
+        <div class="chat-header">
+            <h3>Chat</h3>
+            <button class="btn" id="close-chat-btn">X</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-message system">Bienvenue dans le chat de jeu</div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="chat-input" placeholder="Tapez un message...">
+            <button id="send-chat-btn">Envoyer</button>
+        </div>
+    </div>
+    
+    <!-- Modal pour les règles du jeu -->
+    <div class="modal" id="rules-modal">
+        <div class="modal-content">
+            <h2 class="modal-title">Règles de Lost Cities</h2>
+            <div>
+                <p>Lost Cities est un jeu de cartes dans lequel vous organisez des expéditions de différentes couleurs.</p>
+                <ul>
+                    <li>À votre tour, vous devez d'abord jouer une carte ou en défausser une.</li>
+                    <li>Puis, vous devez piocher une carte (du paquet ou d'une défausse).</li>
+                    <li>Les cartes d'une même expédition doivent être posées en ordre croissant.</li>
+                    <li>Les cartes d'investissement (marquées "W") doivent être posées avant les cartes normales.</li>
+                    <li>Commencer une expédition coûte 20 points, mais les investissements peuvent multiplier votre score.</li>
+                    <li>La partie se joue en 3 manches, le joueur avec le plus de points gagne.</li>
+                </ul>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn" id="close-rules-btn">Fermer</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal pour confirmation d'abandon -->
+    <div class="modal" id="surrender-modal">
+        <div class="modal-content">
+            <h2 class="modal-title">Abandonner la partie ?</h2>
+            <p>Êtes-vous sûr de vouloir abandonner ? Vous perdrez automatiquement la partie.</p>
+            <div class="modal-buttons">
+                <button class="btn" id="confirm-surrender-btn">Oui, abandonner</button>
+                <button class="btn" id="cancel-surrender-btn">Non, continuer</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal pour la fin de la partie -->
+    <div class="modal" id="game-end-modal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="game-result">Partie terminée</h2>
+            <div id="end-game-details">
+                <p id="winner-text">Le gagnant est...</p>
+                <div id="final-scores">
+                    <p><span id="player-final-name">Joueur 1</span>: <span id="player-final-score">0</span> points</p>
+                    <p><span id="opponent-final-name">Joueur 2</span>: <span id="opponent-final-score">0</span> points</p>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn" id="new-game-btn">Nouvelle partie</button>
+                <button class="btn" id="back-btn">Retour au menu</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Écran de chargement -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Chargement de la partie...</p>
+    </div>
+    
+    <script src="game.js"></script>
 </body>
 </html>
