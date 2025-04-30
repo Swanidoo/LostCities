@@ -9,12 +9,22 @@ const gameRouter = new Router();
 
 // Route to serve the game page
 gameRouter.get("/game/:id", async (ctx) => {
+  // In the gameRouter.get("/game/:id", ...) route handler:
   const gameId = ctx.params.id;
   try {
-    // Just serve the static game.html file - we'll handle the data loading in the client
+    // Read the HTML template
     const html = await Deno.readTextFile(`${ROOT}/game/game.html`);
+    
+    // Replace template variables with default values or user data
+    // You can load actual user data from your authentication context when available
+    const modifiedHtml = html
+      .replace(/\{\{userId\}\}/g, "1") // Default user ID or get from auth
+      .replace(/\{\{gameId\}\}/g, gameId)
+      .replace(/\{\{player1Name\}\}/g, "Player 1") // Or get from user database
+      .replace(/\{\{player2Name\}\}/g, "Player 2"); // Or get from user database
+    
     ctx.response.type = "text/html";
-    ctx.response.body = html;
+    ctx.response.body = modifiedHtml;
   } catch (error) {
     console.error("Error loading game page:", error);
     ctx.response.status = 404;
