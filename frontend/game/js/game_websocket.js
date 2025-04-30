@@ -1,218 +1,190 @@
-// frontend/game/js/game_websocket.js
+/**
+ * WebSocket handler for Lost Cities game
+ * Manages real-time communication between game client and server
+ */
 
-class GameWebSocket {
-    constructor(gameId, userId) {
-        this.gameId = gameId;
-        this.userId = userId;
-        this.socket = null;
-        this.onGameUpdate = null;
-        this.onPlayerJoined = null;
-        this.onPlayerLeft = null;
-        this.onError = null;
-        this.onConnect = null;
-        this.onDisconnect = null;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
-        this.isConnected = false;
+export class GameWebSocket {
+    constructor(gameId, token, options = {}) {
+      this.gameId = gameId;
+      this.token = token;
+      this.socket = null;
+      this.isConnected = false;
+      this.reconnectAttempts = 0;
+      this.maxReconnectAttempts = options.maxReconnectAttempts || 5;
+      this.reconnectDelay = options.reconnectDelay || 1000;
+      this.reconnectBackoffFactor = options.reconnectBackoffFactor || 2;
+      this.reconnectTimeoutId = null;
+      
+      // Event handlers
+      this.onConnect = options.onConnect || (() => {});
+      this.onMessage = options.onMessage || (() => {});
+      this.onDisconnect = options.onDisconnect || (() => {});
+      this.onError = options.onError || (() => {});
+      this.onReconnecting = options.onReconnecting || (() => {});
+      this.onReconnectFailed = options.onReconnectFailed || (() => {});
+      
+      // Connect immediately if autoConnect is not explicitly set to false
+      if (options.autoConnect !== false) {
+        this.connect();
+      }
     }
-
+    
+    /**
+     * Establish WebSocket connection
+     */
     connect() {
-        // Get auth token from localStorage
-        const token = localStorage.getItem("authToken");
-        if (!token) {
-            console.error("No authentication token found. Please log in.");
-            window.location.href = "/login.html";
-            return;
-        }
-
-        // Determine the WebSocket URL based on the current environment
-        const isLocalhost = window.location.hostname === "localhost";
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = isLocalhost ? `${window.location.hostname}:3000` : 'lostcitiesbackend.onrender.com';
-        const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
-
-        console.log(`Connecting to WebSocket: ${wsUrl.split('?')[0]}...`);
-
-        // Create WebSocket connection
+      // Determine the WebSocket URL based on environment
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.hostname === 'localhost' ? 
+        'localhost:3000' : 
+        'lostcitiesbackend.onrender.com';
+      
+      // Create WebSocket URL with token
+      const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(this.token)}`;
+      console.log(`Connecting to WebSocket: ${wsUrl.substring(0, wsUrl.indexOf('?'))}...`);
+      
+      try {
         this.socket = new WebSocket(wsUrl);
-
-        // Set up event handlers
-        this.socket.onopen = () => {
-            console.log("WebSocket connection established!");
-            this.isConnected = true;
-            this.reconnectAttempts = 0;
-
-            // Subscribe to the specific game
-            this.subscribeToGame();
-
-            // Trigger the onConnect callback if provided
-            if (this.onConnect) {
-                this.onConnect();
-            }
-        };
-
-        this.socket.onclose = (event) => {
-            this.isConnected = false;
-            console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
-
-            // Trigger the onDisconnect callback if provided
-            if (this.onDisconnect) {
-                this.onDisconnect(event);
-            }
-
-            // Attempt to reconnect if the connection was closed unexpectedly
-            if (event.code !== 1000 && event.code !== 1001) {
-                this.attemptReconnect();
-            }
-        };
-
-        this.socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
-            if (this.onError) {
-                this.onError(error);
-            }
-        };
-
-        this.socket.onmessage = (event) => {
-            this.handleMessage(event);
-        };
-    }
-
-    handleMessage(event) {
-        try {
-            const data = JSON.parse(event.data);
-            console.log("Received message:", data);
-
-            switch (data.event) {
-                case "gameUpdated":
-                    if (this.onGameUpdate) {
-                        this.onGameUpdate(data.data.gameState);
-                    }
-                    break;
-                case "playerJoined":
-                    if (this.onPlayerJoined) {
-                        this.onPlayerJoined(data.data);
-                    }
-                    break;
-                case "playerLeft":
-                    if (this.onPlayerLeft) {
-                        this.onPlayerLeft(data.data);
-                    }
-                    break;
-                case "gameAction":
-                    if (this.onGameUpdate) {
-                        // Trigger a game state update when an action is performed
-                        this.requestGameState();
-                    }
-                    break;
-                case "systemMessage":
-                    console.log("System message:", data.data.message);
-                    break;
-                default:
-                    console.log("Unhandled message event:", data.event);
-            }
-        } catch (error) {
-            console.error("Error handling WebSocket message:", error);
-        }
-    }
-
-    subscribeToGame() {
-        if (!this.isConnected) {
-            console.error("Cannot subscribe to game, WebSocket is not connected");
-            return false;
-        }
-
-        this.socket.send(JSON.stringify({
-            event: "subscribeGame",
-            data: {
-                gameId: this.gameId
-            }
-        }));
-
-        console.log(`Subscribed to game ${this.gameId}`);
-        return true;
-    }
-
-    attemptReconnect() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error("Maximum reconnect attempts reached. Please refresh the page.");
-            return;
-        }
-
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-        console.log(`Attempting to reconnect in ${delay/1000} seconds...`);
         
-        this.reconnectAttempts++;
-        setTimeout(() => this.connect(), delay);
-    }
-
-    disconnect() {
-        if (this.socket && this.isConnected) {
-            this.socket.close(1000, "User disconnected intentionally");
-        }
-    }
-
-    // Game-specific methods
-    playCard(cardId, color) {
-        this.sendGameAction("play_card", { cardId, color });
-    }
-
-    discardCard(cardId) {
-        this.sendGameAction("discard_card", { cardId });
-    }
-
-    drawCardFromDeck() {
-        this.sendGameAction("draw_card", { source: "deck" });
-    }
-
-    drawCardFromDiscardPile(color) {
-        this.sendGameAction("draw_card", { source: "discard_pile", color });
-    }
-
-    surrender() {
-        this.sendGameAction("surrender");
-    }
-
-    requestGameState() {
-        this.sendGameAction("request_state");
-    }
-
-    sendChatMessage(message) {
-        if (!this.isConnected) {
-            console.error("Cannot send message, WebSocket is not connected");
-            return false;
-        }
-
-        this.socket.send(JSON.stringify({
-            event: "chatMessage",
-            data: {
-                gameId: this.gameId,
-                message
-            }
-        }));
-
-        return true;
-    }
-
-    sendGameAction(action, data = {}) {
-        if (!this.isConnected) {
-            console.error(`Cannot send game action ${action}, WebSocket is not connected`);
-            return false;
-        }
-
-        const payload = {
-            event: "gameAction",
-            data: {
-                gameId: this.gameId,
-                action,
-                ...data
-            }
+        // Setup event handlers
+        this.socket.onopen = (event) => {
+          console.log('Connected to game server');
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          
+          // Subscribe to the game channel
+          this.send({
+            event: 'subscribeGame',
+            data: { gameId: this.gameId }
+          });
+          
+          this.onConnect(event);
         };
-
-        console.log(`Sending game action: ${action}`, payload);
-        this.socket.send(JSON.stringify(payload));
-        return true;
+        
+        this.socket.onclose = (event) => {
+          console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
+          this.isConnected = false;
+          
+          this.onDisconnect(event);
+          
+          // Attempt to reconnect if it wasn't a clean close
+          if (!event.wasClean) {
+            this.attemptReconnect();
+          }
+        };
+        
+        this.socket.onerror = (error) => {
+          console.log('WebSocket error: ', error);
+          this.onError(error);
+        };
+        
+        this.socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('Game server message:', data);
+            this.onMessage(data);
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+      } catch (error) {
+        console.error('Error creating WebSocket connection:', error);
+        this.onError(error);
+      }
     }
-}
-
-export default GameWebSocket;
+    
+    /**
+     * Send data to the WebSocket server
+     */
+    send(data) {
+      if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        console.warn('Cannot send message - WebSocket not connected');
+        return false;
+      }
+      
+      try {
+        const message = typeof data === 'string' ? data : JSON.stringify(data);
+        this.socket.send(message);
+        return true;
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+        return false;
+      }
+    }
+    
+    /**
+     * Send a game move
+     */
+    sendMove(moveData) {
+      return this.send({
+        event: 'gameAction',
+        data: {
+          ...moveData,
+          gameId: this.gameId
+        }
+      });
+    }
+    
+    /**
+     * Send a chat message
+     */
+    sendChat(message) {
+      return this.send({
+        event: 'chatMessage',
+        data: {
+          gameId: this.gameId,
+          message
+        }
+      });
+    }
+    
+    /**
+     * Attempt to reconnect to the WebSocket server with exponential backoff
+     */
+    attemptReconnect() {
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.error('Maximum reconnect attempts reached. Please refresh the page.');
+        this.onReconnectFailed();
+        return;
+      }
+      
+      const delay = this.reconnectDelay * Math.pow(this.reconnectBackoffFactor, this.reconnectAttempts);
+      console.log(`Attempting to reconnect in ${delay / 1000} seconds...`);
+      
+      this.onReconnecting(this.reconnectAttempts, delay);
+      this.reconnectAttempts++;
+      
+      this.reconnectTimeoutId = setTimeout(() => {
+        this.connect();
+      }, delay);
+    }
+    
+    /**
+     * Close the WebSocket connection
+     */
+    close(code = 1000, reason = 'Normal closure') {
+      // Clear any pending reconnect attempts
+      if (this.reconnectTimeoutId) {
+        clearTimeout(this.reconnectTimeoutId);
+        this.reconnectTimeoutId = null;
+      }
+      
+      // Close the socket if it exists and is not already closed
+      if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+        try {
+          this.socket.close(code, reason);
+        } catch (error) {
+          console.error('Error closing WebSocket:', error);
+        }
+      }
+      
+      this.isConnected = false;
+    }
+    
+    /**
+     * Check if the WebSocket is currently connected
+     */
+    isCurrentlyConnected() {
+      return this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN;
+    }
+  }

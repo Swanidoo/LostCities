@@ -1,455 +1,791 @@
-// frontend/game/js/lost_cities_fallback.js
-
 /**
  * Fallback game logic for Lost Cities
- * This provides a basic implementation that works locally when the server connection isn't ready
+ * Used when server connection is unavailable or interrupted
  */
-
-
-class FallbackGameLogic {
-    constructor(gameId, userId, opponentId, playerName, opponentName) {
-        this.gameId = gameId;
-        this.userId = userId;
-        this.opponentId = opponentId || 'opponent';
-        this.playerName = playerName || 'You';
-        this.opponentName = opponentName || 'Opponent';
-
-        // Initialize the deck
-        this.deck = this.generateDeck();
-
-        // Initialize other game state properties
-        this.player1Hand = [];
-        this.player2Hand = [];
-        this.discardPiles = {
+export class FallbackGameLogic {
+    constructor(gameId, userId, opponentId = null) {
+      this.gameId = gameId;
+      this.userId = userId;
+      this.opponentId = opponentId || 'opponent-' + Math.floor(Math.random() * 1000);
+      this.onStateChange = null;
+      this.currentState = this.createInitialState();
+    }
+    
+    /**
+     * Create an initial game state
+     */
+    createInitialState() {
+      // Generate a deck
+      const deck = this.generateDeck();
+      
+      // Deal cards to players
+      const player1Hand = [];
+      const player2Hand = [];
+      
+      for (let i = 0; i < 8; i++) {
+        player1Hand.push(deck.pop());
+        player2Hand.push(deck.pop());
+      }
+      
+      // Initial game state
+      return {
+        gameId: this.gameId,
+        status: 'in_progress',
+        currentRound: 1,
+        totalRounds: 3,
+        currentPlayerId: this.userId, // Player starts first in fallback mode
+        turnPhase: 'play',
+        usePurpleExpedition: true,
+        cardsInDeck: deck.length,
+        player1: {
+          id: this.userId,
+          hand: player1Hand,
+          expeditions: {
             red: [],
             green: [],
             white: [],
             blue: [],
             yellow: [],
             purple: []
-        };
+          },
+          handSize: player1Hand.length
+        },
+        player2: {
+          id: this.opponentId,
+          hand: player2Hand, // We include this for the AI opponent's logic
+          expeditions: {
+            red: [],
+            green: [],
+            white: [],
+            blue: [],
+            yellow: [],
+            purple: []
+          },
+          handSize: player2Hand.length
+        },
+        discardPiles: {
+          red: [],
+          green: [],
+          white: [],
+          blue: [],
+          yellow: [],
+          purple: []
+        },
+        scores: {
+          player1: { round1: 0, round2: 0, round3: 0, total: 0 },
+          player2: { round1: 0, round2: 0, round3: 0, total: 0 }
+        },
+        winner: null,
+        deck: deck // Include for fallback logic
+      };
     }
-
-    // Generate a randomized deck of cards
+    
+    /**
+     * Generate a full deck of cards
+     */
     generateDeck() {
-        const colors = ['red', 'green', 'white', 'blue', 'yellow', 'purple'];
-        const deck = [];
-
-        // Add cards 2-10 and 3 investment cards for each color
-        colors.forEach(color => {
-            for (let value = 2; value <= 10; value++) {
-                deck.push({ color, value });
-            }
-            for (let i = 0; i < 3; i++) {
-                deck.push({ color, value: 'investment' });
-            }
-        });
-
-        // Shuffle the deck
-        for (let i = deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [deck[i], deck[j]] = [deck[j], deck[i]];
+      const colors = ['red', 'green', 'white', 'blue', 'yellow', 'purple'];
+      const deck = [];
+      
+      // For each color, create the cards
+      colors.forEach(color => {
+        // Create expedition cards (2-10)
+        for (let value = 2; value <= 10; value++) {
+          deck.push({
+            id: `${color}_${value}`,
+            color,
+            type: 'expedition',
+            value
+          });
         }
-
-        return deck;
-    }
-    
-    // Generate initial hand of 8 random cards
-    generateInitialHand() {
-        const hand = [];
-        for (let i = 0; i < 8; i++) {
-            if (this.deck.length > 0) {
-                hand.push(this.deck.pop());
-            }
+        
+        // Create wager cards (3 per color)
+        for (let i = 0; i < 3; i++) {
+          deck.push({
+            id: `${color}_wager_${i}`,
+            color,
+            type: 'wager',
+            value: 'W'
+          });
         }
-        return hand;
+      });
+      
+      // Shuffle the deck
+      return this.shuffleArray(deck);
     }
     
-    // Get current game state
-    getGameState() {
-        return this.currentState;
+    /**
+     * Shuffle an array using Fisher-Yates algorithm
+     */
+    shuffleArray(array) {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
     }
     
-    // Play a card from hand to expedition
+    /**
+     * Set the state change callback
+     */
+    setOnStateChange(callback) {
+      this.onStateChange = callback;
+    }
+    
+    /**
+     * Notify listeners of state changes
+     */
+    notifyStateChange() {
+      if (this.onStateChange) {
+        // In the fallback mode, we should only send player1 hand for the client
+        const player1 = this.userId === this.currentState.player1.id ? 
+          this.currentState.player1 : this.currentState.player2;
+          
+        const player2 = this.userId === this.currentState.player1.id ? 
+          this.currentState.player2 : this.currentState.player1;
+        
+        // Create a sanitized version of the state to send to the UI
+        const sanitizedState = {
+          ...this.currentState,
+          player1: {
+            ...player1,
+            // Only include hand for player1 (the user)
+            hand: player1.hand
+          },
+          player2: {
+            ...player2,
+            // Don't include hand for player2 (opponent)
+            hand: undefined
+          },
+          // Don't include the full deck in the state sent to UI
+          deck: undefined
+        };
+        
+        this.onStateChange(sanitizedState);
+      }
+    }
+    
+    /**
+     * Play a card to an expedition
+     */
     playCard(cardId, color) {
-        // Only allow actions on the player's turn
-        if (this.currentState.currentPlayerId !== this.userId || this.currentState.turnPhase !== 'play') {
-            return false;
-        }
-        
-        // Find the card in the player's hand
-        const handIndex = this.currentState.player1.hand.findIndex(card => card.id === cardId);
-        if (handIndex === -1) {
-            return false;
-        }
-        
-        const card = this.currentState.player1.hand[handIndex];
-        
-        // Verify the card color matches the expedition color
-        if (card.color !== color) {
-            return false;
-        }
-        
-        // Check if the play is valid according to expedition rules
-        const expedition = this.currentState.player1.expeditions[color];
-        
-        // If expedition is empty, any card of that color is valid
-        if (expedition.length === 0) {
-            // All good
-        } 
+      // Check if it's the player's turn and in play phase
+      if (this.currentState.currentPlayerId !== this.userId || 
+          this.currentState.turnPhase !== 'play') {
+        return false;
+      }
+      
+      const player = this.currentState.player1.id === this.userId ? 
+        this.currentState.player1 : this.currentState.player2;
+      
+      // Find the card in the player's hand
+      const cardIndex = player.hand.findIndex(card => card.id === cardId);
+      if (cardIndex === -1) {
+        return false;
+      }
+      
+      const card = player.hand[cardIndex];
+      
+      // Check if card color matches expedition color
+      if (card.color !== color) {
+        return false;
+      }
+      
+      // Check if play is valid according to expedition rules
+      const expedition = player.expeditions[color];
+      
+      let isValidPlay = true;
+      
+      // If there are cards in the expedition, check rules
+      if (expedition.length > 0) {
         // If there are only wager cards, any expedition card is valid
-        else if (expedition.every(c => c.type === 'wager')) {
-            if (card.type === 'wager') {
-                // Can add another wager
-            } else {
-                // Adding expedition card after wagers is valid
-            }
+        if (expedition.every(c => c.type === 'wager')) {
+          if (card.type === 'wager') {
+            // Can add another wager
+          } else {
+            // Adding expedition card after wagers is valid
+          }
         } 
         // If the last card is an expedition card, new card must have higher value
         else {
-            const lastExpeditionCard = [...expedition].filter(c => c.type === 'expedition').pop();
-            if (lastExpeditionCard && card.type === 'expedition') {
-                if (typeof lastExpeditionCard.value === 'number' && 
-                    typeof card.value === 'number' && 
-                    card.value <= lastExpeditionCard.value) {
-                    return false;
-                }
+          const lastExpeditionCard = [...expedition].filter(c => c.type === 'expedition').pop();
+          if (lastExpeditionCard && card.type === 'expedition') {
+            if (typeof lastExpeditionCard.value === 'number' && 
+                typeof card.value === 'number' && 
+                card.value <= lastExpeditionCard.value) {
+              isValidPlay = false;
             }
-            if (lastExpeditionCard && card.type === 'wager') {
-                return false;
-            }
+          }
+          if (lastExpeditionCard && card.type === 'wager') {
+            isValidPlay = false;
+          }
         }
-        
-        // Move card from hand to expedition
-        this.currentState.player1.hand.splice(handIndex, 1);
-        this.currentState.player1.expeditions[color].push(card);
-        
-        // Change to draw phase
-        this.currentState.turnPhase = 'draw';
-        
-        // Notify state change
-        this.notifyStateChange();
-        
-        return true;
+      }
+      
+      if (!isValidPlay) {
+        return false;
+      }
+      
+      // Move card from hand to expedition
+      player.hand.splice(cardIndex, 1);
+      player.expeditions[color].push(card);
+      
+      // Update hand size
+      player.handSize = player.hand.length;
+      
+      // Change to draw phase
+      this.currentState.turnPhase = 'draw';
+      
+      // Notify state change
+      this.notifyStateChange();
+      
+      return true;
     }
     
-    // Discard a card from the player's hand
+    /**
+     * Discard a card
+     */
     discardCard(cardId) {
-        // Only allow actions on the player's turn
-        if (this.currentState.currentPlayerId !== this.userId || this.currentState.turnPhase !== 'play') {
-            return false;
-        }
-        
-        // Find the card in the player's hand
-        const handIndex = this.currentState.player1.hand.findIndex(card => card.id === cardId);
-        if (handIndex === -1) {
-            return false;
-        }
-        
-        const card = this.currentState.player1.hand[handIndex];
-        
-        // Move card from hand to discard pile
-        this.currentState.player1.hand.splice(handIndex, 1);
-        this.currentState.discardPiles[card.color].push(card);
-        
-        // Change to draw phase
-        this.currentState.turnPhase = 'draw';
-        
-        // Notify state change
-        this.notifyStateChange();
-        
-        return true;
+      // Check if it's the player's turn and in play phase
+      if (this.currentState.currentPlayerId !== this.userId || 
+          this.currentState.turnPhase !== 'play') {
+        return false;
+      }
+      
+      const player = this.currentState.player1.id === this.userId ? 
+        this.currentState.player1 : this.currentState.player2;
+      
+      // Find the card in the player's hand
+      const cardIndex = player.hand.findIndex(card => card.id === cardId);
+      if (cardIndex === -1) {
+        return false;
+      }
+      
+      const card = player.hand[cardIndex];
+      
+      // Move card from hand to discard pile
+      player.hand.splice(cardIndex, 1);
+      this.currentState.discardPiles[card.color].push(card);
+      
+      // Update hand size
+      player.handSize = player.hand.length;
+      
+      // Change to draw phase
+      this.currentState.turnPhase = 'draw';
+      
+      // Notify state change
+      this.notifyStateChange();
+      
+      return true;
     }
     
-    // Draw a card from the deck
+    /**
+     * Draw a card from the deck
+     */
     drawFromDeck() {
-        // Only allow actions on the player's turn
-        if (this.currentState.currentPlayerId !== this.userId || this.currentState.turnPhase !== 'draw') {
-            return false;
-        }
-        
-        // Check if deck is empty
-        if (this.deck.length === 0) {
-            this.endRound();
-            return true;
-        }
-        
-        // Draw a card
-        const card = this.deck.pop();
-        this.currentState.player1.hand.push(card);
-        
-        // Update cards in deck count
-        this.currentState.cardsInDeck = this.deck.length;
-        
-        // End turn
-        this.endTurn();
-        
+      // Check if it's the player's turn and in draw phase
+      if (this.currentState.currentPlayerId !== this.userId || 
+          this.currentState.turnPhase !== 'draw') {
+        return false;
+      }
+      
+      // Check if deck is empty
+      if (this.currentState.deck.length === 0) {
+        this.endRound();
         return true;
+      }
+      
+      const player = this.currentState.player1.id === this.userId ? 
+        this.currentState.player1 : this.currentState.player2;
+      
+      // Draw a card from the deck
+      const card = this.currentState.deck.pop();
+      player.hand.push(card);
+      
+      // Update deck and hand sizes
+      this.currentState.cardsInDeck = this.currentState.deck.length;
+      player.handSize = player.hand.length;
+      
+      // End turn
+      this.endTurn();
+      
+      return true;
     }
     
-    // Draw a card from a discard pile
+    /**
+     * Draw a card from a discard pile
+     */
     drawFromDiscardPile(color) {
-        // Only allow actions on the player's turn
-        if (this.currentState.currentPlayerId !== this.userId || this.currentState.turnPhase !== 'draw') {
-            return false;
-        }
-        
-        // Check if the discard pile has cards
-        if (this.currentState.discardPiles[color].length === 0) {
-            return false;
-        }
-        
-        // Draw the top card from the discard pile
-        const card = this.currentState.discardPiles[color].pop();
-        this.currentState.player1.hand.push(card);
-        
-        // End turn
-        this.endTurn();
-        
-        return true;
+      // Check if it's the player's turn and in draw phase
+      if (this.currentState.currentPlayerId !== this.userId || 
+          this.currentState.turnPhase !== 'draw') {
+        return false;
+      }
+      
+      // Check if the discard pile has cards
+      if (this.currentState.discardPiles[color].length === 0) {
+        return false;
+      }
+      
+      const player = this.currentState.player1.id === this.userId ? 
+        this.currentState.player1 : this.currentState.player2;
+      
+      // Draw the top card from the discard pile
+      const card = this.currentState.discardPiles[color].pop();
+      player.hand.push(card);
+      
+      // Update hand size
+      player.handSize = player.hand.length;
+      
+      // End turn
+      this.endTurn();
+      
+      return true;
     }
     
-    // End the current turn and switch players
+    /**
+     * End the current turn
+     */
     endTurn() {
-        // Switch to opponent's turn
-        this.currentState.currentPlayerId = this.opponentId;
-        this.currentState.turnPhase = 'play';
-        
-        this.notifyStateChange();
-        
-        // Simulate opponent's turn after a delay
-        setTimeout(() => this.simulateOpponentTurn(), 2000);
+      // Switch current player
+      this.currentState.currentPlayerId = this.currentState.currentPlayerId === this.userId ? 
+        this.opponentId : this.userId;
+      
+      // Reset to play phase
+      this.currentState.turnPhase = 'play';
+      
+      // Notify state change
+      this.notifyStateChange();
+      
+      // If it's the opponent's turn, simulate their move
+      if (this.currentState.currentPlayerId === this.opponentId) {
+        setTimeout(() => this.simulateOpponentTurn(), 1000);
+      }
     }
     
-    // Simulate opponent's turn (basic AI)
+    /**
+     * Simulate opponent's turn
+     */
     simulateOpponentTurn() {
-        if (this.currentState.currentPlayerId !== this.opponentId) {
-            return;
-        }
-        
-        // 50% chance to play a card, 50% chance to discard
-        const playCard = Math.random() > 0.5;
+      const opponent = this.currentState.player1.id === this.opponentId ? 
+        this.currentState.player1 : this.currentState.player2;
+      
+      // Play phase
+      if (this.currentState.turnPhase === 'play') {
+        // Decide whether to play or discard (60% play, 40% discard)
+        const playCard = Math.random() < 0.6;
         
         if (playCard) {
-            // Choose a random expedition color
-            const colors = ['red', 'green', 'white', 'blue', 'yellow'];
-            if (this.currentState.usePurpleExpedition) {
-                colors.push('purple');
-            }
-            
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            
-            // Add a card to the opponent's expedition
-            const expedition = this.currentState.player2.expeditions[color];
-            
-            // Determine the next card value
-            let nextValue = 2;
-            if (expedition.length > 0) {
-                const lastCard = expedition[expedition.length - 1];
-                if (lastCard.type === 'expedition') {
-                    nextValue = lastCard.value + 1;
-                }
-            }
-            
-            // Create a card
-            const card = {
-                id: `${color}_${nextValue}_ai`,
-                color,
-                type: 'expedition',
-                value: nextValue
-            };
-            
-            // Add to expedition
-            this.currentState.player2.expeditions[color].push(card);
+          // Try to play a card to an expedition
+          this.simulateOpponentPlayCard(opponent);
         } else {
-            // Simulate discarding a card
-            const colors = ['red', 'green', 'white', 'blue', 'yellow'];
-            if (this.currentState.usePurpleExpedition) {
-                colors.push('purple');
-            }
-            
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            
-            // Create a discard card
-            const card = {
-                id: `${color}_${Math.floor(Math.random() * 9) + 2}_ai_discard`,
-                color,
-                type: 'expedition',
-                value: Math.floor(Math.random() * 9) + 2
-            };
-            
-            // Add to discard pile
-            this.currentState.discardPiles[color].push(card);
+          // Discard a card
+          this.simulateOpponentDiscardCard(opponent);
         }
+      }
+      
+      // Draw phase happens after play phase
+      if (this.currentState.turnPhase === 'draw') {
+        // Decide whether to draw from deck or discard pile (70% deck, 30% discard)
+        const drawFromDeck = Math.random() < 0.7;
         
-        // Set to draw phase
-        this.currentState.turnPhase = 'draw';
-        this.notifyStateChange();
-        
-        // Simulate drawing after a delay
-        setTimeout(() => {
-            // 70% chance to draw from deck, 30% chance to draw from discard pile
-            const drawFromDeck = Math.random() > 0.3;
-            
-            if (drawFromDeck || this.allDiscardPilesEmpty()) {
-                // Simulate drawing from deck
-                this.currentState.cardsInDeck--;
-                
-                // Check if deck is empty
-                if (this.currentState.cardsInDeck <= 0) {
-                    this.endRound();
-                    return;
-                }
-            } else {
-                // Draw from a non-empty discard pile
-                const nonEmptyPiles = Object.entries(this.currentState.discardPiles)
-                    .filter(([_, cards]) => cards.length > 0)
-                    .map(([color, _]) => color);
-                
-                if (nonEmptyPiles.length > 0) {
-                    const color = nonEmptyPiles[Math.floor(Math.random() * nonEmptyPiles.length)];
-                    this.currentState.discardPiles[color].pop();
-                }
-            }
-            
-            // End opponent's turn
-            this.currentState.currentPlayerId = this.userId;
-            this.currentState.turnPhase = 'play';
-            this.notifyStateChange();
-            
-        }, 1000);
-    }
-    
-    // Check if all discard piles are empty
-    allDiscardPilesEmpty() {
-        return Object.values(this.currentState.discardPiles).every(pile => pile.length === 0);
-    }
-    
-    // End the current round
-    endRound() {
-        // Calculate scores
-        const player1Score = this.calculateScore(this.currentState.player1.expeditions);
-        const player2Score = this.calculateScore(this.currentState.player2.expeditions);
-        
-        // Update round scores
-        const roundKey = `round${this.currentState.currentRound}`;
-        this.currentState.scores.player1[roundKey] = player1Score;
-        this.currentState.scores.player2[roundKey] = player2Score;
-        
-        // Update total scores
-        this.currentState.scores.player1.total = 
-            (this.currentState.scores.player1.round1 || 0) + 
-            (this.currentState.scores.player1.round2 || 0) + 
-            (this.currentState.scores.player1.round3 || 0);
-        
-        this.currentState.scores.player2.total = 
-            (this.currentState.scores.player2.round1 || 0) + 
-            (this.currentState.scores.player2.round2 || 0) + 
-            (this.currentState.scores.player2.round3 || 0);
-        
-        // Check if game is over
-        if (this.currentState.currentRound >= this.currentState.totalRounds) {
-            this.endGame();
+        if (drawFromDeck || this.allDiscardPilesEmpty()) {
+          // Draw from deck
+          this.simulateOpponentDrawFromDeck(opponent);
         } else {
-            // Start next round
-            this.startNewRound();
+          // Draw from a discard pile
+          this.simulateOpponentDrawFromDiscardPile(opponent);
         }
+      }
     }
     
-    // Start a new round
-    startNewRound() {
-        this.currentState.currentRound++;
-        
-        // Reset expeditions
-        const colors = ['red', 'green', 'white', 'blue', 'yellow', 'purple'];
-        colors.forEach(color => {
-            this.currentState.player1.expeditions[color] = [];
-            this.currentState.player2.expeditions[color] = [];
-            this.currentState.discardPiles[color] = [];
-        });
-        
-        // Reset deck and deal new cards
-        this.deck = this.generateDeck();
-        this.currentState.cardsInDeck = this.deck.length;
-        this.currentState.player1.hand = this.generateInitialHand();
-        
-        // Reset turn
-        this.currentState.currentPlayerId = this.userId;
-        this.currentState.turnPhase = 'play';
-        
-        this.notifyStateChange();
-    }
-    
-    // End the game
-    endGame() {
-        this.currentState.status = 'finished';
-        
-        // Determine winner
-        if (this.currentState.scores.player1.total > this.currentState.scores.player2.total) {
-            this.currentState.winner = this.userId;
-        } else if (this.currentState.scores.player2.total > this.currentState.scores.player1.total) {
-            this.currentState.winner = this.opponentId;
-        } else {
-            this.currentState.winner = null; // Tie
+    /**
+     * Simulate opponent playing a card
+     */
+    simulateOpponentPlayCard(opponent) {
+      // Group cards by color
+      const cardsByColor = {};
+      opponent.hand.forEach(card => {
+        if (!cardsByColor[card.color]) {
+          cardsByColor[card.color] = [];
         }
-        
-        this.notifyStateChange();
-    }
-    
-    // Calculate score for a set of expeditions
-    calculateScore(expeditions) {
-        let totalScore = 0;
-        
-        // Calculate score for each expedition
-        Object.values(expeditions).forEach(expedition => {
-            // Skip empty expeditions
-            if (expedition.length === 0) {
-                return;
+        cardsByColor[card.color].push(card);
+      });
+      
+      // Try to find a valid play
+      let validPlay = null;
+      
+      // Try to continue existing expeditions first
+      for (const color in opponent.expeditions) {
+        if (opponent.expeditions[color].length > 0 && cardsByColor[color]?.length > 0) {
+          const expedition = opponent.expeditions[color];
+          const cards = cardsByColor[color];
+          
+          // Check if there are only wager cards in the expedition
+          const onlyWagers = expedition.every(c => c.type === 'wager');
+          
+          if (onlyWagers) {
+            // Can play any card of this color
+            const card = cards[0]; // Just take the first one
+            validPlay = { card, color };
+            break;
+          } else {
+            // Need to play cards in ascending order
+            const lastCard = [...expedition].filter(c => c.type === 'expedition').pop();
+            if (lastCard && typeof lastCard.value === 'number') {
+              // Find a card with higher value
+              const validCard = cards.find(c => 
+                c.type === 'expedition' && 
+                typeof c.value === 'number' && 
+                c.value > lastCard.value
+              );
+              
+              if (validCard) {
+                validPlay = { card: validCard, color };
+                break;
+              }
             }
-            
-            // Count wager cards
-            const wagerCount = expedition.filter(card => card.type === 'wager').length;
-            
-            // Sum card values
-            let sum = 0;
-            expedition.forEach(card => {
-                if (card.type === 'expedition' && typeof card.value === 'number') {
-                    sum += card.value;
-                }
+          }
+        }
+      }
+      
+      // If no valid play found for existing expeditions, try to start a new one
+      if (!validPlay) {
+        for (const color in cardsByColor) {
+          if (opponent.expeditions[color].length === 0 && cardsByColor[color].length > 0) {
+            // Sort cards by type (wagers first) then by value
+            const cards = [...cardsByColor[color]].sort((a, b) => {
+              if (a.type !== b.type) {
+                return a.type === 'wager' ? -1 : 1;
+              }
+              
+              if (a.type === 'expedition' && b.type === 'expedition') {
+                return a.value - b.value;
+              }
+              
+              return 0;
             });
             
-            // Subtract expedition cost (20 points)
-            let expeditionScore = sum - 20;
-            
-            // Apply wager multiplier
-            if (wagerCount > 0) {
-                expeditionScore *= (wagerCount + 1);
-            }
-            
-            // Apply expedition bonus (if 8 or more cards)
-            if (expedition.length >= 8) {
-                expeditionScore += 20;
-            }
-            
-            // Add to total
-            totalScore += expeditionScore;
+            validPlay = { card: cards[0], color };
+            break;
+          }
+        }
+      }
+      
+      // If we found a valid play, execute it
+      if (validPlay) {
+        const { card, color } = validPlay;
+        
+        // Find the card index in hand
+        const cardIndex = opponent.hand.findIndex(c => c.id === card.id);
+        if (cardIndex !== -1) {
+          // Move card from hand to expedition
+          opponent.hand.splice(cardIndex, 1);
+          opponent.expeditions[color].push(card);
+          
+          // Update hand size
+          opponent.handSize = opponent.hand.length;
+          
+          // Change to draw phase
+          this.currentState.turnPhase = 'draw';
+          
+          // Notify state change
+          this.notifyStateChange();
+        }
+      } else {
+        // If no valid play, discard a card
+        this.simulateOpponentDiscardCard(opponent);
+      }
+    }
+    
+    /**
+     * Simulate opponent discarding a card
+     */
+    simulateOpponentDiscardCard(opponent) {
+      if (opponent.hand.length === 0) {
+        // No cards to discard
+        this.currentState.turnPhase = 'draw';
+        this.notifyStateChange();
+        return;
+      }
+      
+      // Choose a card to discard
+      // Prefer to discard high-value cards or cards with no matching expedition
+      let cardToDiscard = null;
+      
+      // Check for cards that aren't useful for current expeditions
+      for (const card of opponent.hand) {
+        const expedition = opponent.expeditions[card.color];
+        
+        if (expedition.length === 0) {
+          // Haven't started this expedition yet, might want to
+          continue;
+        }
+        
+        // If there are only wager cards, we might want to play more
+        if (expedition.every(c => c.type === 'wager') && card.type === 'wager') {
+          continue;
+        }
+        
+        // If we have expedition cards, check if this one is too low
+        if (card.type === 'expedition') {
+          const lastExpCard = [...expedition].filter(c => c.type === 'expedition').pop();
+          if (lastExpCard && typeof lastExpCard.value === 'number' && 
+              typeof card.value === 'number' && card.value <= lastExpCard.value) {
+            // This card is too low to play, discard it
+            cardToDiscard = card;
+            break;
+          }
+        }
+        
+        // Wager cards after expedition cards can't be played
+        if (card.type === 'wager' && expedition.some(c => c.type === 'expedition')) {
+          cardToDiscard = card;
+          break;
+        }
+      }
+      
+      // If we didn't find a specific bad card, just pick one randomly
+      if (!cardToDiscard && opponent.hand.length > 0) {
+        cardToDiscard = opponent.hand[Math.floor(Math.random() * opponent.hand.length)];
+      }
+      
+      if (cardToDiscard) {
+        // Find the card index in hand
+        const cardIndex = opponent.hand.findIndex(c => c.id === cardToDiscard.id);
+        if (cardIndex !== -1) {
+          // Move card from hand to discard pile
+          opponent.hand.splice(cardIndex, 1);
+          this.currentState.discardPiles[cardToDiscard.color].push(cardToDiscard);
+          
+          // Update hand size
+          opponent.handSize = opponent.hand.length;
+          
+          // Change to draw phase
+          this.currentState.turnPhase = 'draw';
+          
+          // Notify state change
+          this.notifyStateChange();
+        }
+      }
+    }
+    
+    /**
+     * Simulate opponent drawing from deck
+     */
+    simulateOpponentDrawFromDeck(opponent) {
+      // Check if deck is empty
+      if (this.currentState.deck.length === 0) {
+        this.endRound();
+        return;
+      }
+      
+      // Draw a card from the deck
+      const card = this.currentState.deck.pop();
+      opponent.hand.push(card);
+      
+      // Update deck and hand sizes
+      this.currentState.cardsInDeck = this.currentState.deck.length;
+      opponent.handSize = opponent.hand.length;
+      
+      // End turn
+      this.endTurn();
+    }
+    
+    /**
+     * Simulate opponent drawing from a discard pile
+     */
+    simulateOpponentDrawFromDiscardPile(opponent) {
+      // Find non-empty discard piles
+      const nonEmptyPiles = Object.entries(this.currentState.discardPiles)
+        .filter(([_, cards]) => cards.length > 0)
+        .map(([color, _]) => color);
+      
+      if (nonEmptyPiles.length === 0) {
+        // No cards in discard piles, draw from deck instead
+        this.simulateOpponentDrawFromDeck(opponent);
+        return;
+      }
+      
+      // Choose a pile - prefer to take cards of colors we're already playing
+      let chosenColor = null;
+      for (const color of nonEmptyPiles) {
+        if (opponent.expeditions[color].length > 0) {
+          chosenColor = color;
+          break;
+        }
+      }
+      
+      // If no color matches expeditions, pick randomly
+      if (!chosenColor) {
+        chosenColor = nonEmptyPiles[Math.floor(Math.random() * nonEmptyPiles.length)];
+      }
+      
+      // Draw the top card from the chosen discard pile
+      const card = this.currentState.discardPiles[chosenColor].pop();
+      opponent.hand.push(card);
+      
+      // Update hand size
+      opponent.handSize = opponent.hand.length;
+      
+      // End turn
+      this.endTurn();
+    }
+    
+    /**
+     * Check if all discard piles are empty
+     */
+    allDiscardPilesEmpty() {
+      return Object.values(this.currentState.discardPiles).every(pile => pile.length === 0);
+    }
+    
+    /**
+     * End the current round
+     */
+    endRound() {
+      // Calculate scores
+      const player1Score = this.calculateScore(this.currentState.player1.expeditions);
+      const player2Score = this.calculateScore(this.currentState.player2.expeditions);
+      
+      // Update scores
+      const roundKey = `round${this.currentState.currentRound}`;
+      this.currentState.scores.player1[roundKey] = player1Score;
+      this.currentState.scores.player2[roundKey] = player2Score;
+      
+      // Update total scores
+      this.currentState.scores.player1.total = 
+        (this.currentState.scores.player1.round1 || 0) + 
+        (this.currentState.scores.player1.round2 || 0) + 
+        (this.currentState.scores.player1.round3 || 0);
+      
+      this.currentState.scores.player2.total = 
+        (this.currentState.scores.player2.round1 || 0) + 
+        (this.currentState.scores.player2.round2 || 0) + 
+        (this.currentState.scores.player2.round3 || 0);
+      
+      // Check if game is over
+      if (this.currentState.currentRound >= this.currentState.totalRounds) {
+        this.endGame();
+      } else {
+        // Start next round
+        this.startNewRound();
+      }
+      
+      // Notify state change
+      this.notifyStateChange();
+    }
+    
+    /**
+     * Calculate score for expeditions
+     */
+    calculateScore(expeditions) {
+      let totalScore = 0;
+      
+      // Calculate score for each expedition
+      for (const color in expeditions) {
+        const expedition = expeditions[color];
+        
+        // Skip empty expeditions
+        if (expedition.length === 0) {
+          continue;
+        }
+        
+        // Count wager cards
+        const wagerCount = expedition.filter(card => card.type === 'wager').length;
+        
+        // Sum expedition card values
+        let expeditionSum = 0;
+        expedition.forEach(card => {
+          if (card.type === 'expedition' && typeof card.value === 'number') {
+            expeditionSum += card.value;
+          }
         });
         
-        return totalScore;
-    }
-    
-    // Notify state change to listeners
-    notifyStateChange() {
-        if (this.onStateChange) {
-            this.onStateChange(this.currentState);
+        // Subtract expedition cost (20 points)
+        let expeditionScore = expeditionSum - 20;
+        
+        // Apply wager multiplier (if any)
+        if (wagerCount > 0) {
+          expeditionScore *= (wagerCount + 1);
         }
+        
+        // Apply expedition bonus (if 8 or more cards)
+        if (expedition.length >= 8) {
+          expeditionScore += 20;
+        }
+        
+        // Add to total
+        totalScore += expeditionScore;
+      }
+      
+      return totalScore;
     }
     
-    // Register state change listener
-    setOnStateChange(callback) {
-        this.onStateChange = callback;
+    /**
+     * Start a new round
+     */
+    startNewRound() {
+      this.currentState.currentRound++;
+      
+      // Generate a new deck
+      this.currentState.deck = this.generateDeck();
+      
+      // Reset expeditions
+      for (const color in this.currentState.player1.expeditions) {
+        this.currentState.player1.expeditions[color] = [];
+        this.currentState.player2.expeditions[color] = [];
+      }
+      
+      // Reset discard piles
+      for (const color in this.currentState.discardPiles) {
+        this.currentState.discardPiles[color] = [];
+      }
+      
+      // Deal new hands
+      this.currentState.player1.hand = [];
+      this.currentState.player2.hand = [];
+      
+      for (let i = 0; i < 8; i++) {
+        this.currentState.player1.hand.push(this.currentState.deck.pop());
+        this.currentState.player2.hand.push(this.currentState.deck.pop());
+      }
+      
+      // Update hand sizes
+      this.currentState.player1.handSize = this.currentState.player1.hand.length;
+      this.currentState.player2.handSize = this.currentState.player2.hand.length;
+      
+      // Update deck size
+      this.currentState.cardsInDeck = this.currentState.deck.length;
+      
+      // Reset turn phase
+      this.currentState.turnPhase = 'play';
+      
+      // Alternate starting player between rounds
+      this.currentState.currentPlayerId = 
+        this.currentState.currentRound % 2 === 1 ? this.userId : this.opponentId;
+      
+      // If it's the opponent's turn, simulate their move
+      if (this.currentState.currentPlayerId === this.opponentId) {
+        setTimeout(() => this.simulateOpponentTurn(), 1000);
+      }
     }
     
-}
-
-export default FallbackGameLogic;
+    /**
+     * End the game
+     */
+    endGame() {
+      this.currentState.status = 'finished';
+      
+      // Determine winner
+      if (this.currentState.scores.player1.total > this.currentState.scores.player2.total) {
+        this.currentState.winner = this.currentState.player1.id;
+      } else if (this.currentState.scores.player2.total > this.currentState.scores.player1.total) {
+        this.currentState.winner = this.currentState.player2.id;
+      } else {
+        this.currentState.winner = null; // Tie
+      }
+    }
+  }
+  
+  export default FallbackGameLogic;

@@ -1,269 +1,276 @@
-// frontend/game/js/lost_cities_main.js
+/**
+ * Main Game Controller
+ * Coordinates WebSocket, UI, and game logic for Lost Cities
+ */
 
-import GameWebSocket from './game_websocket.js';
-import GameUIController from './game_ui_controller.js';
-import FallbackGameLogic from './lost_cities_fallback.js';
+import { GameWebSocket } from './game_websocket.js';
+import { GameUIController } from './game_ui_controller.js';
 
-class LostCitiesGameController {
-    constructor() {
-        console.log("Initializing game controller");
-        
-        // Get game ID and user ID from hidden inputs
-        this.gameId = document.getElementById('game-id')?.value || '1';
-        this.userId = document.getElementById('current-user-id')?.value || '1';
-        
-        // Get player names from the HTML
-        this.playerName = document.querySelector('.player-info:first-child .player-name')?.textContent || 'Player 1';
-        this.opponentName = document.querySelector('.player-info:last-child .player-name')?.textContent || 'Player 2';
-        
-        console.log(`Game: ${this.gameId}, User: ${this.userId}`);
-        console.log(`Players: ${this.playerName} vs ${this.opponentName}`);
-        
-        // Track connection status
-        this.isConnected = false;
-        this.connectionAttempts = 0;
-        this.maxConnectionAttempts = 3;
-        this.usingFallback = false;
-        
-        // Initialize components
-        this.initializeComponents();
-        
-        // Set up event handlers
-        this.setupEventHandlers();
-        
-        // Initialize the UI
-        this.ui.initialize();
-        
-        // Connect to WebSocket
-        this.ws.connect();
-        
-        // Set timeout for fallback mode
-        this.connectionTimeout = setTimeout(() => {
-            if (!this.isConnected && !this.usingFallback) {
-                this.switchToFallbackMode();
-            }
-        }, 5000);
+class LostCitiesGame {
+  constructor() {
+    console.log("Initializing game controller");
+    
+    // Parse game ID and user ID
+    this.parseIds();
+    
+    // Initialize UI controller
+    this.ui = new GameUIController(this.gameId, this.userId);
+    this.ui.setGameMessage('Connecting to game server...');
+    
+    // Set up UI event handlers
+    this.setupUIHandlers();
+    
+    // Initialize WebSocket connection
+    this.initializeWebSocket();
+  }
+  
+  /**
+   * Parse game ID and user ID from page
+   */
+  parseIds() {
+    // Get game ID from URL parameter or hidden input
+    this.gameId = document.getElementById('game-id')?.value || 
+                  new URLSearchParams(window.location.search).get('id') || 
+                  '1';
+    
+    // Get user ID from hidden input or localStorage
+    this.userId = document.getElementById('current-user-id')?.value || 
+                  localStorage.getItem('user_id') || 
+                  '1';
+    
+    // Get auth token from localStorage
+    this.token = localStorage.getItem('authToken');
+    
+    if (!this.token) {
+      console.error('No authentication token found. Redirecting to login...');
+      setTimeout(() => window.location.href = '/login/login.html', 1000);
+      return;
     }
     
-    initializeComponents() {
-        // Initialize fallback game logic
-        this.fallbackGameLogic = new FallbackGameLogic(
-            this.gameId,
-            this.userId,
-            this.opponentId,
-            this.playerName,
-            this.opponentName
-        );
-
-        // Generate initial hands for both players
-        this.player1Hand = this.fallbackGameLogic.generateInitialHand();
-        this.player2Hand = this.fallbackGameLogic.generateInitialHand();
-
-        // Initialize UI controller
-        this.ui = new GameUIController(this.gameId, this.userId);
+    console.log(`Game: ${this.gameId}, User: ${this.userId}`);
+  }
+  
+  /**
+   * Initialize WebSocket connection
+   */
+  initializeWebSocket() {
+    // Create WebSocket with handlers
+    this.ws = new GameWebSocket(this.gameId, this.token, {
+      onConnect: this.handleConnect.bind(this),
+      onMessage: this.handleMessage.bind(this),
+      onDisconnect: this.handleDisconnect.bind(this),
+      onError: this.handleError.bind(this),
+      onReconnecting: this.handleReconnecting.bind(this),
+      onReconnectFailed: this.handleReconnectFailed.bind(this),
+      maxReconnectAttempts: 5
+    });
+  }
+  
+  /**
+   * Set up UI event handlers
+   */
+  setupUIHandlers() {
+    // Handle card moves
+    this.ui.setMoveHandler(moveData => {
+      console.log('Move:', moveData);
+      this.sendMove(moveData);
+    });
+    
+    // Handle surrender
+    this.ui.setSurrenderHandler(() => {
+      console.log('Surrendering game');
+      this.surrender();
+    });
+    
+    // Handle chat messages
+    this.ui.setChatHandler(message => {
+      console.log('Sending chat message:', message);
+      this.sendChatMessage(message);
+    });
+  }
+  
+  /**
+   * Handle WebSocket connection
+   */
+  handleConnect(event) {
+    console.log('Connected to game server');
+    this.ui.setGameMessage('Connected. Waiting for game state...');
+    
+    // Request initial game state
+    this.requestGameState();
+  }
+  
+  /**
+   * Handle WebSocket messages
+   */
+  handleMessage(data) {
+    if (!data || !data.event) return;
+    
+    switch (data.event) {
+      case 'gameUpdated':
+        this.handleGameUpdate(data.data?.gameState);
+        break;
         
-        // Initialize WebSocket
-        this.ws = new GameWebSocket(this.gameId, this.userId);
+      case 'gameSubscribed':
+        console.log('Subscribed to game:', data.data?.gameId);
+        this.requestGameState();
+        break;
         
-        // Initialize fallback game logic
-        this.fallbackLogic = new FallbackGameLogic(
-            this.gameId, 
-            this.userId, 
-            null, // Opponent ID will be set when available
-            this.playerName,
-            this.opponentName
-        );
+      case 'chatMessage':
+        this.handleChatMessage(data.data);
+        break;
+        
+      case 'systemMessage':
+        this.handleSystemMessage(data.data);
+        break;
+        
+      case 'playerJoined':
+        this.handlePlayerJoined(data.data);
+        break;
+        
+      case 'playerLeft':
+        this.handlePlayerLeft(data.data);
+        break;
+        
+      default:
+        console.log('Unknown message type:', data.event);
+    }
+  }
+  
+  /**
+   * Handle WebSocket disconnection
+   */
+  handleDisconnect(event) {
+    console.log('Disconnected from game server', event);
+    this.ui.setGameMessage('Disconnected from game server. Trying to reconnect...');
+  }
+  
+  /**
+   * Handle WebSocket error
+   */
+  handleError(error) {
+    console.error('Game server error', error);
+    this.ui.setGameMessage('Error connecting to game server.');
+  }
+  
+  /**
+   * Handle reconnect attempt
+   */
+  handleReconnecting(attempt, delay) {
+    console.log(`Reconnect attempt ${attempt} in ${delay}ms`);
+    this.ui.setGameMessage(`Reconnecting to server (attempt ${attempt})...`);
+  }
+  
+  /**
+   * Handle reconnect failure
+   */
+  handleReconnectFailed() {
+    console.error('Failed to reconnect to game server');
+    this.ui.setGameMessage('Could not reconnect to server. Please reload the page.');
+  }
+  
+  /**
+   * Handle game state update
+   */
+  handleGameUpdate(gameState) {
+    console.log('Game state received:', gameState);
+    
+    if (!gameState) {
+      console.error('Invalid game state received');
+      return;
     }
     
-    setupEventHandlers() {
-        // WebSocket event handlers
-        this.ws.onConnect = () => {
-            console.log('Connected to game server');
-            this.isConnected = true;
-            clearTimeout(this.connectionTimeout);
-            
-            this.ui.updateGameStatus('Connected to game server. Waiting for game state...');
-            
-            // Request initial game state
-            setTimeout(() => this.ws.requestGameState(), 500);
-        };
-        
-        this.ws.onDisconnect = (event) => {
-            console.log('Disconnected from game server', event);
-            this.isConnected = false;
-            
-            // Only show reconnect message if not using fallback
-            if (!this.usingFallback) {
-                this.ui.updateGameStatus('Disconnected from game server. Trying to reconnect...');
-                
-                // Try fallback after multiple failed attempts
-                this.connectionAttempts++;
-                if (this.connectionAttempts >= this.maxConnectionAttempts) {
-                    this.switchToFallbackMode();
-                }
-            }
-        };
-        
-        this.ws.onError = (error) => {
-            console.error('Game server error', error);
-            
-            // Only show error if not using fallback
-            if (!this.usingFallback) {
-                this.ui.updateGameStatus('Error connecting to game server.');
-                
-                // Try fallback after error
-                this.connectionAttempts++;
-                if (this.connectionAttempts >= this.maxConnectionAttempts) {
-                    this.switchToFallbackMode();
-                }
-            }
-        };
-        
-        this.ws.onGameUpdate = (gameState) => {
-            console.log('Game state updated', gameState);
-            
-            // If we get a valid game state from server, disable fallback mode
-            if (this.usingFallback) {
-                console.log('Switching back to server mode from fallback');
-                this.usingFallback = false;
-            }
-            
-            this.ui.updateGameState(gameState);
-            
-            // If opponent ID wasn't set yet, set it in fallback logic
-            if (gameState.player1 && gameState.player2) {
-                if (gameState.player1.id !== this.userId) {
-                    this.fallbackLogic.opponentId = gameState.player1.id;
-                } else if (gameState.player2.id !== this.userId) {
-                    this.fallbackLogic.opponentId = gameState.player2.id;
-                }
-            }
-        };
-        
-        this.ws.onPlayerJoined = (data) => {
-            console.log('Player joined', data);
-            this.ui.updateGameStatus(`${data.username} has joined the game.`);
-            
-            // Request updated game state
-            setTimeout(() => this.ws.requestGameState(), 500);
-        };
-        
-        this.ws.onPlayerLeft = (data) => {
-            console.log('Player left', data);
-            this.ui.updateGameStatus(`${data.username} has left the game.`);
-            
-            // Request updated game state
-            setTimeout(() => this.ws.requestGameState(), 500);
-        };
-        
-        // Fallback game logic event handler
-        this.fallbackLogic.setOnStateChange((gameState) => {
-            if (this.usingFallback) {
-                console.log('Fallback game state updated', gameState);
-                this.ui.updateGameState(gameState);
-            }
-        });
-        
-        // Set up UI event handlers
-        this.setupUIEventHandlers();
+    // Update UI with new game state
+    this.ui.updateGameState(gameState);
+  }
+  
+  /**
+   * Handle chat message
+   */
+  handleChatMessage(data) {
+    if (data && data.username && data.message) {
+      this.ui.addChatMessage(data.username, data.message);
     }
+  }
+  
+  /**
+   * Handle system message
+   */
+  handleSystemMessage(data) {
+    if (data && data.message) {
+      this.ui.addSystemMessage(data.message);
+    }
+  }
+  
+  /**
+   * Handle player joined
+   */
+  handlePlayerJoined(data) {
+    if (data && data.username) {
+      this.ui.addSystemMessage(`${data.username} has joined the game.`);
+      this.requestGameState();
+    }
+  }
+  
+  /**
+   * Handle player left
+   */
+  handlePlayerLeft(data) {
+    if (data && data.username) {
+      this.ui.addSystemMessage(`${data.username} has left the game.`);
+    }
+  }
+  
+  /**
+   * Request current game state
+   */
+  requestGameState() {
+    this.ws.sendMove({
+      action: 'request_state',
+      gameId: this.gameId
+    });
+  }
+  
+  /**
+   * Send a game move
+   */
+  sendMove(moveData) {
+    // Add game ID to move data
+    moveData.gameId = this.gameId;
     
-    setupUIEventHandlers() {
-        // UI event handlers
-        this.ui.onPlayCard = (cardId, color) => {
-            console.log(`Playing card ${cardId} to ${color} expedition`);
-            
-            if (this.usingFallback) {
-                this.fallbackLogic.playCard(cardId, color);
-            } else {
-                this.ws.playCard(cardId, color);
-            }
-        };
-        
-        this.ui.onDiscardCard = (cardId) => {
-            console.log(`Discarding card ${cardId}`);
-            
-            if (this.usingFallback) {
-                this.fallbackLogic.discardCard(cardId);
-            } else {
-                this.ws.discardCard(cardId);
-            }
-        };
-        
-        this.ui.onDrawFromDeck = () => {
-            console.log('Drawing card from deck');
-            
-            if (this.usingFallback) {
-                this.fallbackLogic.drawFromDeck();
-            } else {
-                this.ws.drawCardFromDeck();
-            }
-        };
-        
-        this.ui.onDrawFromDiscardPile = (color) => {
-            console.log(`Drawing card from ${color} discard pile`);
-            
-            if (this.usingFallback) {
-                this.fallbackLogic.drawFromDiscardPile(color);
-            } else {
-                this.ws.drawCardFromDiscardPile(color);
-            }
-        };
-        
-        this.ui.onSurrender = () => {
-            console.log('Surrendering game');
-            
-            if (this.usingFallback) {
-                // In fallback mode, just end the game with opponent as winner
-                this.fallbackLogic.currentState.status = 'finished';
-                this.fallbackLogic.currentState.winner = this.fallbackLogic.opponentId;
-                this.fallbackLogic.notifyStateChange();
-            } else {
-                this.ws.surrender();
-            }
-        };
-        
-        this.ui.onSendChatMessage = (message) => {
-            console.log('Sending chat message', message);
-            
-            if (this.usingFallback) {
-                // In fallback mode, just show the message locally
-                this.ui.addChatMessage(this.playerName, message, true);
-            } else {
-                this.ws.sendChatMessage(message);
-            }
-        };
-    }
+    // Send move via WebSocket
+    const success = this.ws.sendMove(moveData);
     
-    switchToFallbackMode() {
-        if (this.usingFallback) {
-            return; // Already using fallback
-        }
-        
-        console.log('Switching to fallback mode');
-        this.usingFallback = true;
-        
-        // Update UI to show fallback mode is active
-        this.ui.updateGameStatus('Unable to connect to game server. Running in offline mode.');
-        
-        // Initialize the fallback logic with a starting state
-        const initialState = this.fallbackLogic.getGameState();
-        this.ui.updateGameState(initialState);
-        
-        // Show a warning about fallback mode
-        setTimeout(() => {
-            alert('Unable to connect to the game server. The game will run in offline mode with a simulated opponent. Your progress will not be saved to the server.');
-        }, 500);
+    if (!success) {
+      this.ui.setGameMessage('Error sending move. Please try again.');
     }
+  }
+  
+  /**
+   * Surrender the game
+   */
+  surrender() {
+    this.ws.sendMove({
+      action: 'surrender',
+      gameId: this.gameId
+    });
+  }
+  
+  /**
+   * Send a chat message
+   */
+  sendChatMessage(message) {
+    this.ws.sendChat(message);
+  }
 }
 
-// Initialize the game controller when the DOM is loaded
+// Initialize game when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        console.log("DOM loaded, creating game controller");
-        window.gameController = new LostCitiesGameController();
-    } catch (error) {
-        console.error('Error initializing game controller:', error);
-        alert('There was an error initializing the game. Please refresh the page and try again.');
-    }
+  try {
+    console.log("DOM loaded, creating game controller");
+    window.gameController = new LostCitiesGame();
+  } catch (error) {
+    console.error('Error initializing game controller:', error);
+    alert('There was an error initializing the game. Please refresh the page and try again.');
+  }
 });
