@@ -1,144 +1,157 @@
-/* Main game layout and base styles */
-:root {
-    --color-red: #e63946;
-    --color-green: #2a9d8f;
-    --color-white: #f1faee;
-    --color-blue: #457b9d;
-    --color-yellow: #e9c46a;
-    --color-purple: #8338ec;
-    --color-background: #f5f5f5;
-    --color-border: #ddd;
-    --card-width: 90px;
-    --card-height: 140px;
-    --card-border-radius: 8px;
-}
+/* frontend/game/game.css - Main Game Styles */
 
-body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f5f5f5;
-    margin: 0;
-    padding: 0;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
+/* Game Container */
 .game-container {
-    width: 95%;
-    max-width: 1200px;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    position: relative;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    height: 100vh;
+    padding: 10px;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Game info section */
+/* Game Info Bar */
 .game-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--color-border);
+    padding: 10px;
+    background-color: #3d6a7c;
+    color: white;
+    border-radius: 5px 5px 0 0;
+    margin-bottom: 10px;
 }
 
 .player-info {
     display: flex;
     align-items: center;
-    gap: 12px;
+    flex: 1;
+    max-width: 300px;
+}
+
+.player-info:first-child {
+    justify-content: flex-start;
+}
+
+.player-info:last-child {
+    justify-content: flex-end;
+    text-align: right;
 }
 
 .player-avatar {
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
+    background-color: #fff;
     border-radius: 50%;
-    background-color: #ddd;
-    background-image: url('/assets/avatar-placeholder.png');
-    background-size: cover;
+    margin: 0 10px;
+    border: 2px solid #ddd;
 }
 
 .player-name {
     font-weight: bold;
-    font-size: 18px;
+    margin-bottom: 3px;
 }
 
 .player-score {
-    color: #555;
+    font-size: 0.9em;
 }
 
 .player-turn-indicator {
-    background-color: #eee;
     padding: 5px 10px;
     border-radius: 15px;
-    font-size: 14px;
-    display: none;
+    background-color: #444;
+    font-size: 0.8em;
+    margin: 0 10px;
 }
 
 .player-turn-indicator.active {
-    display: inline-block;
     background-color: #4CAF50;
-    color: white;
+}
+
+.player-turn-indicator.inactive {
+    background-color: #757575;
+}
+
+.player-turn-indicator.winner {
+    background-color: #FFD700;
+    color: #333;
+}
+
+.player-turn-indicator.loser {
+    background-color: #F44336;
 }
 
 .game-stats {
     text-align: center;
-    font-size: 16px;
-    background-color: #f8f8f8;
-    padding: 10px;
-    border-radius: 4px;
+    flex: 1;
+    max-width: 200px;
+    font-size: 0.9em;
 }
 
-/* Game board */
+/* Game Board */
 .game-board {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    flex-grow: 1;
+    flex: 1;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+    padding: 15px;
+    position: relative;
+    overflow: hidden;
 }
 
-/* Expedition areas */
+/* Expedition Areas */
 .expedition-area {
     display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin: 0 20px;
-}
-
-.expedition-slot {
-    width: var(--card-width);
-    height: var(--card-height);
-    border: 2px dashed #ccc;
-    border-radius: var(--card-border-radius);
+    justify-content: space-around;
+    min-height: 120px;
+    margin: 10px 0;
     position: relative;
 }
 
+.expedition-slot {
+    width: 80px;
+    height: 120px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 5px;
+    border: 2px dashed rgba(128, 128, 128, 0.3);
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.expedition-slot:hover {
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
 .expedition-slot.red {
-    border-color: var(--color-red);
+    border-color: rgba(220, 53, 69, 0.5);
 }
 
 .expedition-slot.green {
-    border-color: var(--color-green);
+    border-color: rgba(40, 167, 69, 0.5);
 }
 
 .expedition-slot.white {
-    border-color: var(--color-white);
+    border-color: rgba(108, 117, 125, 0.5);
 }
 
 .expedition-slot.blue {
-    border-color: var(--color-blue);
+    border-color: rgba(0, 123, 255, 0.5);
 }
 
 .expedition-slot.yellow {
-    border-color: var(--color-yellow);
+    border-color: rgba(255, 193, 7, 0.5);
 }
 
 .expedition-slot.purple {
-    border-color: var(--color-purple);
-    display: none; /* Hidden by default, shown when purple expedition is enabled */
+    border-color: rgba(111, 66, 193, 0.5);
 }
 
 .expedition-stack {
@@ -147,268 +160,466 @@ body {
     height: 100%;
 }
 
-/* Center board area with deck and discard piles */
+/* Board Center */
 .board-center {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 160px;
+    height: 150px;
+    position: relative;
+    margin: 10px 0;
 }
 
 .deck-and-discards {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 15px;
+    width: 100%;
+    position: relative;
 }
 
 .deck {
-    width: var(--card-width);
-    height: var(--card-height);
+    width: 80px;
+    height: 120px;
     background-color: #2c3e50;
-    border-radius: var(--card-border-radius);
-    background-image: url('/assets/card-back.png');
-    background-size: cover;
+    border-radius: 5px;
+    margin: 0 10px;
     position: relative;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.deck::after {
+.deck:hover {
+    transform: translateY(-5px);
+}
+
+.deck.empty {
+    background-color: rgba(0, 0, 0, 0.1);
+    box-shadow: none;
+    cursor: default;
+}
+
+.deck::before {
     content: attr(data-count);
     position: absolute;
     top: -10px;
     right: -10px;
     background-color: white;
-    color: #2c3e50;
+    color: #333;
     border-radius: 50%;
-    width: 30px;
-    height: 30px;
+    width: 24px;
+    height: 24px;
     display: flex;
     justify-content: center;
     align-items: center;
+    font-size: 0.8em;
     font-weight: bold;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+}
+
+.card-back {
+    width: 100%;
+    height: 100%;
+    background-color: #2c3e50;
+    background-image: url('/game/assets/card-back.png');
+    background-size: cover;
+    border-radius: 5px;
 }
 
 .discard-pile {
-    width: var(--card-width);
-    height: var(--card-height);
-    border: 2px dashed #ccc;
-    border-radius: var(--card-border-radius);
+    width: 80px;
+    height: 120px;
+    border-radius: 5px;
+    margin: 0 10px;
     position: relative;
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
 
-.discard-pile.red {
-    border-color: var(--color-red);
+.discard-pile:hover {
+    transform: translateY(-5px);
 }
 
-.discard-pile.green {
-    border-color: var(--color-green);
+.discard-pile::before {
+    content: attr(data-count);
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background-color: white;
+    color: #333;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.8em;
+    font-weight: bold;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
-.discard-pile.white {
-    border-color: var(--color-white);
+.discard-pile.has-cards::before {
+    opacity: 1;
 }
 
-.discard-pile.blue {
-    border-color: var(--color-blue);
+.card-placeholder {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed;
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-.discard-pile.yellow {
-    border-color: var(--color-yellow);
+.discard-pile.red .card-placeholder {
+    border-color: rgba(220, 53, 69, 0.7);
 }
 
-.discard-pile.purple {
-    border-color: var(--color-purple);
-    display: none; /* Hidden by default, shown when purple expedition is enabled */
+.discard-pile.green .card-placeholder {
+    border-color: rgba(40, 167, 69, 0.7);
 }
 
-/* Player's hand */
+.discard-pile.white .card-placeholder {
+    border-color: rgba(108, 117, 125, 0.7);
+}
+
+.discard-pile.blue .card-placeholder {
+    border-color: rgba(0, 123, 255, 0.7);
+}
+
+.discard-pile.yellow .card-placeholder {
+    border-color: rgba(255, 193, 7, 0.7);
+}
+
+.discard-pile.purple .card-placeholder {
+    border-color: rgba(111, 66, 193, 0.7);
+}
+
+/* Player Hand */
 .player-hand {
     display: flex;
     justify-content: center;
-    gap: 10px;
-    margin-top: 20px;
-    min-height: var(--card-height);
-    padding: 10px;
-    background-color: #f0f0f0;
-    border-radius: 8px;
+    align-items: center;
+    padding: 15px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    margin-top: 10px;
+    min-height: 130px;
+    overflow-x: auto;
 }
 
 /* Cards */
 .card {
-    width: var(--card-width);
-    height: var(--card-height);
-    border-radius: var(--card-border-radius);
-    background-color: white;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    width: 75px;
+    height: 110px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    margin: 0 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     position: relative;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    user-select: none;
+    transition: all 0.2s ease;
+    background-color: white;
+    font-weight: bold;
+    font-size: 1.5em;
 }
 
-.card:hover {
+.card.in-hand {
+    cursor: pointer;
+}
+
+.card.in-hand:hover {
     transform: translateY(-10px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
 .card.selected {
+    box-shadow: 0 0 0 3px gold, 0 5px 10px rgba(0, 0, 0, 0.3);
     transform: translateY(-15px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
-.card-inner {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 5px;
-    box-sizing: border-box;
+.card.red {
+    color: #dc3545;
+    background-color: #ffecee;
+}
+
+.card.green {
+    color: #28a745;
+    background-color: #e8f5e9;
+}
+
+.card.white {
+    color: #6c757d;
+    background-color: #f8f9fa;
+}
+
+.card.blue {
+    color: #007bff;
+    background-color: #e6f2ff;
+}
+
+.card.yellow {
+    color: #ffc107;
+    background-color: #fffde7;
+}
+
+.card.purple {
+    color: #6f42c1;
+    background-color: #f3e5f5;
+}
+
+.card.wager {
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(0, 0, 0, 0.05),
+        rgba(0, 0, 0, 0.05) 10px,
+        rgba(0, 0, 0, 0) 10px,
+        rgba(0, 0, 0, 0) 20px
+    );
 }
 
 .card-value {
-    font-size: 24px;
-    font-weight: bold;
-}
-
-.card-color {
-    width: 100%;
-    height: 15px;
-    position: absolute;
-    top: 0;
-    left: 0;
-    border-top-left-radius: var(--card-border-radius);
-    border-top-right-radius: var(--card-border-radius);
-}
-
-.card-color.red {
-    background-color: var(--color-red);
-}
-
-.card-color.green {
-    background-color: var(--color-green);
-}
-
-.card-color.white {
-    background-color: var(--color-white);
-}
-
-.card-color.blue {
-    background-color: var(--color-blue);
-}
-
-.card-color.yellow {
-    background-color: var(--color-yellow);
-}
-
-.card-color.purple {
-    background-color: var(--color-purple);
-}
-
-.card.wager .card-value::before {
-    content: "W";
-}
-
-/* Game message */
-.game-message {
+    font-size: 1.8em;
     text-align: center;
-    padding: 15px;
-    background-color: #f8f8f8;
-    border-radius: 4px;
-    margin: 10px 0;
-    font-weight: bold;
 }
 
-/* Game controls */
+/* Game Message */
+.game-message {
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    margin-top: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-size: 0.9em;
+    color: #333;
+}
+
+/* Game Controls */
 .game-controls {
     display: flex;
     justify-content: center;
-    gap: 20px;
+    padding: 10px;
+    gap: 10px;
     margin-top: 10px;
 }
 
 .game-controls button {
-    padding: 10px 20px;
+    padding: 8px 15px;
     border: none;
-    border-radius: 4px;
-    background-color: #5b3d2b;
+    border-radius: 3px;
+    background-color: #3d6a7c;
     color: white;
     cursor: pointer;
     transition: background-color 0.2s;
 }
 
 .game-controls button:hover {
-    background-color: #7a5038;
+    background-color: #2a4d5a;
 }
 
-/* Stack of cards in expeditions */
-.card-stack {
-    position: absolute;
-    transition: transform 0.3s ease;
+#btn-surrender {
+    background-color: #dc3545;
 }
 
-/* Modal for game rules, chat, etc. */
-.modal {
-    display: none;
+#btn-surrender:hover {
+    background-color: #c82333;
+}
+
+#btn-help {
+    background-color: #6c757d;
+}
+
+#btn-help:hover {
+    background-color: #5a6268;
+}
+
+/* Chat */
+.chat-container {
+    position: fixed;
+    right: -300px;
+    bottom: 20px;
+    width: 300px;
+    height: 400px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s ease;
+    z-index: 1000;
+}
+
+.chat-container.visible {
+    right: 20px;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #3d6a7c;
+    color: white;
+    border-radius: 5px 5px 0 0;
+}
+
+.chat-header h3 {
+    margin: 0;
+    font-size: 1em;
+}
+
+.close-chat {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2em;
+    cursor: pointer;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-message {
+    max-width: 80%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    position: relative;
+}
+
+.chat-message-mine {
+    background-color: #e6f2ff;
+    align-self: flex-end;
+    border-bottom-right-radius: 0;
+}
+
+.chat-message-other {
+    background-color: #f1f1f1;
+    align-self: flex-start;
+    border-bottom-left-radius: 0;
+}
+
+.chat-sender {
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+.chat-text {
+    word-break: break-word;
+}
+
+.chat-input {
+    display: flex;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-top: 1px solid #eee;
+    border-radius: 0 0 5px 5px;
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-right: 5px;
+}
+
+.chat-input button {
+    padding: 8px 12px;
+    background-color: #3d6a7c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Rules Dialog */
+.overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 1000;
 }
 
-.modal-content {
+.rules-dialog {
     background-color: white;
     padding: 20px;
-    border-radius: 8px;
-    width: 80%;
+    border-radius: 5px;
     max-width: 600px;
     max-height: 80vh;
     overflow-y: auto;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
+.rules-dialog h2 {
+    color: #3d6a7c;
+    margin-top: 0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
 }
 
-.modal-title {
-    font-size: 20px;
-    font-weight: bold;
+.rules-dialog ul {
+    padding-left: 20px;
 }
 
-.modal-close {
-    background: none;
+.rules-dialog li {
+    margin-bottom: 5px;
+}
+
+.rules-dialog button {
+    padding: 8px 15px;
+    background-color: #3d6a7c;
+    color: white;
     border: none;
-    font-size: 24px;
+    border-radius: 4px;
     cursor: pointer;
+    margin-top: 15px;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    :root {
-        --card-width: 70px;
-        --card-height: 110px;
+    .game-container {
+        height: auto;
+        min-height: 100vh;
     }
     
-    .expedition-area {
-        margin: 0 10px;
+    .player-info {
+        flex-direction: column;
     }
     
     .deck-and-discards {
-        gap: 8px;
+        flex-wrap: wrap;
     }
     
-    .game-info {
-        flex-direction: column;
-        gap: 10px;
+    .expedition-area {
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding: 10px 0;
+    }
+    
+    .expedition-slot {
+        flex-shrink: 0;
+    }
+    
+    .player-hand {
+        justify-content: flex-start;
+        overflow-x: auto;
     }
 }

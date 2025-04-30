@@ -1,164 +1,241 @@
-/**
- * Lost Cities Main
- * Main entry point for the game - initializes and orchestrates the game components
- */
+// frontend/game/js/lost_cities_main.js
 
-import { LostCitiesGame } from './lost_cities_game_logic.js';
-import { LostCitiesApiClient } from './lost_cities_api_client.js';
+import GameWebSocket from './game_websocket.js';
+import GameUIController from './game_ui_controller.js';
+import FallbackGameLogic from './lost_cities_fallback.js';
 
-// Wait for the DOM to be fully loaded
-document.addEventListener('DOMContentLoaded', async () => {
-    // Check for authentication
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-        console.error('No authentication token found');
-        window.location.href = '/login.html';
-        return;
-    }
-    
-    // Show loading overlay
-    showLoadingOverlay(true);
-    
-    try {
-        // Initialize the game
-        const game = new LostCitiesGame();
-        const initialized = await game.init();
+class LostCitiesGameController {
+    constructor() {
+        // Get game ID and user ID from hidden inputs
+        this.gameId = document.getElementById('game-id').value;
+        this.userId = document.getElementById('current-user-id').value;
         
-        if (!initialized) {
-            console.error('Failed to initialize game');
-            showErrorScreen('Failed to initialize game. Please try again later.');
-            return;
+        // Get player names from the HTML
+        this.playerName = document.querySelector('.player-info:first-child .player-name').textContent;
+        this.opponentName = document.querySelector('.player-info:last-child .player-name').textContent;
+        
+        // Initialize UI controller
+        this.ui = new GameUIController(this.gameId, this.userId);
+        
+        // Initialize WebSocket
+        this.ws = new GameWebSocket(this.gameId, this.userId);
+        
+        // Initialize fallback game logic
+        this.fallbackLogic = new FallbackGameLogic(
+            this.gameId, 
+            this.userId, 
+            null, // Opponent ID will be set when available
+            this.playerName,
+            this.opponentName
+        );
+        
+        // Track connection status
+        this.isConnected = false;
+        this.connectionAttempts = 0;
+        this.maxConnectionAttempts = 3;
+        this.usingFallback = false;
+        
+        // Set up event handlers
+        this.setupEventHandlers();
+        
+        // Initialize the UI
+        this.ui.initialize();
+        
+        // Connect to WebSocket
+        this.ws.connect();
+        
+        // Set a timeout to switch to fallback mode if connection fails
+        this.connectionTimeout = setTimeout(() => {
+            if (!this.isConnected && !this.usingFallback) {
+                this.switchToFallbackMode();
+            }
+    
+    // Switch to fallback mode when server connection fails
+    switchToFallbackMode() {
+        if (this.usingFallback) {
+            return; // Already using fallback
         }
         
-        // Game initialized successfully
-        console.log('Game initialized successfully');
+        console.log('Switching to fallback mode');
+        this.usingFallback = true;
         
-        // Hide loading overlay
-        showLoadingOverlay(false);
+        // Update UI to show fallback mode is active
+        this.ui.updateGameStatus('Unable to connect to game server. Running in offline mode.');
+        
+        // Initialize the fallback logic with a starting state
+        const initialState = this.fallbackLogic.getGameState();
+        this.ui.updateGameState(initialState);
+        
+        // Show a warning about fallback mode
+        setTimeout(() => {
+            alert('Unable to connect to the game server. The game will run in offline mode with a simulated opponent. Your progress will not be saved to the server.');
+        }, 500);
+    }
+        }, 5000);
+        
+        console.log(`Game controller initialized for game ${this.gameId} and user ${this.userId}`);
+    }
+    
+    setupEventHandlers() {
+        // WebSocket event handlers
+        this.ws.onConnect = () => {
+            console.log('Connected to game server');
+            this.isConnected = true;
+            clearTimeout(this.connectionTimeout);
+            
+            this.ui.updateGameStatus('Connected to game server. Waiting for game state...');
+            
+            // Request initial game state
+            setTimeout(() => this.ws.requestGameState(), 500);
+        };
+        
+        this.ws.onDisconnect = (event) => {
+            console.log('Disconnected from game server', event);
+            this.isConnected = false;
+            
+            // Only show reconnect message if not using fallback
+            if (!this.usingFallback) {
+                this.ui.updateGameStatus('Disconnected from game server. Trying to reconnect...');
+                
+                // Try fallback after multiple failed attempts
+                this.connectionAttempts++;
+                if (this.connectionAttempts >= this.maxConnectionAttempts) {
+                    this.switchToFallbackMode();
+                }
+            }
+        };
+        
+        this.ws.onError = (error) => {
+            console.error('Game server error', error);
+            
+            // Only show error if not using fallback
+            if (!this.usingFallback) {
+                this.ui.updateGameStatus('Error connecting to game server.');
+                
+                // Try fallback after error
+                this.connectionAttempts++;
+                if (this.connectionAttempts >= this.maxConnectionAttempts) {
+                    this.switchToFallbackMode();
+                }
+            }
+        };
+        
+        this.ws.onGameUpdate = (gameState) => {
+            console.log('Game state updated', gameState);
+            
+            // If we get a valid game state from server, disable fallback mode
+            if (this.usingFallback) {
+                console.log('Switching back to server mode from fallback');
+                this.usingFallback = false;
+            }
+            
+            this.ui.updateGameState(gameState);
+            
+            // If opponent ID wasn't set yet, set it in fallback logic
+            if (gameState.player1.id !== this.userId) {
+                this.fallbackLogic.opponentId = gameState.player1.id;
+            } else if (gameState.player2.id !== this.userId) {
+                this.fallbackLogic.opponentId = gameState.player2.id;
+            }
+        };
+        
+        this.ws.onPlayerJoined = (data) => {
+            console.log('Player joined', data);
+            this.ui.updateGameStatus(`${data.username} has joined the game.`);
+            
+            // Request updated game state
+            setTimeout(() => this.ws.requestGameState(), 500);
+        };
+        
+        this.ws.onPlayerLeft = (data) => {
+            console.log('Player left', data);
+            this.ui.updateGameStatus(`${data.username} has left the game.`);
+            
+            // Request updated game state
+            setTimeout(() => this.ws.requestGameState(), 500);
+        };
+        
+        // Fallback game logic event handler
+        this.fallbackLogic.setOnStateChange((gameState) => {
+            if (this.usingFallback) {
+                console.log('Fallback game state updated', gameState);
+                this.ui.updateGameState(gameState);
+            }
+        });
+        
+        // UI event handlers
+        this.ui.onPlayCard = (cardId, color) => {
+            console.log(`Playing card ${cardId} to ${color} expedition`);
+            
+            if (this.usingFallback) {
+                this.fallbackLogic.playCard(cardId, color);
+            } else {
+                this.ws.playCard(cardId, color);
+            }
+        };
+        
+        this.ui.onDiscardCard = (cardId) => {
+            console.log(`Discarding card ${cardId}`);
+            
+            if (this.usingFallback) {
+                this.fallbackLogic.discardCard(cardId);
+            } else {
+                this.ws.discardCard(cardId);
+            }
+        };
+        
+        this.ui.onDrawFromDeck = () => {
+            console.log('Drawing card from deck');
+            
+            if (this.usingFallback) {
+                this.fallbackLogic.drawFromDeck();
+            } else {
+                this.ws.drawCardFromDeck();
+            }
+        };
+        
+        this.ui.onDrawFromDiscardPile = (color) => {
+            console.log(`Drawing card from ${color} discard pile`);
+            
+            if (this.usingFallback) {
+                this.fallbackLogic.drawFromDiscardPile(color);
+            } else {
+                this.ws.drawCardFromDiscardPile(color);
+            }
+        };
+        
+        this.ui.onSurrender = () => {
+            console.log('Surrendering game');
+            
+            if (this.usingFallback) {
+                // In fallback mode, just end the game with opponent as winner
+                this.fallbackLogic.currentState.status = 'finished';
+                this.fallbackLogic.currentState.winner = this.fallbackLogic.opponentId;
+                this.fallbackLogic.notifyStateChange();
+            } else {
+                this.ws.surrender();
+            }
+        };
+        
+        this.ui.onSendChatMessage = (message) => {
+            console.log('Sending chat message', message);
+            
+            if (this.usingFallback) {
+                // In fallback mode, just show the message locally
+                this.ui.addChatMessage(this.playerName, message, true);
+            } else {
+                this.ws.sendChatMessage(message);
+            }
+        };
+    }
+}
+
+// Initialize the game controller when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        window.gameController = new LostCitiesGameController();
     } catch (error) {
-        console.error('Error initializing game:', error);
-        showErrorScreen('An error occurred while loading the game. Please try again later.');
+        console.error('Error initializing game controller:', error);
+        alert('There was an error initializing the game. Please refresh the page and try again.');
     }
-});
-
-/**
- * Show or hide loading overlay
- * @param {boolean} show - Whether to show the overlay
- */
-function showLoadingOverlay(show) {
-    let overlay = document.querySelector('.loading-overlay');
-    
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.className = 'loading-overlay';
-        
-        const spinner = document.createElement('div');
-        spinner.className = 'spinner';
-        
-        overlay.appendChild(spinner);
-        document.body.appendChild(overlay);
-    }
-    
-    overlay.classList.toggle('active', show);
-}
-
-/**
- * Show error screen
- * @param {string} message - Error message
- */
-function showErrorScreen(message) {
-    // Hide loading overlay
-    showLoadingOverlay(false);
-    
-    // Create error container
-    const gameContainer = document.querySelector('.game-container');
-    if (gameContainer) {
-        gameContainer.innerHTML = '';
-        
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-screen';
-        
-        const errorIcon = document.createElement('div');
-        errorIcon.className = 'error-icon';
-        errorIcon.innerHTML = '⚠️';
-        
-        const errorMessage = document.createElement('div');
-        errorMessage.className = 'error-message';
-        errorMessage.textContent = message;
-        
-        const errorActions = document.createElement('div');
-        errorActions.className = 'error-actions';
-        
-        const refreshButton = document.createElement('button');
-        refreshButton.textContent = 'Try Again';
-        refreshButton.addEventListener('click', () => {
-            window.location.reload();
-        });
-        
-        const homeButton = document.createElement('button');
-        homeButton.textContent = 'Go to Home';
-        homeButton.addEventListener('click', () => {
-            window.location.href = '/';
-        });
-        
-        errorActions.appendChild(refreshButton);
-        errorActions.appendChild(homeButton);
-        
-        errorDiv.appendChild(errorIcon);
-        errorDiv.appendChild(errorMessage);
-        errorDiv.appendChild(errorActions);
-        
-        gameContainer.appendChild(errorDiv);
-        
-        // Add some inline styles
-        const style = document.createElement('style');
-        style.textContent = `
-            .error-screen {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                padding: 40px;
-                text-align: center;
-            }
-            
-            .error-icon {
-                font-size: 64px;
-                margin-bottom: 20px;
-            }
-            
-            .error-message {
-                font-size: 18px;
-                margin-bottom: 30px;
-                color: #555;
-            }
-            
-            .error-actions {
-                display: flex;
-                gap: 20px;
-            }
-            
-            .error-actions button {
-                padding: 10px 20px;
-                border: none;
-                border-radius: 4px;
-                background-color: #5b3d2b;
-                color: white;
-                cursor: pointer;
-                font-size: 16px;
-                transition: background-color 0.2s;
-            }
-            
-            .error-actions button:hover {
-                background-color: #7a5038;
-            }
-        `;
-        
-        document.head.appendChild(style);
-    }
-}
-
-// Add event listener for page unload to cleanup WebSocket connection
-window.addEventListener('beforeunload', () => {
-    // The WebSocket will be automatically closed, but could add additional cleanup here
 });
