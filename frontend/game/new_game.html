@@ -54,6 +54,15 @@
             display: none;
         }
         
+        .success-message {
+            color: green;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #eeffee;
+            border-radius: 4px;
+            display: none;
+        }
+        
         .button-container {
             text-align: center;
             margin-top: 30px;
@@ -117,10 +126,14 @@
         <div class="error-message" id="error-message">
             Failed to create game. Please try again.
         </div>
+
+        <div class="success-message" id="success-message">
+            Game created successfully! Redirecting to game...
+        </div>
         
         <div id="loading-message">Loading available opponents...</div>
         
-        <form action="/new-game" method="POST" id="newGameForm" style="display:none;">
+        <form id="newGameForm" style="display:none;">
             <div class="form-group">
                 <label for="opponent_id">Select Opponent</label>
                 <select name="opponent_id" id="opponent_id" required>
@@ -137,7 +150,7 @@
             </div>
             
             <div class="button-container">
-                <button type="submit">Create Game</button>
+                <button type="submit" id="createGameBtn">Create Game</button>
             </div>
         </form>
 
@@ -145,6 +158,7 @@
             <h3>Debug Information</h3>
             <p>Current User ID: <span id="current-user-id">Not set</span></p>
             <p>Auth Token Present: <span id="auth-token-status">No</span></p>
+            <p>API URL: <span id="api-url">Not set</span></p>
             <button id="create-test-user">Create Test User</button>
         </div>
     </div>
@@ -156,17 +170,19 @@
             document.getElementById('error-message').style.display = 'block';
         }
         
-        // Show debug info in development
+        // Set up API URL
+        const API_URL = window.location.hostname === "localhost"
+            ? "http://localhost:3000" // Local backend URL
+            : "https://lostcitiesbackend.onrender.com"; // Render backend URL
+        
+        // Show debug info
         const showDebug = true; // Set to false in production
         if (showDebug) {
             document.getElementById('debug-info').style.display = 'block';
             document.getElementById('current-user-id').textContent = localStorage.getItem('user_id') || 'Not set';
             document.getElementById('auth-token-status').textContent = localStorage.getItem('authToken') ? 'Yes' : 'No';
+            document.getElementById('api-url').textContent = API_URL;
         }
-
-        const API_URL = window.location.hostname === "localhost"
-            ? "http://localhost:3000" // Local backend URL
-            : "https://lostcitiesbackend.onrender.com"; // Render backend URL
         
         // Function to create a test user
         document.getElementById('create-test-user').addEventListener('click', async () => {
@@ -193,6 +209,77 @@
                 console.error("Error creating test user:", error);
                 alert("Error creating test user. See console for details.");
             }
+        });
+        
+        // Form submission handler
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('newGameForm');
+            
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    alert("Authentication token not found. Please log in again.");
+                    window.location.href = '/login.html';
+                    return;
+                }
+                
+                // Disable the submit button to prevent double submission
+                const submitButton = document.getElementById('createGameBtn');
+                submitButton.disabled = true;
+                submitButton.textContent = 'Creating Game...';
+                
+                try {
+                    // Get form values
+                    const opponentId = document.getElementById('opponent_id').value;
+                    const usePurple = document.getElementById('use_purple').checked;
+                    
+                    console.log("Creating game with:", { opponentId, usePurpleExpedition: usePurple });
+                    
+                    // Create game via API
+                    const response = await fetch(`${API_URL}/lost-cities/games`, {
+                        method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${token}`,
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            opponentId,
+                            usePurpleExpedition: usePurple
+                        })
+                    });
+                    
+                    console.log("Game creation response status:", response.status);
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || "Failed to create game");
+                    }
+                    
+                    const responseData = await response.json();
+                    console.log("Game created successfully:", responseData);
+                    
+                    // Show success message
+                    document.getElementById('success-message').style.display = 'block';
+                    document.getElementById('newGameForm').style.display = 'none';
+                    
+                    // Redirect to the game page
+                    setTimeout(() => {
+                        window.location.href = `/game/${responseData.gameId}`;
+                    }, 1500);
+                    
+                } catch (error) {
+                    console.error("Error creating game:", error);
+                    document.getElementById('error-message').textContent = 
+                        `Failed to create game: ${error.message}`;
+                    document.getElementById('error-message').style.display = 'block';
+                    
+                    // Re-enable the submit button
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Create Game';
+                }
+            });
         });
         
         // Load available opponents
@@ -227,6 +314,7 @@
                 
                 const select = document.getElementById('opponent_id');
                 const currentUserId = localStorage.getItem('user_id');
+                console.log("Current user ID:", currentUserId);
                 
                 // Count how many opponents we add
                 let opponentCount = 0;

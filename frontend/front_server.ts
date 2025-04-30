@@ -1,74 +1,97 @@
 import { Application, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { Router } from "https://deno.land/x/oak@v12.6.1/router.ts";
 
-const app = new Application();
-const router = new Router();
+// Define the ROOT constant
+const ROOT = Deno.cwd();
 
-// Définir la racine pour les fichiers statiques
-const ROOT = Deno.cwd(); // Ceci était utilisé dans le message de log mais n'était pas défini
+// Game routes
+const gameRouter = new Router();
 
-// Servir la page d'accueil
-router.get("/", async (ctx) => {
-  await ctx.send({
-    root: ROOT,
-    index: "index.html",
-  });
-});
-
-// Routes spécifiques pour les pages principales
-router.get("/login", async (ctx) => {
-  ctx.response.redirect("/login/login.html");
-});
-
-router.get("/chat", async (ctx) => {
-  ctx.response.redirect("/chat/chat.html");
-});
-
-router.get("/new-game", async (ctx) => {
-  ctx.response.redirect("/game/new_game.html");
-});
-
-// Ajout d'une route pour les jeux
-router.get("/game/:id", async (ctx) => {
-  await ctx.send({
-    root: ROOT,
-    path: "game/game.html" // On sert directement game.html avec les paramètres de l'URL préservés
-  });
-});
-
-// Router doit être utilisé avant le middleware de fichiers statiques
-app.use(router.routes());
-app.use(router.allowedMethods());
-
-// Middleware pour servir les fichiers statiques
-app.use(async (ctx, next) => {
+// Route to serve the game page
+gameRouter.get("/game/:id", async (ctx) => {
+  const gameId = ctx.params.id;
   try {
-    // Essayer de servir un fichier statique
-    const filePath = ctx.request.url.pathname;
-    
-    // Servir tout fichier demandé directement
-    await send(ctx, filePath, {
-      root: ROOT,
-    });
+    // Just serve the static game.html file - we'll handle the data loading in the client
+    const html = await Deno.readTextFile(`${ROOT}/game/game.html`);
+    ctx.response.type = "text/html";
+    ctx.response.body = html;
+  } catch (error) {
+    console.error("Error loading game page:", error);
+    ctx.response.status = 404;
+    ctx.response.body = "Game not found";
+  }
+});
+
+// Route to create a new game
+gameRouter.get("/new-game", async (ctx) => {
+  try {
+    // Serve the new game form
+    const html = await Deno.readTextFile(`${ROOT}/game/new_game.html`);
+    ctx.response.type = "text/html";
+    ctx.response.body = html;
+  } catch (error) {
+    console.error("Error loading new game page:", error);
+    ctx.response.status = 500;
+    ctx.response.body = "Error loading page";
+  }
+});
+
+// Create the application
+const app = new Application();
+
+// IMPORTANT: Serve static files with correct MIME types
+app.use(async (ctx, next) => {
+  const path = ctx.request.url.pathname;
+  try {
+    // Serve static files
+    if (
+      path.startsWith("/shared/") ||
+      path.startsWith("/game/") ||
+      path.startsWith("/login/") ||
+      path.startsWith("/admin/") ||
+      path.startsWith("/chat/")
+    ) {
+      // Set correct content type based on file extension
+      if (path.endsWith('.css')) {
+        ctx.response.headers.set("Content-Type", "text/css");
+      } else if (path.endsWith('.js')) {
+        ctx.response.headers.set("Content-Type", "application/javascript");
+      } else if (path.endsWith('.html')) {
+        ctx.response.headers.set("Content-Type", "text/html");
+      } else if (path.endsWith('.png')) {
+        ctx.response.headers.set("Content-Type", "image/png");
+      } else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+        ctx.response.headers.set("Content-Type", "image/jpeg");
+      }
+      
+      await send(ctx, path, {
+        root: ROOT,
+      });
+      return;
+    }
+    await next();
   } catch (err) {
-    // Si le fichier n'est pas trouvé, passer au middleware suivant
+    if (err.name !== 'NotFound') {
+      console.error(`Error serving static file ${path}:`, err);
+    }
     await next();
   }
 });
 
-// Middleware de fallback pour les routes non gérées
+// Use the game router
+app.use(gameRouter.routes());
+app.use(gameRouter.allowedMethods());
+
+// Root path - redirect to login
 app.use(async (ctx) => {
-  try {
-    // Si aucune route n'a été trouvée, on essaie de servir index.html
-    await ctx.send({
-      root: ROOT,
-      path: "index.html",
-    });
-  } catch (err) {
-    // Si même index.html n'est pas trouvé, on renvoie une 404
-    ctx.response.status = 404;
-    ctx.response.body = "Page not found";
+  if (ctx.request.url.pathname === "/") {
+    ctx.response.redirect("/login/login.html");
+    return;
   }
+  
+  // If we get here, serve a 404 page
+  ctx.response.status = 404;
+  ctx.response.body = "Page not found";
 });
 
 // Configuration du port et des options SSL
@@ -80,7 +103,7 @@ if (Deno.args.length >= 3) {
   try {
     options.secure = true;
     options.certFile = Deno.args[1]; // Utiliser certFile au lieu de cert
-    options.keyFile = Deno.args[2];  // Utiliser keyFile au lieu de key
+    options.keyFile = Deno.args[2]; // Utiliser keyFile au lieu de key
     console.log(`SSL conf ready (use https)`);
   } catch (error) {
     console.error("Error loading SSL certificates:", error);
