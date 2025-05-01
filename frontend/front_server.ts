@@ -1,120 +1,88 @@
-import { Application, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
-import { Router } from "https://deno.land/x/oak@v12.6.1/router.ts";
+// Modified front_server.ts
+import { Application, Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 
-// Define the ROOT constant
 const ROOT = Deno.cwd();
-
-// Create the application
 const app = new Application();
 
-// Middleware to set CORS headers
-app.use(async (ctx, next) => {
-  ctx.response.headers.set("Access-Control-Allow-Origin", "*");
-  ctx.response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  
-  if (ctx.request.method === "OPTIONS") {
-    ctx.response.status = 200;
-    return;
-  }
-  
-  await next();
+// 1. Route redirects for section roots
+const redirectRouter = new Router();
+redirectRouter.get("/chat", (ctx) => {
+  ctx.response.redirect("/chat/chat.html");
 });
 
-// Game router for dynamic game routes
-const gameRouter = new Router();
+redirectRouter.get("/login", (ctx) => {
+  ctx.response.redirect("/login/login.html");
+});
 
-// Route to serve the game page
+redirectRouter.get("/admin", (ctx) => {
+  ctx.response.redirect("/admin/admin.html");
+});
+
+redirectRouter.get("/matchmaking", (ctx) => {
+  ctx.response.redirect("/matchmaking.html");
+});
+
+// 2. Game-specific dynamic routes
+const gameRouter = new Router();
 gameRouter.get("/game/:id", async (ctx) => {
   const gameId = ctx.params.id;
-  try {
-    // Read the HTML template
-    const html = await Deno.readTextFile(`${ROOT}/game/game.html`);
-    
-    // Replace template variables with default values
-    const modifiedHtml = html
-      .replace(/\{\{userId\}\}/g, "1") // Default user ID
-      .replace(/\{\{gameId\}\}/g, gameId)
-      .replace(/\{\{player1Name\}\}/g, "Player 1")
-      .replace(/\{\{player2Name\}\}/g, "Player 2");
-    
-    ctx.response.type = "text/html";
-    ctx.response.body = modifiedHtml;
-  } catch (error) {
-    console.error("Error loading game page:", error);
-    ctx.response.status = 404;
-    ctx.response.body = "Game not found";
-  }
+  // Your existing game route logic...
 });
 
-// Use the game router
+// 3. Mount routers
+app.use(redirectRouter.routes());
+app.use(redirectRouter.allowedMethods());
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
 
-// Middleware to serve static files with correct MIME types
+// 4. Root route - serve index.html
 app.use(async (ctx, next) => {
-  const path = ctx.request.url.pathname;
-
-  // Set mime types explicitly for important file types
-  const mimeTypes = {
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.html': 'text/html',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',
-  };
-
-  // Set content type based on file extension
-  for (const [ext, type] of Object.entries(mimeTypes)) {
-    if (path.endsWith(ext)) {
-      ctx.response.headers.set("Content-Type", type);
-      break;
-    }
-  }
-
-  // Try to serve the file
-  try {
-    // Special case for matchmaking.html and matchmaking.js in root
-    if (path === "/matchmaking.html" || path === "/matchmaking.js") {
-      await send(ctx, path, { root: ROOT });
-      return;
-    }
-    
-    // Handle other static files
-    await send(ctx, path, { root: ROOT });
-    return;
-  } catch (err) {
-    if (err.name !== "NotFound") {
-      console.error(`Error serving static file ${path}:`, err);
-    }
-    await next();
-  }
-});
-
-// Default route - redirect to index.html or login
-app.use(async (ctx) => {
   if (ctx.request.url.pathname === "/") {
     try {
       await send(ctx, "/index.html", { root: ROOT });
       return;
     } catch (err) {
-      // Fallback to login if index.html doesn't exist
-      ctx.response.redirect("/login/login.html");
-      return;
+      console.error("Error serving index.html:", err);
     }
   }
-  
-  // If we get here, serve a 404 page
+  await next();
+});
+
+// 5. Static file serving with proper MIME types
+app.use(async (ctx, next) => {
   try {
-    await send(ctx, "/404.html", { root: ROOT });
+    // Set MIME types explicitly
+    const path = ctx.request.url.pathname;
+    if (path.endsWith(".css")) {
+      ctx.response.headers.set("Content-Type", "text/css");
+    } else if (path.endsWith(".js")) {
+      ctx.response.headers.set("Content-Type", "application/javascript");
+    } else if (path.endsWith(".html")) {
+      ctx.response.headers.set("Content-Type", "text/html");
+    }
+    else if (path.endsWith(".png")) {
+      ctx.response.headers.set("Content-Type", "image/png");
+    } else if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
+      ctx.response.headers.set("Content-Type", "image/jpeg");
+    } else if (path.endsWith(".svg")) {
+      ctx.response.headers.set("Content-Type", "image/svg+xml");
+    }
+        
+    // Serve the file
+    await send(ctx, path, { root: ROOT });
   } catch (err) {
-    ctx.response.status = 404;
-    ctx.response.body = "Page not found";
+    if (err.name !== "NotFound") {
+      console.error(`Error serving file: ${err}`);
+    }
+    await next();
   }
+});
+
+// 6. 404 handler
+app.use((ctx) => {
+  ctx.response.status = 404;
+  ctx.response.body = "Page not found";
 });
 
 // Configuration du port et des options SSL
