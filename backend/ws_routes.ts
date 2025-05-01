@@ -364,3 +364,441 @@ wsRouter.get("/ws", async (ctx) => {
       socket.onerror = (error) => {
         console.error(`❌ WebSocket error for ${username}:`, error);
       };
+      
+    } catch (err) {
+      console.error("❌ Invalid or expired token:", err.message);
+      ctx.throw(401, "Invalid or expired token");
+    }
+  } catch (error) {
+    console.error("❌ Error in WebSocket route:", error);
+    if (!ctx.response.writable) {
+      console.error("❌ Cannot respond, context already used");
+      return;
+    }
+    ctx.response.status = error.status || 500;
+    ctx.response.body = { error: error.message || "Internal server error" };
+  }
+});
+
+// Broadcast a system message to all clients except the excluded socket
+function broadcastSystemMessage(message: string, excludeSocket?: WebSocket) {
+  console.log(`💬 Broadcasting system message: ${message}`);
+  const systemMessage = JSON.stringify({
+    event: "systemMessage",
+    data: { message }
+  });
+  
+  let sentCount = 0;
+  connectedClients.forEach((client) => {
+    try {
+      if ((!excludeSocket || client.socket !== excludeSocket) && 
+          client.socket.readyState === WebSocket.OPEN) {
+        client.socket.send(systemMessage);
+        sentCount++;
+      }
+    } catch (error) {
+      console.error(`❌ Error sending system message to ${client.username}:`, error);
+    }
+  });
+  console.log(`✅ System message sent to ${sentCount} clients`);
+}
+
+// Handle chat messages
+function handleChatMessage(
+  data: { message: string },
+  sender: WebSocket,
+  username: string,
+  userId: string
+) {
+  console.log(`💬 Chat message from ${username}: ${data.message}`);
+  
+  // Format the message to be sent
+  const formattedMessage = JSON.stringify({ 
+    event: "chatMessage", 
+    data: { username, message: data.message } 
+  });
+  
+  console.log(`📤 Sending message to all other clients (${connectedClients.size - 1} others)`);
+  
+  // Send to all other connected clients
+  let sentCount = 0;
+  connectedClients.forEach((client) => {
+    try {
+      if (client.socket !== sender && client.socket.readyState === WebSocket.OPEN) {
+        console.log(`  📨 Sending to ${client.username}`);
+        client.socket.send(formattedMessage);
+        sentCount++;
+      }
+    } catch (error) {
+      console.error(`❌ Error sending message to ${client.username}:`, error);
+    }
+  });
+  
+  console.log(`✅ Message sent to ${sentCount} clients`);
+}
+
+// Handle matchmaking start request
+function handleStartMatchmaking(data: any, socket: WebSocket, userId: string) {
+  console.log(`🎮 User ${userId} is starting matchmaking`);
+  
+  // Check if user is already in queue
+  const existingIndex = matchmakingQueue.findIndex(entry => entry.userId === userId);
+  if (existingIndex !== -1) {
+    console.log(`ℹ️ User ${userId} is already in matchmaking queue`);
+    
+    // Send confirmation that they're already in queue
+    socket.send(JSON.stringify({
+      event: "matchmakingUpdate",
+      data: { status: "searching" }
+    }));
+    
+    return;
+  }
+  
+  // Add user to matchmaking queue
+  matchmakingQueue.push({
+    userId: userId,
+    socket: socket,
+    timestamp: Date.now()
+  });
+  
+  console.log(`✅ Added user ${userId} to matchmaking queue (total: ${matchmakingQueue.length})`);
+  
+  // Send confirmation
+  socket.send(JSON.stringify({
+    event: "matchmakingUpdate",
+    data: { status: "searching" }
+  }));
+  
+  // Process matchmaking immediately in case there's already someone waiting
+  processMatchmaking();
+}
+
+// Handle matchmaking cancellation
+function handleCancelMatchmaking(data: any, socket: WebSocket, userId: string) {
+  console.log(`🎮 User ${userId} is cancelling matchmaking`);
+  
+  // Find and remove user from queue
+  const queueIndex = matchmakingQueue.findIndex(entry => entry.userId === userId);
+  if (queueIndex !== -1) {
+    matchmakingQueue.splice(queueIndex, 1);
+    console.log(`✅ Removed user ${userId} from matchmaking queue (remaining: ${matchmakingQueue.length})`);
+    
+    // Send confirmation
+    socket.send(JSON.stringify({
+      event: "matchmakingUpdate",
+      data: { status: "cancelled" }
+    }));
+  } else {
+    console.log(`ℹ️ User ${userId} was not in matchmaking queue`);
+    
+    // Send notification they weren't in queue
+    socket.send(JSON.stringify({
+      event: "systemMessage",
+      data: { message: "Vous n'étiez pas en recherche de partie." }
+    }));
+  }
+}
+
+// Handle player challenge request
+function handleChallengePlayer(data: any, socket: WebSocket, userId: string) {
+  if (!data.opponentId) {
+    console.log(`❌ Missing opponentId in challenge request from ${userId}`);
+    return;
+  }
+  
+  console.log(`🎮 User ${userId} is challenging player ${data.opponentId}`);
+  
+  // Check if opponent is connected
+  if (!connectedClients.has(data.opponentId)) {
+    console.log(`❌ Opponent ${data.opponentId} is not connected`);
+    
+    socket.send(JSON.stringify({
+      event: "systemMessage",
+      data: { message: "Ce joueur n'est plus en ligne." }
+    }));
+    
+    return;
+  }
+  
+  // Get opponent's socket
+  const opponentClient = connectedClients.get(data.opponentId);
+  if (!opponentClient || opponentClient.socket.readyState !== WebSocket.OPEN) {
+    console.log(`❌ Opponent ${data.opponentId} socket is not open`);
+    
+    socket.send(JSON.stringify({
+      event: "systemMessage",
+      data: { message: "Ce joueur n'est plus disponible." }
+    }));
+    
+    return;
+  }
+  
+  // Get challenger username
+  const challengerClient = connectedClients.get(userId);
+  if (!challengerClient) {
+    console.log(`❌ Challenger ${userId} not found in connected clients`);
+    return;
+  }
+  
+  // Create a game between the two players
+  createGameBetweenPlayers(userId, data.opponentId, socket, opponentClient.socket);
+}
+
+// Send list of online players
+function sendOnlinePlayersList(socket: WebSocket) {
+  const onlinePlayers = Array.from(connectedClients.entries()).map(([id, client]) => ({
+    id: id,
+    username: client.username,
+    status: matchmakingQueue.some(entry => entry.userId === id) ? "en recherche" : "disponible"
+  }));
+  
+  socket.send(JSON.stringify({
+    event: "onlinePlayers",
+    data: { players: onlinePlayers }
+  }));
+}
+
+// Handle game action
+function handleGameAction(data: any, socket: WebSocket, userId: string) {
+  if (!data.gameId) {
+    console.log(`❌ Missing gameId in game action from ${userId}`);
+    return;
+  }
+  
+  console.log(`🎮 Game action in game ${data.gameId} by user ${userId}: ${data.action}`);
+  
+  // Check if the game exists
+  if (!activeGames.has(data.gameId.toString())) {
+    console.log(`❌ Game ${data.gameId} not found for action by ${userId}`);
+    
+    socket.send(JSON.stringify({
+      event: "systemMessage",
+      data: { message: "Cette partie n'existe plus." }
+    }));
+    
+    return;
+  }
+  
+  // Get game data
+  const gameData = activeGames.get(data.gameId.toString());
+  
+  // Check if the user is part of the game
+  if (gameData?.player1 !== userId && gameData?.player2 !== userId) {
+    console.log(`❌ User ${userId} is not part of game ${data.gameId}`);
+    
+    socket.send(JSON.stringify({
+      event: "systemMessage",
+      data: { message: "Vous ne faites pas partie de cette partie." }
+    }));
+    
+    return;
+  }
+  
+  // Process the game action based on type
+  processGameAction(data, userId).then(gameState => {
+    if (gameState) {
+      // Notify all subscribers about the game update
+      notifyGamePlayers(data.gameId.toString(), gameState);
+    }
+  }).catch(error => {
+    console.error(`❌ Error processing game action:`, error);
+    
+    socket.send(JSON.stringify({
+      event: "systemMessage",
+      data: { message: "Erreur lors du traitement de l'action de jeu." }
+    }));
+  });
+}
+
+// Process game action and return the updated game state
+async function processGameAction(data: any, userId: string): Promise<any> {
+  try {
+    const gameId = data.gameId;
+    const action = data.action;
+    
+    // Load the game from the database
+    const game = await LostCitiesGame.load(gameId);
+    
+    // Verify it's the player's turn
+    if (game.currentPlayerId !== userId) {
+      throw new Error("Not your turn");
+    }
+    
+    let success = false;
+    
+    // Process different action types
+    switch (action) {
+      case "play_card":
+        if (!data.cardId || !data.color) {
+          throw new Error("Missing cardId or color for play_card action");
+        }
+        success = game.playCardToExpedition(userId, data.cardId, data.color);
+        break;
+        
+      case "discard_card":
+        if (!data.cardId) {
+          throw new Error("Missing cardId for discard_card action");
+        }
+        success = game.discardCard(userId, data.cardId);
+        break;
+        
+      case "draw_card":
+        if (!data.source) {
+          throw new Error("Missing source for draw_card action");
+        }
+        
+        if (data.source === "deck") {
+          success = game.drawCardFromDeck(userId);
+        } else if (data.source === "discard_pile" && data.color) {
+          success = game.drawCardFromDiscardPile(userId, data.color);
+        } else {
+          throw new Error("Invalid draw source");
+        }
+        break;
+        
+      case "surrender":
+        // Handle surrender - set other player as winner
+        game.gameStatus = 'finished';
+        game.winner = game.player1.id === userId ? game.player2.id : game.player1.id;
+        success = true;
+        break;
+        
+      case "request_state":
+        // Just return the current state without making changes
+        success = true;
+        break;
+        
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+    
+    if (!success) {
+      throw new Error("Action failed");
+    }
+    
+    // Save the updated game state
+    await game.save();
+    
+    // Return the game state to be sent to clients
+    return game.getGameState();
+  } catch (error) {
+    console.error(`❌ Error processing game action: ${error.message}`);
+    throw error;
+  }
+}
+
+// Handle game subscription requests
+function handleGameSubscription(data: { gameId: string }, socket: WebSocket, username: string): void {
+  console.log(`🎮 User ${username} subscribing to game ${data.gameId}`);
+  
+  // Create set for this game if it doesn't exist
+  if (!gameSubscriptions.has(data.gameId)) {
+    gameSubscriptions.set(data.gameId, new Set());
+  }
+  
+  // Add socket to the game's subscriptions
+  const subscribers = gameSubscriptions.get(data.gameId)!;
+  subscribers.add(socket);
+  
+  console.log(`✅ User ${username} subscribed to game ${data.gameId}. Total subscribers: ${subscribers.size}`);
+  
+  // Send confirmation to the client
+  try {
+    socket.send(JSON.stringify({
+      event: 'gameSubscribed',
+      data: { gameId: data.gameId }
+    }));
+  } catch (error) {
+    console.error(`❌ Error sending subscription confirmation to ${username}:`, error);
+  }
+}
+
+// Handle client disconnection - remove from game subscriptions
+function handleGameClientDisconnect(socket: WebSocket): void {
+  // Check all game subscriptions and remove this socket
+  gameSubscriptions.forEach((subscribers, gameId) => {
+    if (subscribers.has(socket)) {
+      subscribers.delete(socket);
+      console.log(`🎮 Client unsubscribed from game ${gameId}. Remaining subscribers: ${subscribers.size}`);
+      
+      // Clean up empty subscription sets
+      if (subscribers.size === 0) {
+        gameSubscriptions.delete(gameId);
+        console.log(`🧹 Removed empty subscription set for game ${gameId}`);
+      }
+    }
+  });
+}
+
+// Function to check for and clean up stale game subscriptions
+function cleanupGameSubscriptions(): void {
+  let totalRemoved = 0;
+  
+  gameSubscriptions.forEach((subscribers, gameId) => {
+    const initialSize = subscribers.size;
+    
+    // Remove closed sockets
+    subscribers.forEach(socket => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        subscribers.delete(socket);
+        totalRemoved++;
+      }
+    });
+    
+    // Remove empty sets
+    if (subscribers.size === 0) {
+      gameSubscriptions.delete(gameId);
+      console.log(`🧹 Removed empty subscription set for game ${gameId}`);
+    } else if (initialSize !== subscribers.size) {
+      console.log(`🧹 Removed ${initialSize - subscribers.size} stale subscribers from game ${gameId}`);
+    }
+  });
+  
+  if (totalRemoved > 0) {
+    console.log(`🧹 Total stale connections removed: ${totalRemoved}`);
+  }
+}
+
+// Function to notify game players about updates
+function notifyGamePlayers(gameId: string, gameState: any): void {
+  console.log(`🎮 Notifying update for game ${gameId}`);
+  
+  const subscribers = gameSubscriptions.get(gameId);
+  if (!subscribers || subscribers.size === 0) {
+    console.log(`ℹ️ No subscribers for game ${gameId}`);
+    return;
+  }
+  
+  console.log(`📤 Sending game update to ${subscribers.size} subscribers`);
+  
+  const message = JSON.stringify({
+    event: 'gameUpdated',
+    data: { 
+      gameId,
+      gameState
+    }
+  });
+  
+  let sentCount = 0;
+  subscribers.forEach(socket => {
+    try {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(message);
+        sentCount++;
+      } else {
+        // Remove closed sockets
+        subscribers.delete(socket);
+      }
+    } catch (error) {
+      console.error('❌ Error sending game update:', error);
+      // Remove socket on error
+      subscribers.delete(socket);
+    }
+  });
+  
+  console.log(`✅ Game update sent to ${sentCount} subscribers`);
+}
+
+export { notifyGamePlayers };
+export default wsRouter;
