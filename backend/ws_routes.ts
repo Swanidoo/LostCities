@@ -3,6 +3,7 @@ import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
+const playersLookingForMatch: { socket: WebSocket; userId: string; username: string }[] = [];
 
 const jwtKey = Deno.env.get("JWT_SECRET");
 if (!jwtKey) {
@@ -124,11 +125,15 @@ wsRouter.get("/ws", async (ctx) => {
         try {
           const data = JSON.parse(event.data);
           console.log("📩 Message received:", data);
-          
+      
           if (data.event === "chatMessage" && data.data?.message) {
             handleChatMessage(data.data, socket, username);
           } else if (data.event === "movePlayed" && data.data?.gameId && data.data?.move) {
             handleMovePlayed(data.data, socket, username);
+          } else if (data.event === "findMatch") {
+            handleMatchmaking(socket, username, userId);
+          } else if (data.event === "cancelMatch") {
+            removeFromMatchmaking(socket);
           } else {
             console.warn("⚠️ Unknown message type or missing data:", data);
           }
@@ -139,7 +144,7 @@ wsRouter.get("/ws", async (ctx) => {
       
       // Set up close event listener
       socket.onclose = (event) => {
-        console.log(`👋 Client ${username} disconnected with code ${event.code} and reason "${event.reason}"`);
+        console.log(`👋 Client ${username} (${userId}) disconnected with code ${event.code} and reason "${event.reason}"`);
         
         // Remove the client from the connected clients array
         const index = connectedClients.findIndex(client => client.socket === socket);
@@ -152,7 +157,15 @@ wsRouter.get("/ws", async (ctx) => {
         
         // Notify others that the user has left
         broadcastSystemMessage(`${username} has left the chat.`);
+        
+        // Handle player disconnect for matchmaking
+        handlePlayerDisconnect(socket);
       };
+      
+      function handlePlayerDisconnect(socket: WebSocket) {
+        // Remove from matchmaking queue if they're in it
+        removeFromMatchmaking(socket);
+      }
       
       // Set up error event listener
       socket.onerror = (error) => {
@@ -279,6 +292,68 @@ function notifyGamePlayers(gameId: string, gameState: any): void {
       }
     }
   });
+}
+
+
+function handleMatchmaking(socket: WebSocket, username: string, userId: string) {
+  console.log(`🎮 User ${username} (${userId}) is looking for a match`);
+  
+  // Remove any existing entry for this player (in case they're already searching)
+  removeFromMatchmaking(socket);
+  
+  // Add to matchmaking queue
+  playersLookingForMatch.push({ socket, userId, username });
+  
+  // Send confirmation to player
+  socket.send(JSON.stringify({
+    event: "matchmakingStatus",
+    data: { status: "searching", message: "Looking for an opponent..." }
+  }));
+  
+  // Try to find a match
+  tryFindMatch();
+}
+
+function removeFromMatchmaking(socket: WebSocket) {
+  const index = playersLookingForMatch.findIndex(player => player.socket === socket);
+  if (index !== -1) {
+    const player = playersLookingForMatch[index];
+    console.log(`🎮 User ${player.username} (${player.userId}) stopped looking for a match`);
+    playersLookingForMatch.splice(index, 1);
+  }
+}
+
+function tryFindMatch() {
+  // Need at least 2 players to make a match
+  if (playersLookingForMatch.length >= 2) {
+    // Take the first two players in the queue
+    const player1 = playersLookingForMatch.shift();
+    const player2 = playersLookingForMatch.shift();
+    
+    console.log(`🎮 Match found between ${player1.username} and ${player2.username}`);
+    
+    // Create a simple game ID (just using timestamp for now)
+    const gameId = Date.now().toString();
+    
+    // Notify both players
+    player1.socket.send(JSON.stringify({
+      event: "matchFound",
+      data: { 
+        gameId,
+        opponentId: player2.userId,
+        opponentName: player2.username
+      }
+    }));
+    
+    player2.socket.send(JSON.stringify({
+      event: "matchFound",
+      data: { 
+        gameId,
+        opponentId: player1.userId,
+        opponentName: player1.username
+      }
+    }));
+  }
 }
 
 export { notifyGamePlayers };
