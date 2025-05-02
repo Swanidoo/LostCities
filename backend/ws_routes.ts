@@ -142,28 +142,27 @@ wsRouter.get("/ws", async (ctx) => {
         }
       };
       
-      // Set up close event listener
-      socket.onclose = (event) => {
-        console.log(`👋 Client ${username} (${userId}) disconnected with code ${event.code} and reason "${event.reason}"`);
+      
+      // WebSocket onclose event handler 
+      socket.onclose = function(event) {
+        // Find client data from the array instead of using local variables
+        const clientIndex = connectedClients.findIndex(client => client.socket === socket);
+        const clientData = clientIndex !== -1 ? connectedClients[clientIndex] : { username: "unknown user" };
+        
+        console.log(`👋 Client ${clientData.username} disconnected with code ${event.code} and reason "${event.reason}"`);
         
         // Remove the client from the connected clients array
-        const index = connectedClients.findIndex(client => client.socket === socket);
-        if (index !== -1) {
-          connectedClients.splice(index, 1);
+        if (clientIndex !== -1) {
+          connectedClients.splice(clientIndex, 1);
           console.log(`👥 Remaining connected clients: ${connectedClients.length}`);
         } else {
           console.warn("⚠️ Could not find client in connected clients array!");
         }
         
         // Notify others that the user has left
-        broadcastSystemMessage(`${username} has left the chat.`);
+        broadcastSystemMessage(`${clientData.username} has left the chat.`);
         
         // Handle player disconnect for matchmaking
-        handlePlayerDisconnect(socket);
-      };
-      
-      function handlePlayerDisconnect(socket: WebSocket) {
-        // Remove from matchmaking queue if they're in it
         removeFromMatchmaking(socket);
       }
       
