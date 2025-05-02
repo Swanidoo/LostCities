@@ -148,19 +148,22 @@ document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
 });
 
+
 // Connexion au WebSocket
 function connectWebSocket() {
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
-    // Fermer la connexion existante si elle existe
-    if (gameState.socket && gameState.socket.readyState === WebSocket.OPEN) {
-        gameState.socket.close();
-    }
-
-    // Créer une nouvelle connexion WebSocket avec le token d'authentification
-    const wsUrl = `${WS_URL}?token=${encodeURIComponent(token)}`;
-    console.log(`Connexion au WebSocket: ${wsUrl.split('?')[0]}...`);
+    // Clean the token (like in chat.js)
+    const cleanToken = token.trim();
+    
+    // Use the same WebSocket protocol detection as your chat.js
+    const isLocalhost = window.location.hostname === "localhost";
+    const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
+    const wsHost = isLocalhost ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
+    const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(cleanToken)}`;
+    
+    console.log("Connecting to WebSocket URL:", wsUrl.substring(0, wsUrl.indexOf('?') + 15) + "...");
     
     gameState.socket = new WebSocket(wsUrl);
     
