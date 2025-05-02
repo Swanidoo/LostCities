@@ -25,9 +25,14 @@ redirectRouter.get("/matchmaking", (ctx) => {
 
 // 2. Game-specific dynamic routes
 const gameRouter = new Router();
-gameRouter.get("/game/:id", async (ctx) => {
-  const gameId = ctx.params.id;
-  // Your existing game route logic...
+gameRouter.get("/game/game.html", async (ctx) => {
+  try {
+    await send(ctx, "/game/game.html", { root: ROOT });
+  } catch (err) {
+    console.error("Error serving game.html:", err);
+    ctx.response.status = 404;
+    ctx.response.body = "Game not found";
+  }
 });
 
 // 3. Mount routers

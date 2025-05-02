@@ -25,6 +25,27 @@ const gameState = {
     cardElements: new Map() // Pour stocker les références aux éléments DOM des cartes
 };
 
+// At the beginning of your game.js file
+document.addEventListener('DOMContentLoaded', () => {
+    // Get gameId from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameId = urlParams.get('gameId');
+    
+    if (!gameId) {
+      console.error("No game ID found in URL");
+      // Show error message to user
+      document.getElementById('game-status').textContent = "Error: No game ID found";
+      return;
+    }
+    
+    console.log("Loading game with ID:", gameId);
+    
+    // Store gameId in hidden input for later use
+    document.getElementById('game-id').value = gameId;
+    
+  });
+
+
 // Éléments DOM
 const elements = {
     // Infos générales
