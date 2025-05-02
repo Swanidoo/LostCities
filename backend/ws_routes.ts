@@ -3,8 +3,6 @@ import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
-const playersLookingForMatch: { socket: WebSocket; userId: string; username: string }[] = [];
-const gameSubscriptions: Map<string, Set<WebSocket>> = new Map();
 
 const jwtKey = Deno.env.get("JWT_SECRET");
 if (!jwtKey) {
@@ -38,140 +36,6 @@ setInterval(() => {
   }
 }, 30000); // Every 30 seconds
 
-// Handle matchmaking requests
-function handleMatchmaking(socket: WebSocket, username: string, userId: string) {
-  console.log(`🎮 User ${username} (${userId}) is looking for a match`);
-  
-  // Remove any existing entry
-  removeFromMatchmaking(socket);
-  
-  // Add to queue
-  playersLookingForMatch.push({ socket, userId, username });
-  
-  // Send confirmation
-  try {
-    socket.send(JSON.stringify({
-      event: "matchmakingStatus",
-      data: { status: "searching", message: "Looking for an opponent..." }
-    }));
-  } catch (error) {
-    console.error("Error sending matchmaking confirmation:", error);
-  }
-  
-  // Try to find a match
-  tryFindMatch();
-}
-
-function removeFromMatchmaking(socket: WebSocket) {
-  const index = playersLookingForMatch.findIndex(player => player.socket === socket);
-  if (index !== -1) {
-    const player = playersLookingForMatch[index];
-    console.log(`🎮 User ${player.username} (${player.userId}) stopped looking for a match`);
-    playersLookingForMatch.splice(index, 1);
-  }
-}
-
-function tryFindMatch() {
-  if (playersLookingForMatch.length >= 2) {
-    const player1 = playersLookingForMatch.shift();
-    const player2 = playersLookingForMatch.shift();
-    
-    const gameId = Date.now().toString();
-    
-    console.log(`🎮 Match found between ${player1.username} and ${player2.username}`);
-    
-    try {
-      player1.socket.send(JSON.stringify({
-        event: "matchFound",
-        data: { 
-          gameId,
-          opponentId: player2.userId,
-          opponentName: player2.username
-        }
-      }));
-      
-      player2.socket.send(JSON.stringify({
-        event: "matchFound",
-        data: { 
-          gameId,
-          opponentId: player1.userId,
-          opponentName: player1.username
-        }
-      }));
-    } catch (error) {
-      console.error("Error notifying players about match:", error);
-    }
-  }
-}
-
-// Game subscription handler
-function handleGameSubscription(data: { gameId: string }, socket: WebSocket, username: string) {
-  const gameId = data.gameId;
-  console.log(`🎮 User ${username} subscribing to game ${gameId}`);
-  
-  // Create set for this game if it doesn't exist
-  if (!gameSubscriptions.has(gameId)) {
-    gameSubscriptions.set(gameId, new Set());
-  }
-  
-  // Add socket to the game's subscriptions
-  const subscribers = gameSubscriptions.get(gameId);
-  subscribers.add(socket);
-  
-  console.log(`✅ User ${username} subscribed to game ${gameId}. Total subscribers: ${subscribers.size}`);
-  
-  // Send confirmation to the client
-  try {
-    socket.send(JSON.stringify({
-      event: 'gameSubscribed',
-      data: { gameId }
-    }));
-  } catch (error) {
-    console.error(`❌ Error sending subscription confirmation to ${username}:`, error);
-  }
-}
-
-// Game move handler
-function handleGameMove(data: { gameId: string, moveType: string, moveData: any }, socket: WebSocket, username: string) {
-  console.log(`🎮 Move in game ${data.gameId} by ${username}: ${data.moveType}`);
-  
-  // Get subscribers to this game
-  const subscribers = gameSubscriptions.get(data.gameId);
-  if (!subscribers) {
-    console.log(`ℹ️ No subscribers for game ${data.gameId}`);
-    return;
-  }
-  
-  // Format the message
-  const message = JSON.stringify({
-    event: 'gameMove',
-    data: {
-      gameId: data.gameId,
-      player: username,
-      moveType: data.moveType,
-      moveData: data.moveData,
-      timestamp: new Date().toISOString()
-    }
-  });
-  
-  // Send to all OTHER subscribers of this game
-  let sentCount = 0;
-  subscribers.forEach(sub => {
-    try {
-      if (sub !== socket && sub.readyState === WebSocket.OPEN) {
-        sub.send(message);
-        sentCount++;
-      }
-    } catch (error) {
-      console.error('❌ Error broadcasting game move:', error);
-      // Remove socket on error
-      subscribers.delete(sub);
-    }
-  });
-  
-  console.log(`✅ Move broadcast to ${sentCount} subscribers`);
-}
-
 wsRouter.get("/ws", async (ctx) => {
   try {
     if (!ctx.isUpgradable) {
@@ -189,6 +53,7 @@ wsRouter.get("/ws", async (ctx) => {
     }
 
     try {
+      // Create the same CryptoKey used for signing in auth_routes.ts
       const encoder = new TextEncoder();
       const keyData = encoder.encode(jwtKey);
       const cryptoKey = await crypto.subtle.importKey(
@@ -199,6 +64,7 @@ wsRouter.get("/ws", async (ctx) => {
         ["verify"]
       );
       
+      // Verify with the CryptoKey
       const payload = await verify(token, cryptoKey);
       console.log("✅ Token valid:", payload);
       
@@ -208,20 +74,16 @@ wsRouter.get("/ws", async (ctx) => {
       }
       
       const username = (payload as Record<string, unknown>).username || (payload as Record<string, unknown>).email;
-      const userId = (payload as Record<string, unknown>).id;
-      
-      if (typeof username !== "string" || userId === undefined) {
-        console.error("❌ Invalid token payload: Missing username or id");
+      if (typeof username !== "string") {
+        console.error("❌ Invalid token payload: Missing username or email");
         ctx.throw(401, "Invalid token payload");
       }
       
-      // Convert userId to string
-      const userIdStr = String(userId);
-      
+      // Upgrade the connection
       let socket;
       try {
         socket = ctx.upgrade();
-        console.log(`✅ Client connected to WebSocket as ${username} (${userIdStr})!`);
+        console.log(`✅ Client connected to WebSocket as ${username}!`);
       } catch (error) {
         console.error(`❌ Failed to upgrade connection for ${username}:`, error);
         ctx.throw(500, "Failed to upgrade connection");
@@ -267,25 +129,6 @@ wsRouter.get("/ws", async (ctx) => {
             handleChatMessage(data.data, socket, username);
           } else if (data.event === "movePlayed" && data.data?.gameId && data.data?.move) {
             handleMovePlayed(data.data, socket, username);
-          } else if (data.event === "subscribeGame" && data.data?.gameId) {
-            handleGameSubscription(data.data, socket, username);
-          } else if (data.event === "gameMove" && data.data?.gameId) {
-            handleGameMove(data.data, socket, username);
-          } else if (data.event === "findMatch") {
-            // Make sure to pass userId which is now defined
-            handleMatchmaking(socket, username, userIdStr);
-          } else if (data.event === "cancelMatch") {
-            removeFromMatchmaking(socket);
-            
-            // Send cancellation confirmation
-            try {
-              socket.send(JSON.stringify({
-                event: "matchmakingStatus",
-                data: { status: "cancelled", message: "Matchmaking cancelled" }
-              }));
-            } catch (error) {
-              console.error("Error sending cancellation confirmation:", error);
-            }
           } else {
             console.warn("⚠️ Unknown message type or missing data:", data);
           }
@@ -298,30 +141,13 @@ wsRouter.get("/ws", async (ctx) => {
       socket.onclose = (event) => {
         console.log(`👋 Client ${username} disconnected with code ${event.code} and reason "${event.reason}"`);
         
-        // Remove from connected clients
+        // Remove the client from the connected clients array
         const index = connectedClients.findIndex(client => client.socket === socket);
         if (index !== -1) {
           connectedClients.splice(index, 1);
           console.log(`👥 Remaining connected clients: ${connectedClients.length}`);
         } else {
           console.warn("⚠️ Could not find client in connected clients array!");
-        }
-        
-        // Remove from matchmaking
-        removeFromMatchmaking(socket);
-        
-        // Remove from all game subscriptions
-        for (const [gameId, subscribers] of gameSubscriptions.entries()) {
-          if (subscribers.has(socket)) {
-            subscribers.delete(socket);
-            console.log(`🎮 Removed user from game ${gameId} subscriptions`);
-            
-            // Remove empty subscription sets
-            if (subscribers.size === 0) {
-              gameSubscriptions.delete(gameId);
-              console.log(`🧹 Removed empty subscription set for game ${gameId}`);
-            }
-          }
         }
         
         // Notify others that the user has left
@@ -444,19 +270,15 @@ function notifyGamePlayers(gameId: string, gameState: any): void {
     data: { gameId, gameState }
   });
 
-  let sentCount = 0;
   subscribers.forEach((socket) => {
     if (socket.readyState === WebSocket.OPEN) {
       try {
         socket.send(message);
-        sentCount++;
       } catch (error) {
         console.error(`❌ Error notifying player in game ${gameId}:`, error);
       }
     }
   });
-  
-  console.log(`✅ Game update sent to ${sentCount} subscribers`);
 }
 
 export { notifyGamePlayers };
