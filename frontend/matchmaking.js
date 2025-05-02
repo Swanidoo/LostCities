@@ -1,16 +1,15 @@
-// Determine the API URL based on the environment
+// Configuration des URLs en fonction de l'environnement
 const API_URL = window.location.hostname === "localhost"
-  ? "http://localhost:3000" // Local backend URL
-  : "https://lostcitiesbackend.onrender.com"; // Render backend URL
+  ? "http://localhost:3000" // URL du backend local
+  : "https://lostcitiesbackend.onrender.com"; // URL de production
 
-// Determine the WebSocket URL based on the environment
-const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_HOST = window.location.hostname === "localhost" 
-    ? 'localhost:3000' 
-    : 'lostcitiesbackend.onrender.com';
-const WS_URL = `${WS_PROTOCOL}//${WS_HOST}/ws`;
+// Configuration WebSocket - using the same pattern as chat.js
+const isLocalhost = window.location.hostname === "localhost";
+const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
+const wsHost = isLocalhost ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
+const WS_URL = `${wsProtocol}//${wsHost}/ws`;
 
-// Matchmaking state
+// État du matchmaking
 let matchmakingState = {
     searching: false,
     socket: null,
@@ -20,7 +19,7 @@ let matchmakingState = {
     gameId: null
 };
 
-// DOM Elements
+// Éléments DOM
 const elements = {
     searchBtn: document.getElementById('search-game-btn'),
     cancelBtn: document.getElementById('cancel-search-btn'),
@@ -29,17 +28,21 @@ const elements = {
     onlinePlayersList: document.getElementById('online-players')
 };
 
-// Initialization
+// Initialisation
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if user is logged in
+    // Vérifier si l'utilisateur est connecté
     const token = localStorage.getItem('authToken');
     if (!token) {
-        // Redirect to login page if not logged in
+        // Rediriger vers la page de connexion si non connecté
         window.location.href = '/login/login.html';
         return;
     }
 
-    // Get user information from token
+    // Clean the token and log it for debugging (like in chat.js)
+    const cleanToken = token.trim();
+    console.log("Using cleaned token length:", cleanToken.length);
+
+    // Récupérer les informations de l'utilisateur depuis le token
     try {
         const tokenParts = token.split('.');
         if (tokenParts.length === 3) {
@@ -48,26 +51,26 @@ document.addEventListener('DOMContentLoaded', () => {
             matchmakingState.username = payload.username || payload.email;
         }
     } catch (error) {
-        console.error("Error reading token:", error);
+        console.error("Erreur lors de la lecture du token:", error);
     }
 
-    // Set up event listeners
+    // Configurer les écouteurs d'événements
     setupEventListeners();
     
-    // Establish WebSocket connection
-    connectWebSocket();
+    // Établir la connexion WebSocket
+    connectWebSocket(cleanToken);
 });
 
-// Set up event listeners
+// Configuration des écouteurs d'événements
 function setupEventListeners() {
-    // Search button
+    // Bouton de recherche de partie
     elements.searchBtn.addEventListener('click', () => {
         if (!matchmakingState.searching) {
             startMatchmaking();
         }
     });
     
-    // Cancel button
+    // Bouton d'annulation de recherche
     elements.cancelBtn.addEventListener('click', () => {
         if (matchmakingState.searching) {
             cancelMatchmaking();
@@ -75,60 +78,58 @@ function setupEventListeners() {
     });
 }
 
-// Connect to WebSocket
-function connectWebSocket() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
+// Connexion au WebSocket
+function connectWebSocket(cleanToken) {
+    if (!cleanToken) return;
 
-    // Close existing connection if it exists
+    // Fermer la connexion existante si elle existe
     if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
         matchmakingState.socket.close();
     }
 
-    // Create new WebSocket connection with authentication token
-    // Important change: Use ws:// for localhost, not wss://
-    const wsUrl = `${WS_URL}?token=${encodeURIComponent(token)}`;
-    console.log(`Connecting to WebSocket: ${wsUrl.split('?')[0]}...`);
+    // Create WebSocket URL with same pattern as chat.js
+    const wsUrl = `${WS_URL}?token=${encodeURIComponent(cleanToken)}`;
+    console.log("Connecting to WebSocket URL:", wsUrl.substring(0, wsUrl.indexOf('?') + 15) + "...");
     
     matchmakingState.socket = new WebSocket(wsUrl);
     
-    // Set up WebSocket event listeners
+    // Gestion des événements WebSocket
     setupWebSocketEventListeners();
 }
 
-// Set up WebSocket event listeners
+// Configuration des écouteurs d'événements WebSocket
 function setupWebSocketEventListeners() {
     const socket = matchmakingState.socket;
     
-    // Connection established
+    // Connexion établie
     socket.addEventListener('open', () => {
-        console.log("WebSocket connection established");
-        updateStatus("Connected to server", false);
+        console.log("✅ WebSocket connection established");
+        updateStatus("Connecté au serveur", false);
         
-        // Request online players list
+        // Demander la liste des joueurs en ligne
         requestOnlinePlayers();
     });
     
-    // Connection error
+    // Erreur de connexion
     socket.addEventListener('error', (error) => {
-        console.error("WebSocket error:", error);
-        updateStatus("Connection error", false);
+        console.error("❌ WebSocket error:", error);
+        updateStatus("Erreur de connexion au serveur", false);
     });
     
-    // Connection closed
+    // Fermeture de la connexion
     socket.addEventListener('close', (event) => {
         console.log(`WebSocket disconnected: ${event.code} - ${event.reason}`);
-        updateStatus("Disconnected from server", false);
+        updateStatus("Déconnecté du serveur", false);
         
-        // Try to reconnect after 5 seconds
+        // Tentative de reconnexion après 5 secondes
         setTimeout(() => {
             if (!matchmakingState.socket || matchmakingState.socket.readyState !== WebSocket.OPEN) {
-                connectWebSocket();
+                connectWebSocket(localStorage.getItem('authToken')?.trim());
             }
         }, 5000);
     });
     
-    // Message received
+    // Réception de message
     socket.addEventListener('message', handleWebSocketMessage);
 }
 
@@ -136,7 +137,7 @@ function setupWebSocketEventListeners() {
 function handleWebSocketMessage(event) {
     try {
         const data = JSON.parse(event.data);
-        console.log("Message received:", data);
+        console.log("📩 Message received:", data);
 
         switch (data.event) {
             case "matchmakingStatus":
@@ -148,7 +149,7 @@ function handleWebSocketMessage(event) {
 
             case "matchFound":
                 // Match found! Redirect to the game page
-                updateStatus(`Opponent found: ${data.data.opponentName}. Redirecting to game...`, false);
+                updateStatus(`Adversaire trouvé: ${data.data.opponentName}. Redirection vers la partie...`, false);
 
                 // Store game info if needed
                 localStorage.setItem("currentGameId", data.data.gameId);
@@ -176,15 +177,15 @@ function handleWebSocketMessage(event) {
                 console.log("Unknown message type:", data.event);
         }
     } catch (error) {
-        console.error("Error parsing message:", error);
+        console.error("❌ Error parsing message:", error);
     }
 }
 
-// Start matchmaking
+// Démarrer la recherche de partie
 function startMatchmaking() {
     if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
         // Update UI to show searching state
-        updateStatus("Searching for opponent...", true);
+        updateStatus("Recherche d'un adversaire en cours...", true);
 
         // Send matchmaking request
         matchmakingState.socket.send(JSON.stringify({
@@ -198,11 +199,11 @@ function startMatchmaking() {
         matchmakingState.searching = true;
         toggleMatchmakingUI(true);
     } else {
-        updateStatus("Not connected to server. Unable to search for match.", false);
+        updateStatus("Déconnecté du serveur. Impossible de rechercher une partie.", false);
     }
 }
 
-// Cancel matchmaking
+// Annuler la recherche de partie
 function cancelMatchmaking() {
     if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
         // Send cancel matchmaking request
@@ -213,34 +214,34 @@ function cancelMatchmaking() {
             }
         }));
 
-        updateStatus("Search canceled", false);
+        updateStatus("Recherche annulée", false);
         matchmakingState.searching = false;
         toggleMatchmakingUI(false);
     } else {
-        updateStatus("Not connected to server. Unable to cancel.", false);
+        updateStatus("Déconnecté du serveur. Impossible d'annuler la recherche.", false);
     }
 }
 
-// Request online players list
+// Demander la liste des joueurs en ligne
 function requestOnlinePlayers() {
     if (!matchmakingState.socket || matchmakingState.socket.readyState !== WebSocket.OPEN) {
         return;
     }
     
-    // Send request for online players list
+    // Envoyer une demande pour obtenir la liste des joueurs en ligne
     matchmakingState.socket.send(JSON.stringify({
         event: "getOnlinePlayers",
         data: {}
     }));
 }
 
-// Update status message
+// Mettre à jour le message d'état
 function updateStatus(message, showSpinner) {
     elements.statusMessage.textContent = message;
     elements.spinner.style.display = showSpinner ? 'block' : 'none';
 }
 
-// Toggle matchmaking UI
+// Basculer l'interface de matchmaking
 function toggleMatchmakingUI(searching) {
     if (searching) {
         elements.searchBtn.classList.add('hidden');
@@ -251,7 +252,7 @@ function toggleMatchmakingUI(searching) {
     }
 }
 
-// Update online players list
+// Mettre à jour la liste des joueurs en ligne
 function updateOnlinePlayersList() {
     const container = elements.onlinePlayersList;
     container.innerHTML = '';
@@ -259,13 +260,13 @@ function updateOnlinePlayersList() {
     if (matchmakingState.onlinePlayers.length === 0) {
         const emptyMessage = document.createElement('div');
         emptyMessage.className = 'player';
-        emptyMessage.textContent = 'No players online at the moment';
+        emptyMessage.textContent = 'Aucun joueur en ligne pour le moment';
         container.appendChild(emptyMessage);
         return;
     }
     
     matchmakingState.onlinePlayers.forEach(player => {
-        if (player.id === matchmakingState.userId) return; // Don't show current player
+        if (player.id === matchmakingState.userId) return; // Ne pas afficher le joueur actuel
         
         const playerElement = document.createElement('div');
         playerElement.className = 'player';
@@ -273,18 +274,18 @@ function updateOnlinePlayersList() {
         const nameElement = document.createElement('span');
         nameElement.textContent = player.username;
         
-        const statusElement = document.createElement('div');
-        statusElement.className = 'player-stats';
-        statusElement.textContent = `${player.status}`;
+        const statsElement = document.createElement('div');
+        statsElement.className = 'player-stats';
+        statsElement.textContent = `${player.status}`;
         
         playerElement.appendChild(nameElement);
-        playerElement.appendChild(statusElement);
+        playerElement.appendChild(statsElement);
         
-        // Add challenge button if player is available
+        // Ajouter un bouton pour défier le joueur si disponible
         if (player.status === 'available') {
             const challengeBtn = document.createElement('button');
             challengeBtn.className = 'btn btn-small';
-            challengeBtn.textContent = 'Challenge';
+            challengeBtn.textContent = 'Défier';
             challengeBtn.addEventListener('click', () => challengePlayer(player.id));
             playerElement.appendChild(challengeBtn);
         }
@@ -293,14 +294,14 @@ function updateOnlinePlayersList() {
     });
 }
 
-// Challenge a specific player
+// Défier un joueur spécifique
 function challengePlayer(playerId) {
     if (!matchmakingState.socket || matchmakingState.socket.readyState !== WebSocket.OPEN) {
-        updateStatus("Not connected to server", false);
+        updateStatus("Non connecté au serveur", false);
         return;
     }
     
-    // Send challenge request
+    // Envoyer une demande de défi
     matchmakingState.socket.send(JSON.stringify({
         event: "challengePlayer",
         data: { 
@@ -309,10 +310,10 @@ function challengePlayer(playerId) {
         }
     }));
     
-    updateStatus("Challenge sent, waiting for response...", true);
+    updateStatus("Défi envoyé, en attente de réponse...", true);
     matchmakingState.searching = true;
     toggleMatchmakingUI(true);
 }
 
-// Refresh online players list periodically
-setInterval(requestOnlinePlayers, 30000); // Every 30 seconds
+// Actualiser périodiquement la liste des joueurs en ligne
+setInterval(requestOnlinePlayers, 30000); // Toutes les 30 secondes
