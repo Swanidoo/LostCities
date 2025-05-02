@@ -120,28 +120,57 @@ wsRouter.get("/ws", async (ctx) => {
       // Notify others that a new user has joined
       broadcastSystemMessage(`${username} has joined the chat.`, socket);
       
-      // Set up message event listener
-      socket.onmessage = (event) => {
+      // WebSocket message event handler 
+      socket.onmessage = function(event) {
         try {
           const data = JSON.parse(event.data);
           console.log("📩 Message received:", data);
-      
-          if (data.event === "chatMessage" && data.data?.message) {
-            handleChatMessage(data.data, socket, username);
-          } else if (data.event === "movePlayed" && data.data?.gameId && data.data?.move) {
-            handleMovePlayed(data.data, socket, username);
-          } else if (data.event === "findMatch") {
-            handleMatchmaking(socket, username, userId);
-          } else if (data.event === "cancelMatch") {
-            removeFromMatchmaking(socket);
-          } else {
-            console.warn("⚠️ Unknown message type or missing data:", data);
+
+          // Find the client in our connected clients array
+          const clientIndex = connectedClients.findIndex(client => client.socket === socket);
+          if (clientIndex === -1) {
+            console.warn("⚠️ Message received from unknown client");
+            return;
+          }
+          
+          // Get client data including username
+          const clientData = connectedClients[clientIndex];
+          
+          switch (data.event) {
+            case "chatMessage":
+              if (data.data?.message) {
+                handleChatMessage(data.data, socket, clientData.username);
+              }
+              break;
+              
+            case "movePlayed":
+              if (data.data?.gameId && data.data?.move) {
+                handleMovePlayed(data.data, socket, clientData.username);
+              }
+              break;
+              
+            case "findMatch":
+              // Use the userId from the message data, not from unknown scope
+              handleMatchmaking(socket, clientData.username, data.data?.userId);
+              break;
+              
+            case "cancelMatch":
+              removeFromMatchmaking(socket);
+              break;
+              
+            case "getOnlinePlayers":
+              // Handle request for online players
+              handleGetOnlinePlayers(socket);
+              break;
+              
+            default:
+              console.warn("⚠️ Unknown message type or missing data:", data);
           }
         } catch (error) {
           console.error("❌ Error parsing message:", error);
         }
       };
-      
+            
       
       // WebSocket onclose event handler 
       socket.onclose = function(event) {
@@ -272,6 +301,22 @@ function handleMovePlayed(
   console.log(`✅ Move sent to ${sentCount} clients`);
 }
 
+
+// Function to handle getOnlinePlayers request
+function handleGetOnlinePlayers(socket) {
+  // Get list of online players (excluding the requestor)
+  const onlinePlayers = connectedClients.map(client => ({
+    username: client.username,
+    status: 'available' // You can add more status types if needed
+  }));
+  
+  // Send the list to the client
+  socket.send(JSON.stringify({
+    event: "onlinePlayers",
+    data: { players: onlinePlayers }
+  }));
+}
+
 // Notify game players about updates
 function notifyGamePlayers(gameId: string, gameState: any): void {
   const subscribers = gameSubscriptions.get(gameId);
@@ -294,7 +339,7 @@ function notifyGamePlayers(gameId: string, gameState: any): void {
 }
 
 
-function handleMatchmaking(socket: WebSocket, username: string, userId: string) {
+function handleMatchmaking(socket, username, userId) {
   console.log(`🎮 User ${username} (${userId}) is looking for a match`);
   
   // Remove any existing entry for this player (in case they're already searching)
