@@ -129,117 +129,80 @@ function setupWebSocketEventListeners() {
     socket.addEventListener('message', handleWebSocketMessage);
 }
 
-// Traitement des messages WebSocket
+// Handle incoming WebSocket messages
 function handleWebSocketMessage(event) {
-    try {
-        const data = JSON.parse(event.data);
-        console.log("Message reçu:", data);
-        
-        switch (data.event) {
-            case "systemMessage":
-                handleSystemMessage(data.data);
-                break;
-                
-            case "onlinePlayers":
-                handleOnlinePlayers(data.data);
-                break;
-                
-            case "matchmakingUpdate":
-                handleMatchmakingUpdate(data.data);
-                break;
-                
-            case "gameCreated":
-                handleGameCreated(data.data);
-                break;
-                
-            default:
-                console.log("Type de message non reconnu:", data.event);
-        }
-    } catch (error) {
-        console.error("Erreur lors de l'analyse du message:", error);
-    }
-}
+  try {
+    const data = JSON.parse(event.data);
+    console.log("Message reçu:", data);
 
-// Gestion des messages système
-function handleSystemMessage(data) {
-    if (data.message) {
-        updateStatus(data.message, false);
-    }
-}
+    switch (data.event) {
+      case "matchmakingStatus":
+        // Update matchmaking status
+        updateStatus(data.data.message, data.data.searching);
+        matchmakingState.searching = data.data.searching;
+        toggleMatchmakingUI(data.data.searching);
+        break;
 
-// Gestion de la liste des joueurs en ligne
-function handleOnlinePlayers(data) {
-    if (data.players) {
-        matchmakingState.onlinePlayers = data.players;
-        updateOnlinePlayersList();
-    }
-}
+      case "matchFound":
+        // Match found! Redirect to the game page
+        updateStatus(`Adversaire trouvé: ${data.data.opponentName}. Redirection vers la partie...`, false);
 
-// Gestion des mises à jour de matchmaking
-function handleMatchmakingUpdate(data) {
-    if (data.status === "searching") {
-        updateStatus("Recherche en cours...", true);
-        matchmakingState.searching = true;
-        toggleMatchmakingUI(true);
-    } else if (data.status === "cancelled") {
-        updateStatus("Recherche annulée", false);
-        matchmakingState.searching = false;
-        toggleMatchmakingUI(false);
-    } else if (data.status === "matched") {
-        updateStatus(`Adversaire trouvé: ${data.opponent}`, true);
-        // La redirection sera gérée par l'événement gameCreated
-    }
-}
+        // Store game info if needed
+        localStorage.setItem("currentGameId", data.data.gameId);
 
-// Gestion de la création d'une partie
-function handleGameCreated(data) {
-    if (data.gameId) {
-        matchmakingState.gameId = data.gameId;
-        updateStatus(`Partie créée! Redirection...`, false);
-        
-        // Rediriger vers la page de jeu
+        // Redirect to game page
         setTimeout(() => {
-            window.location.href = `/game/game.html?gameId=${data.gameId}`;
+          window.location.href = `/game/game.html?gameId=${data.data.gameId}`;
         }, 1500);
+        break;
+
+      default:
+        console.log("Type de message non reconnu:", data.event);
     }
+  } catch (error) {
+    console.error("Erreur lors de l'analyse du message:", error);
+  }
 }
 
 // Démarrer la recherche de partie
 function startMatchmaking() {
-    if (!matchmakingState.socket || matchmakingState.socket.readyState !== WebSocket.OPEN) {
-        updateStatus("Non connecté au serveur, reconnexion...", false);
-        connectWebSocket();
-        return;
-    }
-    
-    // Envoyer une demande de matchmaking
+  if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
+    // Update UI to show searching state
+    updateStatus("Recherche d'un adversaire en cours...", true);
+
+    // Send matchmaking request
     matchmakingState.socket.send(JSON.stringify({
-        event: "startMatchmaking",
-        data: { userId: matchmakingState.userId }
+      event: "findMatch",
+      data: {
+        userId: matchmakingState.userId,
+        username: matchmakingState.username
+      }
     }));
-    
-    updateStatus("Recherche d'un adversaire...", true);
+
     matchmakingState.searching = true;
     toggleMatchmakingUI(true);
+  } else {
+    updateStatus("Déconnecté du serveur. Impossible de rechercher une partie.", false);
+  }
 }
 
 // Annuler la recherche de partie
 function cancelMatchmaking() {
-    if (!matchmakingState.socket || matchmakingState.socket.readyState !== WebSocket.OPEN) {
-        updateStatus("Non connecté au serveur", false);
-        matchmakingState.searching = false;
-        toggleMatchmakingUI(false);
-        return;
-    }
-    
-    // Envoyer une demande d'annulation de matchmaking
+  if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
+    // Send cancel matchmaking request
     matchmakingState.socket.send(JSON.stringify({
-        event: "cancelMatchmaking",
-        data: { userId: matchmakingState.userId }
+      event: "cancelMatch",
+      data: {
+        userId: matchmakingState.userId
+      }
     }));
-    
-    updateStatus("Annulation de la recherche...", false);
-    // Le statut sera mis à jour définitivement quand le serveur confirmera l'annulation
+
+    updateStatus("Recherche annulée", false);
+    matchmakingState.searching = false;
+    toggleMatchmakingUI(false);
+  } else {
+    updateStatus("Déconnecté du serveur. Impossible d'annuler la recherche.", false);
+  }
 }
 
 // Demander la liste des joueurs en ligne
