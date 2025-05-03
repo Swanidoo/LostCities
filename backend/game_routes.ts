@@ -435,7 +435,9 @@ gameRouter.post("/lost-cities/games/:id/chat", authMiddleware, async (ctx) => {
 async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
   // Get basic game info with LEFT JOIN to handle missing board
   const gameResult = await client.queryObject(`
-    SELECT g.*, b.use_purple_expedition, b.current_round
+    SELECT g.*, 
+           b.use_purple_expedition, 
+           b.current_round as board_current_round
     FROM games g
     LEFT JOIN board b ON g.id = b.game_id
     WHERE g.id = $1
@@ -449,7 +451,7 @@ async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
   
   // Handle case where board might be null
   const usePurpleExpedition = gameData.use_purple_expedition ?? false;
-  const currentRound = gameData.current_round ?? 1;
+  const currentRound = gameData.board_current_round ?? gameData.current_round ?? 1;
   
   // Create game instance
   const game = new LostCitiesGame({
@@ -589,8 +591,8 @@ async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
   }
   
   // Set current game state
+  game.currentRound = currentRound;
   game.currentPlayerId = gameData.current_turn_player_id;
-  game.currentRound = gameData.current_round;
   game.gameStatus = gameData.status;
   game.turnPhase = gameData.turn_phase || 'play';
   game.winner = gameData.winner_id;
