@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Create games table if it doesn't exist
 CREATE TABLE IF NOT EXISTS games (
-    id SERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     player1_id INTEGER NOT NULL,
     player2_id INTEGER NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('waiting', 'in_progress', 'finished')),
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS games (
 -- Board table for game configuration and state
 CREATE TABLE IF NOT EXISTS board (
     id SERIAL PRIMARY KEY,
-    game_id INTEGER,
+    game_id BIGINT,
     use_purple_expedition BOOLEAN DEFAULT FALSE,
     remaining_cards_in_deck INTEGER DEFAULT 60,
     current_round INTEGER DEFAULT 1,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS discard_pile (
 -- GameCard table - links cards to specific games and tracks their location
 CREATE TABLE IF NOT EXISTS game_card (
     id SERIAL PRIMARY KEY,
-    game_id INTEGER NOT NULL,
+    game_id BIGINT NOT NULL,
     card_id VARCHAR(20) NOT NULL,
     location TEXT NOT NULL CHECK (location IN ('deck', 'player1_hand', 'player2_hand', 'player1_expedition', 'player2_expedition', 'discard_pile', 'removed')),
     expedition_id INTEGER,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS game_card (
 -- Move table - tracks game moves for replay and analysis
 CREATE TABLE IF NOT EXISTS move (
     id SERIAL PRIMARY KEY,
-    game_id INTEGER NOT NULL,
+    game_id BIGINT NOT NULL,
     player_id INTEGER NOT NULL,
     turn_number INTEGER NOT NULL,
     action TEXT NOT NULL CHECK (action IN ('play_card', 'discard_card', 'draw_card')),
@@ -99,6 +99,15 @@ CREATE TABLE IF NOT EXISTS move (
     destination TEXT CHECK (destination IN ('expedition', 'discard_pile')),
     source TEXT CHECK (source IN ('hand', 'discard_pile', 'deck')),
     color TEXT CHECK (color IN ('red', 'green', 'white', 'blue', 'yellow', 'purple')),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Chat messages table (if it exists)
+CREATE TABLE IF NOT EXISTS chat_message (
+    id SERIAL PRIMARY KEY,
+    game_id BIGINT,
+    sender_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
