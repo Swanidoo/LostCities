@@ -173,6 +173,17 @@ wsRouter.get("/ws", async (ctx) => {
                     handleGameStateRequest(data.data, socket, clientData.username);
                 }
                 break;
+            case "gameAction":
+                if (data.data?.gameId && data.data?.action) {
+                    if (data.data.action === "request_state") {
+                        // Handle game state request
+                        handleGameStateRequest(data.data, socket, clientData.username);
+                    } else {
+                        // Handle other game actions
+                        console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
+                    }
+                }
+                break;
             default:
                 console.warn("⚠️ Unknown message type or missing data:", data);
           }
