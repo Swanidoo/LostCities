@@ -148,11 +148,12 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   console.log(`🔍 Loading game state for game ${gameId}`);
   
   // Get basic game info
-  const gameResult = await client.queryObject(`
+  const gameResult = await client.queryObject<any>(`
     SELECT g.*, 
            b.use_purple_expedition, 
            b.current_round as board_current_round,
-           b.remaining_cards_in_deck
+           b.remaining_cards_in_deck,
+           b.id as board_id
     FROM games g
     JOIN board b ON g.id = b.game_id
     WHERE g.id = $1
@@ -169,116 +170,170 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   const game = new LostCitiesGame({
     gameId: gameId,
     usePurpleExpedition: gameData.use_purple_expedition || false,
-    totalRounds: 3, // Default to 3 rounds unless specified elsewhere
+    totalRounds: 3,
     player1: { id: gameData.player1_id, hand: [], expeditions: {} },
     player2: { id: gameData.player2_id, hand: [], expeditions: {} },
-    onGameStateChanged: () => {}, // Placeholder for event handler
-    onError: console.error // Log errors to the console
+    onGameStateChanged: () => {},
+    onError: console.error
   });
   
-  // Load players' hands
-  const player1HandResult = await client.queryObject(`
-    SELECT * FROM game_card 
-    WHERE game_id = $1 AND location = 'player1_hand'
-    ORDER BY position
+  // Initialize all data structures
+  game.deck = [];
+  game.discardPiles = {};
+
+  // Initialize colors and expeditions
+  const colors = ['red', 'green', 'white', 'blue', 'yellow'];
+  if (gameData.use_purple_expedition) {
+    colors.push('purple');
+  }
+
+  colors.forEach(color => {
+    game.player1.expeditions[color] = [];
+    game.player2.expeditions[color] = [];
+    game.discardPiles[color] = [];
+  });
+
+  // Get player hands
+  const player1HandResult = await client.queryObject<any>(`
+    SELECT gc.card_id, c.color, c.type, c.value, gc.position
+    FROM game_card gc
+    JOIN card c ON gc.card_id = c.id
+    WHERE gc.game_id = $1 AND gc.location = 'player1_hand'
+    ORDER BY gc.position
   `, [gameId]);
   
-  const player2HandResult = await client.queryObject(`
-    SELECT * FROM game_card 
-    WHERE game_id = $1 AND location = 'player2_hand'
-    ORDER BY position
+  const player2HandResult = await client.queryObject<any>(`
+    SELECT gc.card_id, c.color, c.type, c.value, gc.position
+    FROM game_card gc
+    JOIN card c ON gc.card_id = c.id
+    WHERE gc.game_id = $1 AND gc.location = 'player2_hand'
+    ORDER BY gc.position
   `, [gameId]);
   
   console.log(`🃏 Player 1 hand: ${player1HandResult.rows.length} cards`);
   console.log(`🃏 Player 2 hand: ${player2HandResult.rows.length} cards`);
   
+  // Debug logging
+  if (player1HandResult.rows.length > 0) {
+    console.log(`🃏 First P1 card:`, player1HandResult.rows[0]);
+  } else {
+    console.warn(`⚠️ No cards found in player 1 hand for game ${gameId}`);
+  }
+  
+  // Populate player hands
   game.player1.hand = player1HandResult.rows.map(row => ({
     id: row.card_id,
-    color: row.card_id.split('_')[0],
-    type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-    value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
+    color: row.color,
+    type: row.type,
+    value: row.value
   }));
   
   game.player2.hand = player2HandResult.rows.map(row => ({
     id: row.card_id,
-    color: row.card_id.split('_')[0],
-    type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-    value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
+    color: row.color,
+    type: row.type,
+    value: row.value
   }));
-  
-  // Load expeditions
-  const colors = ['red', 'green', 'white', 'blue', 'yellow'];
-  if (gameData.use_purple_expedition) {
-    colors.push('purple');
-  }
-  
-  for (const color of colors) {
-    // Player 1 expeditions
-    const player1ExpResult = await client.queryObject<GameCardData>(
-      `SELECT gc.* 
-      FROM game_card gc
-      JOIN expedition e ON e.id = gc.expedition_id
-      WHERE gc.game_id = $1 AND e.player_id = $2 AND e.color = $3
-      ORDER BY gc.position`,
-      [gameId, gameData.player1_id, color]
-    );
-    
-    game.player1.expeditions[color] = player1ExpResult.rows.map(row => ({
-      id: row.card_id,
-      color,
-      type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-      value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-    }));
-    
-    // Player 2 expeditions
-    const player2ExpResult = await client.queryObject<GameCardData>(
-      `SELECT gc.* 
-      FROM game_card gc
-      JOIN expedition e ON e.id = gc.expedition_id
-      WHERE gc.game_id = $1 AND e.player_id = $2 AND e.color = $3
-      ORDER BY gc.position`,
-      [gameId, gameData.player2_id, color]
-    );
-    
-    game.player2.expeditions[color] = player2ExpResult.rows.map(row => ({
-      id: row.card_id,
-      color,
-      type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-      value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-    }));
-    
-    // Discard piles
-    const discardResult = await client.queryObject<GameCardData>(
-      `SELECT gc.* 
-      FROM game_card gc
-      JOIN discard_pile dp ON dp.id = gc.pile_id
-      WHERE gc.game_id = $1 AND dp.color = $2
-      ORDER BY gc.position`,
-      [gameId, color]
-    );
-    
-    game.discardPiles[color] = discardResult.rows.map(row => ({
-      id: row.card_id,
-      color,
-      type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-      value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-    }));
-  }
-  
+
   // Load deck
-  const deckResult = await client.queryObject<GameCardData>(
-    `SELECT * FROM game_card 
-    WHERE game_id = $1 AND location = 'deck'
-    ORDER BY position`,
-    [gameId]
-  );
-  
+  const deckResult = await client.queryObject<any>(`
+    SELECT gc.card_id, c.color, c.type, c.value, gc.position
+    FROM game_card gc
+    JOIN card c ON gc.card_id = c.id
+    WHERE gc.game_id = $1 AND gc.location = 'deck'
+    ORDER BY gc.position
+  `, [gameId]);
+
   game.deck = deckResult.rows.map(row => ({
     id: row.card_id,
-    color: row.card_id.split('_')[0],
-    type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-    value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
+    color: row.color,
+    type: row.type,
+    value: row.value
   }));
+
+  console.log(`🃏 Deck: ${game.deck.length} cards`);
+  
+  // Load expeditions and discard piles
+  const boardId = gameData.board_id;
+  
+  for (const color of colors) {
+    // Get expedition IDs for this color
+    const expResult = await client.queryObject<ExpeditionData>(
+      `SELECT id, player_id FROM expedition 
+      WHERE board_id = $1 AND color = $2`,
+      [boardId, color]
+    );
+    
+    const expeditions = expResult.rows;
+    const player1ExpId = expeditions.find(exp => exp.player_id === gameData.player1_id)?.id;
+    const player2ExpId = expeditions.find(exp => exp.player_id === gameData.player2_id)?.id;
+    
+    // Player 1 expeditions
+    if (player1ExpId) {
+      const player1ExpResult = await client.queryObject<any>(
+        `SELECT gc.card_id, c.color, c.type, c.value, gc.position
+        FROM game_card gc
+        JOIN card c ON gc.card_id = c.id
+        WHERE gc.game_id = $1 AND gc.expedition_id = $2
+        ORDER BY gc.position`,
+        [gameId, player1ExpId]
+      );
+      
+      game.player1.expeditions[color] = player1ExpResult.rows.map(row => ({
+        id: row.card_id,
+        color: row.color,
+        type: row.type,
+        value: row.value
+      }));
+    }
+    
+    // Player 2 expeditions
+    if (player2ExpId) {
+      const player2ExpResult = await client.queryObject<any>(
+        `SELECT gc.card_id, c.color, c.type, c.value, gc.position
+        FROM game_card gc
+        JOIN card c ON gc.card_id = c.id
+        WHERE gc.game_id = $1 AND gc.expedition_id = $2
+        ORDER BY gc.position`,
+        [gameId, player2ExpId]
+      );
+      
+      game.player2.expeditions[color] = player2ExpResult.rows.map(row => ({
+        id: row.card_id,
+        color: row.color,
+        type: row.type,
+        value: row.value
+      }));
+    }
+    
+    // Get discard pile for this color
+    const pileResult = await client.queryObject<DiscardPileData>(
+      `SELECT id FROM discard_pile 
+      WHERE board_id = $1 AND color = $2`,
+      [boardId, color]
+    );
+    
+    if (pileResult.rows.length > 0) {
+      const pileId = pileResult.rows[0].id;
+      
+      // Load cards in discard pile
+      const discardResult = await client.queryObject<any>(
+        `SELECT gc.card_id, c.color, c.type, c.value, gc.position
+        FROM game_card gc
+        JOIN card c ON gc.card_id = c.id
+        WHERE gc.game_id = $1 AND gc.pile_id = $2
+        ORDER BY gc.position`,
+        [gameId, pileId]
+      );
+      
+      game.discardPiles[color] = discardResult.rows.map(row => ({
+        id: row.card_id,
+        color: row.color,
+        type: row.type,
+        value: row.value
+      }));
+    }
+  }
   
   // Load scores
   const scoresResult = await client.queryObject<BoardData>(
@@ -319,6 +374,8 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   game.gameStatus = gameData.status;
   game.turnPhase = gameData.turn_phase || 'play';
   game.winner = gameData.winner_id;
+  
+  console.log(`✅ Game state loaded successfully for game ${gameId}`);
   
   return game;
 }
@@ -377,6 +434,18 @@ export async function saveGameState(game: LostCitiesGame): Promise<void> {
       ]
     );
   }
+  
+  // Get board ID
+  const boardResult = await client.queryObject<{id: number}>(
+    `SELECT id FROM board WHERE game_id = $1`,
+    [gameId]
+  );
+  
+  if (boardResult.rows.length === 0) {
+    throw new Error("Board not found for game");
+  }
+  
+  const boardId = boardResult.rows[0].id;
   
   // Update card positions
   // First mark all cards as removed (we'll update their actual location)
@@ -438,9 +507,8 @@ export async function saveGameState(game: LostCitiesGame): Promise<void> {
     // Get expedition IDs for this color
     const expResult = await client.queryObject<ExpeditionData>(
       `SELECT id, player_id FROM expedition 
-      WHERE board_id = (SELECT id FROM board WHERE game_id = $1)
-      AND color = $2`,
-      [gameId, color]
+      WHERE board_id = $1 AND color = $2`,
+      [boardId, color]
     );
     
     const expeditions = expResult.rows;
@@ -526,9 +594,8 @@ export async function saveGameState(game: LostCitiesGame): Promise<void> {
     // Update discard pile
     const pileResult = await client.queryObject<DiscardPileData>(
       `SELECT id FROM discard_pile 
-      WHERE board_id = (SELECT id FROM board WHERE game_id = $1)
-      AND color = $2`,
-      [gameId, color]
+      WHERE board_id = $1 AND color = $2`,
+      [boardId, color]
     );
     
     if (pileResult.rows.length > 0) {

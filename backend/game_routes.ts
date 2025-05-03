@@ -74,6 +74,8 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
     const { opponentId, usePurpleExpedition } = await ctx.request.body({ type: "json" }).value;
     const userId = ctx.state.user.id;
     const gameId = Date.now(); // Use timestamp for ID
+
+    console.log(`🎮 Creating new game ${gameId} between ${userId} and ${opponentId}`);
     
     // Create game entry
     const gameResult = await client.queryObject<{id: number}>(
@@ -82,6 +84,9 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
       [gameId, userId, opponentId]
     );
     
+    console.log(`✅ Game entry created`);
+
+
     // Create board for this game
     const boardResult = await client.queryObject<{id: number}>(
       `INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
@@ -90,6 +95,7 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
     );
     
     const boardId = boardResult.rows[0].id;
+    console.log(`✅ Board created with ID ${boardId}`);
     
     // Initialize expedition slots
     const colors = ['red', 'green', 'white', 'blue', 'yellow'];
@@ -118,6 +124,9 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
         [boardId, color]
       );
     }
+
+
+    console.log(`✅ Expeditions and discard piles created`);
     
     // Create a deck of cards
     const deck: { id: string; color: string; type: string; value: number | string }[] = [];
@@ -143,16 +152,22 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
         });
       }
     }
+
+    console.log(`✅ Deck created with ${deck.length} cards`);
     
     // Shuffle the deck
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
+
+    console.log(`✅ Deck shuffled`);
     
     // Deal initial hands (8 cards each)
     const player1Hand = deck.splice(0, 8);
     const player2Hand = deck.splice(0, 8);
+
+    console.log(`✅ Dealt hands: Player 1: ${player1Hand.length} cards, Player 2: ${player2Hand.length} cards`);
     
     // Save game state to database
     await client.queryObject(
@@ -164,6 +179,8 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
        WHERE id = $2`,
       [userId, gameId]
     );
+
+    console.log(`✅ Game status updated to in_progress`);
     
     // Add cards to database - Player 1 hand
     for (let i = 0; i < player1Hand.length; i++) {
@@ -174,6 +191,8 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
         [gameId, card.id, i]
       );
     }
+
+    console.log(`✅ Player 1 cards saved to database`);
     
     // Add cards to database - Player 2 hand
     for (let i = 0; i < player2Hand.length; i++) {
@@ -184,6 +203,8 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
         [gameId, card.id, i]
       );
     }
+
+    console.log(`✅ Player 2 cards saved to database`);
     
     // Add remaining cards to deck
     for (let i = 0; i < deck.length; i++) {
@@ -194,6 +215,8 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
         [gameId, card.id, i]
       );
     }
+
+    console.log(`✅ Deck cards saved to database`);
     
     // Update deck count in board
     await client.queryObject(
@@ -201,17 +224,15 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
       [deck.length, gameId]
     );
     
+    console.log(`✅ Board deck count updated to ${deck.length}`);
+
     ctx.response.status = 201;
     ctx.response.body = { 
       gameId, 
       message: "Lost Cities game created successfully"
     };
 
-    console.log(`🎲 Game ${gameId} created with:`);
-    console.log(`  - Player 1 (${userId}): ${player1Hand.length} cards`);
-    console.log(`  - Player 2 (${opponentId}): ${player2Hand.length} cards`);
-    console.log(`  - Deck: ${deck.length} cards`);
-    console.log(`  - Total cards: ${player1Hand.length + player2Hand.length + deck.length}`);
+    console.log(`🎯 Game ${gameId} creation completed successfully`);
     
   } catch (err) {
     console.error("Error creating Lost Cities game:", err);
