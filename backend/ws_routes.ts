@@ -2,6 +2,7 @@ import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 import { loadGameState } from "./game_routes.ts";
 import { client } from "./db_client.ts";
+import { LostCitiesGame } from "./lost_cities/lost_cities_controller.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
@@ -483,33 +484,65 @@ function handleGameSubscription(data: { gameId: string }, socket: WebSocket, use
   }
 }
 
-// Handle requests for game state
-function handleGameStateRequest(data: { gameId: string }, socket: WebSocket, username: string): void {
-  console.log(`🎮 User ${username} requested game state for game ${data.gameId}`);
+async function loadGameFromDatabase(gameId: string): Promise<LostCitiesGame> {
+  return await LostCitiesGame.load(gameId);
+}
+
+async function getUserIdFromUsername(username: string): Promise<string> {
+  const result = await client.queryObject<{id: string}>(
+    "SELECT id FROM users WHERE username = $1",
+    [username]
+  );
   
-  // Try to load the game
+  if (result.rows.length === 0) {
+    throw new Error(`User not found: ${username}`);
+  }
+  
+  return result.rows[0].id;
+}
+
+// Handle requests for game state
+async function handleGameStateRequest(data: any, socket: WebSocket, username: string) {
+  const { gameId } = data;
+  
+  console.log(`🎮 User ${username} requested game state for game ${gameId}`);
+  
   try {
-      // Load the game state from database
-      loadGameState(data.gameId).then(game => {
-          // Send the game state to the client
-          socket.send(JSON.stringify({
-              event: 'gameUpdated',
-              data: {
-                  gameId: data.gameId,
-                  gameState: game.getGameState(username)
-              }
-          }));
-          console.log(`✅ Sent game state to ${username} for game ${data.gameId}`);
-      }).catch(error => {
-          console.error(`❌ Error loading game state: ${error.message}`);
-          // Send error to client
-          socket.send(JSON.stringify({
-              event: 'error',
-              data: { message: 'Error loading game state' }
-          }));
-      });
+    // Load game from database
+    const game = await loadGameFromDatabase(gameId);
+    
+    // Create a debug-friendly version of the game state
+    const debugState = {
+      gameId: game.gameId,
+      status: game.gameStatus,
+      currentPlayerId: game.currentPlayerId,
+      player1HandCount: game.player1?.hand?.length || 0,
+      player2HandCount: game.player2?.hand?.length || 0,
+      deckCount: game.deck?.length || 0,
+      turnPhase: game.turnPhase
+    };
+    
+    console.log(`📊 Game state for ${gameId}:`, JSON.stringify(debugState, null, 2));
+    
+    // Get game state for the requesting player
+    const userId = await getUserIdFromUsername(username);
+    const gameState = game.getGameState(userId);
+    
+    console.log(`📤 Sending game state to ${username}:`, JSON.stringify(gameState, null, 2));
+    
+    // Send game state to requesting player
+    socket.send(JSON.stringify({
+      event: 'gameUpdated',
+      data: { gameState }
+    }));
+    
+    console.log(`✅ Sent game state to ${username} for game ${gameId}`);
   } catch (error) {
-      console.error(`❌ Error handling game state request: ${error.message}`);
+    console.error(`❌ Error getting game state for ${gameId}:`, error);
+    socket.send(JSON.stringify({
+      event: 'error',
+      data: { message: 'Failed to get game state' }
+    }));
   }
 }
 

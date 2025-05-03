@@ -145,44 +145,41 @@ export async function saveInitialCards(game: LostCitiesGame): Promise<void> {
  * Load game state from database
  */
 export async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
+  console.log(`🔍 Loading game state for game ${gameId}`);
+  
   // Get basic game info
-  const gameResult = await client.queryObject<GameData>(
-    `SELECT g.*, b.use_purple_expedition, b.current_round
+  const gameResult = await client.queryObject(`
+    SELECT g.*, 
+           b.use_purple_expedition, 
+           b.current_round as board_current_round,
+           b.remaining_cards_in_deck
     FROM games g
     JOIN board b ON g.id = b.game_id
-    WHERE g.id = $1`,
-    [gameId]
-  );
+    WHERE g.id = $1
+  `, [gameId]);
   
   if (gameResult.rows.length === 0) {
     throw new Error("Game not found");
   }
   
   const gameData = gameResult.rows[0];
-  
-  // Create game instance
-  const game = new LostCitiesGame({
-    gameId,
-    usePurpleExpedition: gameData.use_purple_expedition,
-    totalRounds: 3, // Default to 3 rounds
-    player1: { id: gameData.player1_id },
-    player2: { id: gameData.player2_id }
-  });
+  console.log(`📋 Found game data:`, gameData);
   
   // Load players' hands
-  const player1HandResult = await client.queryObject<GameCardData>(
-    `SELECT * FROM game_card 
+  const player1HandResult = await client.queryObject(`
+    SELECT * FROM game_card 
     WHERE game_id = $1 AND location = 'player1_hand'
-    ORDER BY position`,
-    [gameId]
-  );
+    ORDER BY position
+  `, [gameId]);
   
-  const player2HandResult = await client.queryObject<GameCardData>(
-    `SELECT * FROM game_card 
+  const player2HandResult = await client.queryObject(`
+    SELECT * FROM game_card 
     WHERE game_id = $1 AND location = 'player2_hand'
-    ORDER BY position`,
-    [gameId]
-  );
+    ORDER BY position
+  `, [gameId]);
+  
+  console.log(`🃏 Player 1 hand: ${player1HandResult.rows.length} cards`);
+  console.log(`🃏 Player 2 hand: ${player2HandResult.rows.length} cards`);
   
   game.player1.hand = player1HandResult.rows.map(row => ({
     id: row.card_id,
@@ -307,7 +304,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   
   // Set current game state
   game.currentPlayerId = gameData.current_turn_player_id;
-  game.currentRound = gameData.current_round;
+  game.currentRound = gameData.board_current_round || gameData.current_round || 1;
   game.gameStatus = gameData.status;
   game.turnPhase = gameData.turn_phase || 'play';
   game.winner = gameData.winner_id;

@@ -206,6 +206,12 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
       gameId, 
       message: "Lost Cities game created successfully"
     };
+
+    console.log(`🎲 Game ${gameId} created with:`);
+    console.log(`  - Player 1 (${userId}): ${player1Hand.length} cards`);
+    console.log(`  - Player 2 (${opponentId}): ${player2Hand.length} cards`);
+    console.log(`  - Deck: ${deck.length} cards`);
+    console.log(`  - Total cards: ${player1Hand.length + player2Hand.length + deck.length}`);
     
   } catch (err) {
     console.error("Error creating Lost Cities game:", err);

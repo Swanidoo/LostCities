@@ -213,6 +213,16 @@ class LostCitiesGame {
       return;
     }
     
+    // Add detailed logging
+    console.log('Game state details:');
+    console.log('- Game ID:', gameState.gameId);
+    console.log('- Status:', gameState.status);
+    console.log('- Current Player:', gameState.currentPlayerId);
+    console.log('- Turn Phase:', gameState.turnPhase);
+    console.log('- Player 1 hand:', gameState.player1?.hand?.length || 'No hand data');
+    console.log('- Player 2 hand:', gameState.player2?.hand?.length || 'No hand data');
+    console.log('- Cards in deck:', gameState.cardsInDeck);
+    
     // Update UI with new game state
     this.ui.updateGameState(gameState);
   }
