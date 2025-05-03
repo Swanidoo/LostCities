@@ -802,5 +802,8 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
   }
 }
 
+
+export { loadGameState };
+
 export default gameRouter;
 

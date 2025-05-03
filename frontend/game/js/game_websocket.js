@@ -54,9 +54,17 @@ export class GameWebSocket {
           
           // Subscribe to the game channel
           this.send({
-            event: 'subscribeGame',
-            data: { gameId: this.gameId }
+              event: 'subscribeGame',
+              data: { gameId: this.gameId }
           });
+          
+          // Request the game state after a small delay to ensure subscription is processed
+          setTimeout(() => {
+              this.send({
+                  event: 'requestGameState',
+                  data: { gameId: this.gameId }
+              });
+          }, 500);
           
           this.onConnect(event);
         };
@@ -187,4 +195,43 @@ export class GameWebSocket {
     isCurrentlyConnected() {
       return this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN;
     }
+
+    // in game_websocket.js
+
+    // Subscribe to a specific game
+    subscribeToGame() {
+      if (!this.isConnected) {
+          console.log("Cannot subscribe to game, WebSocket is not connected");
+          return false;
+      }
+
+      this.socket.send(JSON.stringify({
+          event: "subscribeGame",
+          data: {
+              gameId: this.gameId
+          }
+      }));
+
+      console.log(`Subscribed to game ${this.gameId}`);
+      return true;
+    }
+
+    // Request the current game state
+    requestGameState() {
+      if (!this.isConnected) {
+          console.log("Cannot request game state, WebSocket is not connected");
+          return false;
+      }
+
+      this.socket.send(JSON.stringify({
+          event: "requestGameState",
+          data: {
+              gameId: this.gameId
+          }
+      }));
+
+      console.log(`Requested game state for game ${this.gameId}`);
+      return true;
+    }
+
   }

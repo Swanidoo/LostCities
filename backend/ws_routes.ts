@@ -1,9 +1,11 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
+import { loadGameState } from "./game_routes.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
 const playersLookingForMatch: { socket: WebSocket; userId: string; username: string }[] = [];
+const gameSubscriptions: Map<string, Set<WebSocket>> = new Map();
 
 const jwtKey = Deno.env.get("JWT_SECRET");
 if (!jwtKey) {
@@ -136,35 +138,43 @@ wsRouter.get("/ws", async (ctx) => {
           // Get client data including username
           const clientData = connectedClients[clientIndex];
           
+          // Inside the socket.onmessage function in ws_routes.ts
           switch (data.event) {
             case "chatMessage":
-              if (data.data?.message) {
-                handleChatMessage(data.data, socket, clientData.username);
-              }
-              break;
-              
+                if (data.data?.message) {
+                    handleChatMessage(data.data, socket, clientData.username);
+                }
+                break;
             case "movePlayed":
-              if (data.data?.gameId && data.data?.move) {
-                handleMovePlayed(data.data, socket, clientData.username);
-              }
-              break;
-              
+                if (data.data?.gameId && data.data?.move) {
+                    handleMovePlayed(data.data, socket, clientData.username);
+                }
+                break;
             case "findMatch":
-              // Use the userId from the message data, not from unknown scope
-              handleMatchmaking(socket, clientData.username, data.data?.userId);
-              break;
-              
+                // Use the userId from the message data, not from unknown scope
+                handleMatchmaking(socket, clientData.username, data.data?.userId);
+                break;
             case "cancelMatch":
-              removeFromMatchmaking(socket);
-              break;
-              
+                removeFromMatchmaking(socket);
+                break;
             case "getOnlinePlayers":
-              // Handle request for online players
-              handleGetOnlinePlayers(socket);
-              break;
-              
+                // Handle request for online players
+                handleGetOnlinePlayers(socket);
+                break;
+            case "subscribeGame":
+                // Add this new case to handle game subscriptions
+                if (data.data?.gameId) {
+                    handleGameSubscription(data.data, socket, clientData.username);
+                }
+                break;
+            case "requestGameState":
+                // Add this case to handle game state requests
+                if (data.data?.gameId) {
+                    handleGameStateRequest(data.data, socket, clientData.username);
+                }
+                break;
             default:
-              console.warn("⚠️ Unknown message type or missing data:", data);
+                console.warn("⚠️ Unknown message type or missing data:", data);
           }
         } catch (error) {
           console.error("❌ Error parsing message:", error);
@@ -399,6 +409,63 @@ function tryFindMatch() {
     }));
   }
 }
+
+// Handle game subscription requests
+function handleGameSubscription(data: { gameId: string }, socket: WebSocket, username: string): void {
+  console.log(`🎮 User ${username} subscribing to game ${data.gameId}`);
+  
+  // Create set for this game if it doesn't exist
+  if (!gameSubscriptions.has(data.gameId)) {
+      gameSubscriptions.set(data.gameId, new Set());
+  }
+  
+  // Add socket to the game's subscriptions
+  const subscribers = gameSubscriptions.get(data.gameId)!;
+  subscribers.add(socket);
+  
+  console.log(`✅ User ${username} subscribed to game ${data.gameId}. Total subscribers: ${subscribers.size}`);
+  
+  // Send confirmation to the client
+  try {
+      socket.send(JSON.stringify({
+          event: 'gameSubscribed',
+          data: { gameId: data.gameId }
+      }));
+  } catch (error) {
+      console.error(`❌ Error sending subscription confirmation to ${username}:`, error);
+  }
+}
+
+// Handle requests for game state
+function handleGameStateRequest(data: { gameId: string }, socket: WebSocket, username: string): void {
+  console.log(`🎮 User ${username} requested game state for game ${data.gameId}`);
+  
+  // Try to load the game
+  try {
+      // Load the game state from database
+      loadGameState(data.gameId).then(game => {
+          // Send the game state to the client
+          socket.send(JSON.stringify({
+              event: 'gameUpdated',
+              data: {
+                  gameId: data.gameId,
+                  gameState: game.getGameState(username)
+              }
+          }));
+          console.log(`✅ Sent game state to ${username} for game ${data.gameId}`);
+      }).catch(error => {
+          console.error(`❌ Error loading game state: ${error.message}`);
+          // Send error to client
+          socket.send(JSON.stringify({
+              event: 'error',
+              data: { message: 'Error loading game state' }
+          }));
+      });
+  } catch (error) {
+      console.error(`❌ Error handling game state request: ${error.message}`);
+  }
+}
+
 
 export { notifyGamePlayers };
 export default wsRouter;
