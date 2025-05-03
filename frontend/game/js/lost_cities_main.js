@@ -94,12 +94,45 @@ class LostCitiesGame {
    */
   handleConnect(event) {
     console.log('Connected to game server');
-    this.ui.setGameMessage('Connected. Waiting for game state...');
+    this.ui.setGameMessage('Connected. Loading game state...');
     
-    // Request initial game state
-    this.requestGameState();
+    // First subscribe to the game
+    // This is handled automatically by your GameWebSocket class
+    
+    // Then fetch initial game state via HTTP
+    this.fetchInitialGameState();
   }
   
+
+  async fetchInitialGameState() {
+    try {
+        // Build the correct API URL
+        const apiUrl = window.location.hostname === "localhost"
+            ? "http://localhost:3000"
+            : "https://lostcitiesbackend.onrender.com";
+            
+        const response = await fetch(`${apiUrl}/lost-cities/games/${this.gameId}`, {
+            headers: {
+                'Authorization': `Bearer ${this.token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch game state');
+        }
+        
+        const gameState = await response.json();
+        console.log('Initial game state fetched:', gameState);
+        
+        // Update UI with initial state
+        this.handleGameUpdate(gameState);
+        
+    } catch (error) {
+        console.error('Error fetching initial game state:', error);
+        this.ui.setGameMessage('Error loading game. Please refresh.');
+    }
+  }
+
   /**
    * Handle WebSocket messages
    */
@@ -225,9 +258,10 @@ class LostCitiesGame {
    * Request current game state
    */
   requestGameState() {
+    // Send request via WebSocket
     this.ws.sendMove({
-      action: 'request_state',
-      gameId: this.gameId
+        action: 'request_state',
+        gameId: this.gameId
     });
   }
   

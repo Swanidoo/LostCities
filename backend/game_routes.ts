@@ -77,24 +77,19 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
     
     // Create game entry
     const gameResult = await client.queryObject<{id: number}>(
-      `INSERT INTO games (id, player1_id, player2_id, status) 
+      `INSERT INTO games (id, player1_id, player2_id, status)
        VALUES ($1, $2, $3, 'waiting') RETURNING id`,
       [gameId, userId, opponentId]
     );
     
-    // ENSURE THIS EXISTS: Create board for this game
-    await client.queryObject(
+    // Create board for this game
+    const boardResult = await client.queryObject<{id: number}>(
       `INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
-       VALUES ($1, $2, 60, 1)`,
+       VALUES ($1, $2, 60, 1) RETURNING id`,
       [gameId, usePurpleExpedition]
     );
     
-    // Create board for this game
-    await client.queryObject(
-      `INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
-       VALUES ($1, $2, 60, 1)`,
-      [gameId, usePurpleExpedition]
-    );
+    const boardId = boardResult.rows[0].id;
     
     // Initialize expedition slots
     const colors = ['red', 'green', 'white', 'blue', 'yellow'];
@@ -106,69 +101,105 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
     for (const color of colors) {
       await client.queryObject(
         `INSERT INTO expedition (board_id, player_id, color, wager_count, card_count)
-         VALUES (currval('board_id_seq'), $1, $2, 0, 0)`,
-        [userId, color]
+         VALUES ($1, $2, $3, 0, 0)`,
+        [boardId, userId, color]
       );
       
       await client.queryObject(
         `INSERT INTO expedition (board_id, player_id, color, wager_count, card_count)
-         VALUES (currval('board_id_seq'), $1, $2, 0, 0)`,
-        [opponentId, color]
+         VALUES ($1, $2, $3, 0, 0)`,
+        [boardId, opponentId, color]
       );
       
       // Create discard pile for this color
       await client.queryObject(
         `INSERT INTO discard_pile (board_id, color)
-         VALUES (currval('board_id_seq'), $1)`,
-        [color]
+         VALUES ($1, $2)`,
+        [boardId, color]
       );
     }
     
-    // Create initial deck and deal cards
-    const game = new LostCitiesGame({
-      gameId,
-      usePurpleExpedition,
-      player1: { id: userId },
-      player2: { id: opponentId }
-    });
+    // Create a deck of cards
+    const deck: { id: string; color: string; type: string; value: number | string }[] = [];
     
-    // Initialize game (create deck, shuffle, deal cards)
-    game.initGame(userId, opponentId);
+    for (const color of colors) {
+      // Add expedition cards (2-10)
+      for (let value = 2; value <= 10; value++) {
+        deck.push({
+          id: `${color}_${value}`,
+          color: color,
+          type: 'expedition',
+          value: value
+        });
+      }
+      
+      // Add wager cards (3 per color)
+      for (let i = 0; i < 3; i++) {
+        deck.push({
+          id: `${color}_wager_${i}`,
+          color: color,
+          type: 'wager',
+          value: 'W'
+        });
+      }
+    }
+    
+    // Shuffle the deck
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    
+    // Deal initial hands (8 cards each)
+    const player1Hand = deck.splice(0, 8);
+    const player2Hand = deck.splice(0, 8);
     
     // Save game state to database
     await client.queryObject(
       `UPDATE games SET 
        current_turn_player_id = $1,
        status = 'in_progress',
+       turn_phase = 'play',
        started_at = CURRENT_TIMESTAMP 
        WHERE id = $2`,
       [userId, gameId]
     );
     
-    // Add cards to database
-    for (const card of game.deck) {
-      await client.queryObject(
-        `INSERT INTO game_card (game_id, card_id, location, position)
-         VALUES ($1, $2, 'deck', $3)`,
-        [gameId, card.id, game.deck.indexOf(card)]
-      );
-    }
-    
-    for (const card of game.player1.hand) {
+    // Add cards to database - Player 1 hand
+    for (let i = 0; i < player1Hand.length; i++) {
+      const card = player1Hand[i];
       await client.queryObject(
         `INSERT INTO game_card (game_id, card_id, location, position)
          VALUES ($1, $2, 'player1_hand', $3)`,
-        [gameId, card.id, game.player1.hand.indexOf(card)]
+        [gameId, card.id, i]
       );
     }
     
-    for (const card of game.player2.hand) {
+    // Add cards to database - Player 2 hand
+    for (let i = 0; i < player2Hand.length; i++) {
+      const card = player2Hand[i];
       await client.queryObject(
         `INSERT INTO game_card (game_id, card_id, location, position)
          VALUES ($1, $2, 'player2_hand', $3)`,
-        [gameId, card.id, game.player2.hand.indexOf(card)]
+        [gameId, card.id, i]
       );
     }
+    
+    // Add remaining cards to deck
+    for (let i = 0; i < deck.length; i++) {
+      const card = deck[i];
+      await client.queryObject(
+        `INSERT INTO game_card (game_id, card_id, location, position)
+         VALUES ($1, $2, 'deck', $3)`,
+        [gameId, card.id, i]
+      );
+    }
+    
+    // Update deck count in board
+    await client.queryObject(
+      `UPDATE board SET remaining_cards_in_deck = $1 WHERE game_id = $2`,
+      [deck.length, gameId]
+    );
     
     ctx.response.status = 201;
     ctx.response.body = { 
@@ -189,11 +220,14 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     const gameId = ctx.params.id;
     const userId = ctx.state.user.id;
     
-    // Get basic game info
+    // Get game info
     const gameResult = await client.queryObject(`
-      SELECT g.*, b.use_purple_expedition, b.remaining_cards_in_deck, b.current_round
+      SELECT g.*, b.use_purple_expedition, b.current_round,
+             u1.username as player1_name, u2.username as player2_name
       FROM games g
       JOIN board b ON g.id = b.game_id
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
       WHERE g.id = $1
     `, [gameId]);
     
@@ -205,18 +239,60 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     
     const game = gameResult.rows[0];
     
-    // Check if user is a player in this game
-    if (game.player1_id !== userId && game.player2_id !== userId) {
+    // Determine which player is requesting
+    const isPlayer1 = game.player1_id === userId;
+    const isPlayer2 = game.player2_id === userId;
+    
+    if (!isPlayer1 && !isPlayer2) {
       ctx.response.status = 403;
-      ctx.response.body = { error: "You are not a player in this game" };
+      ctx.response.body = { error: "Not a player in this game" };
       return;
     }
     
-    // Load game state from database to create full response
-    const lostCitiesGame = await loadGameState(gameId);
+    // Get player's hand
+    const handResult = await client.queryObject(`
+      SELECT c.* FROM game_card gc
+      JOIN card c ON gc.card_id = c.id
+      WHERE gc.game_id = $1 AND gc.location = $2
+      ORDER BY gc.position
+    `, [gameId, isPlayer1 ? 'player1_hand' : 'player2_hand']);
     
-    // Return the game state filtered for this player
-    ctx.response.body = lostCitiesGame.getGameState(userId);
+    // Get expeditions for both players
+    const expeditions = await getExpeditions(gameId);
+    
+    // Get discard piles
+    const discardPiles = await getDiscardPiles(gameId);
+    
+    // Construct game state
+    const gameState = {
+      gameId: game.id,
+      status: game.status,
+      currentRound: game.current_round,
+      totalRounds: 3,
+      currentPlayerId: game.current_turn_player_id,
+      turnPhase: game.turn_phase || 'play',
+      usePurpleExpedition: game.use_purple_expedition,
+      cardsInDeck: await getCardsInDeck(gameId),
+      player1: {
+        id: game.player1_id,
+        name: game.player1_name,
+        expeditions: expeditions.player1,
+        handSize: isPlayer1 ? handResult.rows.length : await getHandSize(gameId, 'player1_hand'),
+        hand: isPlayer1 ? handResult.rows : undefined
+      },
+      player2: {
+        id: game.player2_id,
+        name: game.player2_name,
+        expeditions: expeditions.player2,
+        handSize: isPlayer2 ? handResult.rows.length : await getHandSize(gameId, 'player2_hand'),
+        hand: isPlayer2 ? handResult.rows : undefined
+      },
+      discardPiles,
+      scores: await getScores(gameId),
+      winner: game.winner_id
+    };
+    
+    ctx.response.body = gameState;
     
   } catch (err) {
     console.error("Error getting game state:", err);
@@ -224,6 +300,38 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     ctx.response.body = { error: "Internal server error" };
   }
 });
+
+// Helper functions
+async function getCardsInDeck(gameId) {
+  const result = await client.queryObject(`
+    SELECT COUNT(*) as count FROM game_card 
+    WHERE game_id = $1 AND location = 'deck'
+  `, [gameId]);
+  return result.rows[0].count;
+}
+
+async function getHandSize(gameId, location) {
+  const result = await client.queryObject(`
+    SELECT COUNT(*) as count FROM game_card 
+    WHERE game_id = $1 AND location = $2
+  `, [gameId, location]);
+  return result.rows[0].count;
+}
+
+async function getExpeditions(gameId) {
+  // Implementation to fetch expedition data
+  return { player1: {}, player2: {} };
+}
+
+async function getDiscardPiles(gameId) {
+  // Implementation to fetch discard pile data
+  return {};
+}
+
+async function getScores(gameId) {
+  // Implementation to fetch scores
+  return { player1: { total: 0 }, player2: { total: 0 } };
+}
 
 // Join an existing game
 gameRouter.post("/lost-cities/games/:id/join", authMiddleware, async (ctx) => {
