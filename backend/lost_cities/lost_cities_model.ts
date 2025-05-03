@@ -165,6 +165,17 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   const gameData = gameResult.rows[0];
   console.log(`📋 Found game data:`, gameData);
   
+  // Initialize the game object
+  const game = new LostCitiesGame({
+    gameId: gameId,
+    usePurpleExpedition: gameData.use_purple_expedition || false,
+    totalRounds: 3, // Default to 3 rounds unless specified elsewhere
+    player1: { id: gameData.player1_id, hand: [], expeditions: {} },
+    player2: { id: gameData.player2_id, hand: [], expeditions: {} },
+    onGameStateChanged: () => {}, // Placeholder for event handler
+    onError: console.error // Log errors to the console
+  });
+  
   // Load players' hands
   const player1HandResult = await client.queryObject(`
     SELECT * FROM game_card 
@@ -302,7 +313,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
     };
   }
   
-  // Set current game state
+  // Set additional game state
   game.currentPlayerId = gameData.current_turn_player_id;
   game.currentRound = gameData.board_current_round || gameData.current_round || 1;
   game.gameStatus = gameData.status;
