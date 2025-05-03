@@ -3,6 +3,7 @@ import { client } from "./db_client.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { LostCitiesGame } from "./lost_cities/lost_cities_controller.ts";
 import { notifyGamePlayers } from "./ws_routes.ts";
+import { loadGameState } from "./lost_cities/lost_cities_model.ts";
 
 const gameRouter = new Router();
 
@@ -223,7 +224,17 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
       `UPDATE board SET remaining_cards_in_deck = $1 WHERE game_id = $2`,
       [deck.length, gameId]
     );
-    
+
+    // After all the card insertion code, add this verification:
+    const verifyResult = await client.queryObject(`
+      SELECT COUNT(*) as count FROM game_card WHERE game_id = $1
+    `, [gameId]);
+    console.log(`🔍 After creation, game ${gameId} has ${verifyResult.rows[0].count} cards in game_card`);
+
+    if (verifyResult.rows[0].count !== 60) {
+      console.error(`❌ Expected 60 cards but found ${verifyResult.rows[0].count} for game ${gameId}`);
+    }
+
     console.log(`✅ Board deck count updated to ${deck.length}`);
 
     ctx.response.status = 201;
@@ -566,174 +577,6 @@ gameRouter.post("/lost-cities/games/:id/chat", authMiddleware, async (ctx) => {
   }
 });
 
-// Helper function to load game state from database
-async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
-  // Get basic game info with LEFT JOIN to handle missing board
-  const gameResult = await client.queryObject(`
-    SELECT g.*, 
-           b.use_purple_expedition, 
-           b.current_round as board_current_round
-    FROM games g
-    LEFT JOIN board b ON g.id = b.game_id
-    WHERE g.id = $1
-  `, [gameId]);
-  
-  if (gameResult.rows.length === 0) {
-    throw new Error("Game not found");
-  }
-  
-  const gameData = gameResult.rows[0];
-  
-  // Handle case where board might be null
-  const usePurpleExpedition = gameData.use_purple_expedition ?? false;
-  const currentRound = gameData.board_current_round ?? gameData.current_round ?? 1;
-  
-  // Create game instance
-  const game = new LostCitiesGame({
-    gameId,
-    usePurpleExpedition,
-    totalRounds: 3,
-    player1: { id: gameData.player1_id },
-    player2: { id: gameData.player2_id }
-  });
-  
-  // Load players' hands
-  const player1HandResult = await client.queryObject(`
-    SELECT * FROM game_card 
-    WHERE game_id = $1 AND location = 'player1_hand'
-    ORDER BY position
-  `, [gameId]);
-  
-  const player2HandResult = await client.queryObject(`
-    SELECT * FROM game_card 
-    WHERE game_id = $1 AND location = 'player2_hand'
-    ORDER BY position
-  `, [gameId]);
-  
-  game.player1.hand = player1HandResult.rows.map(row => ({
-    id: row.card_id,
-    color: row.card_id.split('_')[0],
-    type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-    value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-  }));
-  
-  game.player2.hand = player2HandResult.rows.map(row => ({
-    id: row.card_id,
-    color: row.card_id.split('_')[0],
-    type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-    value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-  }));
-  
-  // Load expeditions
-  const colors = ['red', 'green', 'white', 'blue', 'yellow'];
-  if (gameData.use_purple_expedition) {
-    colors.push('purple');
-  }
-  
-  for (const color of colors) {
-    // Player 1 expeditions
-    const player1ExpResult = await client.queryObject(`
-      SELECT gc.* 
-      FROM game_card gc
-      JOIN expedition e ON e.id = gc.expedition_id
-      WHERE gc.game_id = $1 AND e.player_id = $2 AND e.color = $3
-      ORDER BY gc.position
-    `, [gameId, gameData.player1_id, color]);
-    
-    game.player1.expeditions[color] = player1ExpResult.rows.map(row => ({
-      id: row.card_id,
-      color,
-      type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-      value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-    }));
-    
-    // Player 2 expeditions
-    const player2ExpResult = await client.queryObject(`
-      SELECT gc.* 
-      FROM game_card gc
-      JOIN expedition e ON e.id = gc.expedition_id
-      WHERE gc.game_id = $1 AND e.player_id = $2 AND e.color = $3
-      ORDER BY gc.position
-    `, [gameId, gameData.player2_id, color]);
-    
-    game.player2.expeditions[color] = player2ExpResult.rows.map(row => ({
-      id: row.card_id,
-      color,
-      type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-      value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-    }));
-    
-    // Discard piles
-    const discardResult = await client.queryObject(`
-      SELECT gc.* 
-      FROM game_card gc
-      JOIN discard_pile dp ON dp.id = gc.pile_id
-      WHERE gc.game_id = $1 AND dp.color = $2
-      ORDER BY gc.position
-    `, [gameId, color]);
-    
-    game.discardPiles[color] = discardResult.rows.map(row => ({
-      id: row.card_id,
-      color,
-      type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-      value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-    }));
-  }
-  
-  // Load deck
-  const deckResult = await client.queryObject(`
-    SELECT * FROM game_card 
-    WHERE game_id = $1 AND location = 'deck'
-    ORDER BY position
-  `, [gameId]);
-  
-  game.deck = deckResult.rows.map(row => ({
-    id: row.card_id,
-    color: row.card_id.split('_')[0],
-    type: row.card_id.includes('wager') ? 'wager' : 'expedition',
-    value: row.card_id.includes('wager') ? 'W' : parseInt(row.card_id.split('_')[1])
-  }));
-  
-  // Load scores
-  const scoresResult = await client.queryObject(`
-    SELECT round1_score_player1, round1_score_player2,
-           round2_score_player1, round2_score_player2,
-           round3_score_player1, round3_score_player2
-    FROM board
-    WHERE game_id = $1
-  `, [gameId]);
-  
-  if (scoresResult.rows.length > 0) {
-    const scores = scoresResult.rows[0];
-    game.scores = {
-      player1: {
-        round1: scores.round1_score_player1 || 0,
-        round2: scores.round2_score_player1 || 0,
-        round3: scores.round3_score_player1 || 0,
-        total: (scores.round1_score_player1 || 0) + 
-               (scores.round2_score_player1 || 0) + 
-               (scores.round3_score_player1 || 0)
-      },
-      player2: {
-        round1: scores.round1_score_player2 || 0,
-        round2: scores.round2_score_player2 || 0,
-        round3: scores.round3_score_player2 || 0,
-        total: (scores.round1_score_player2 || 0) + 
-               (scores.round2_score_player2 || 0) + 
-               (scores.round3_score_player2 || 0)
-      }
-    };
-  }
-  
-  // Set current game state
-  game.currentRound = currentRound;
-  game.currentPlayerId = gameData.current_turn_player_id;
-  game.gameStatus = gameData.status;
-  game.turnPhase = gameData.turn_phase || 'play';
-  game.winner = gameData.winner_id;
-  
-  return game;
-}
 
 // Helper function to save game state to database
 async function saveGameState(game: LostCitiesGame): Promise<void> {

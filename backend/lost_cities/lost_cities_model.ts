@@ -147,6 +147,16 @@ export async function saveInitialCards(game: LostCitiesGame): Promise<void> {
 export async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
   console.log(`🔍 Loading game state for game ${gameId}`);
   
+  // First check if we have any cards for this game
+  const cardCountResult = await client.queryObject(`
+    SELECT COUNT(*) as count FROM game_card WHERE game_id = $1
+  `, [gameId]);
+  console.log(`🎴 Total cards in game_card table for game ${gameId}: ${cardCountResult.rows[0].count}`);
+  
+  if (cardCountResult.rows[0].count === 0) {
+    console.error(`❌ No cards found for game ${gameId} in game_card table`);
+  }
+  
   // Get basic game info
   const gameResult = await client.queryObject<any>(`
     SELECT g.*, 
@@ -193,7 +203,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
     game.discardPiles[color] = [];
   });
 
-  // Get player hands
+  // Get player hands - with JOIN to card table for complete card info
   const player1HandResult = await client.queryObject<any>(`
     SELECT gc.card_id, c.color, c.type, c.value, gc.position
     FROM game_card gc
@@ -212,13 +222,6 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   
   console.log(`🃏 Player 1 hand: ${player1HandResult.rows.length} cards`);
   console.log(`🃏 Player 2 hand: ${player2HandResult.rows.length} cards`);
-  
-  // Debug logging
-  if (player1HandResult.rows.length > 0) {
-    console.log(`🃏 First P1 card:`, player1HandResult.rows[0]);
-  } else {
-    console.warn(`⚠️ No cards found in player 1 hand for game ${gameId}`);
-  }
   
   // Populate player hands
   game.player1.hand = player1HandResult.rows.map(row => ({
@@ -375,8 +378,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   game.turnPhase = gameData.turn_phase || 'play';
   game.winner = gameData.winner_id;
   
-  console.log(`✅ Game state loaded successfully for game ${gameId}`);
-  
+  console.log(`✅ Game state loaded: ${game.player1.hand.length} + ${game.player2.hand.length} cards in hands, ${game.deck.length} in deck`);  
   return game;
 }
 
