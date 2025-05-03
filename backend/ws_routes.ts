@@ -1,6 +1,7 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 import { loadGameState } from "./game_routes.ts";
+import { client } from "./db_client.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
@@ -400,24 +401,59 @@ function tryFindMatch() {
     // Create a simple game ID (just using timestamp for now)
     const gameId = Date.now().toString();
     
-    // Notify both players
-    player1.socket.send(JSON.stringify({
-      event: "matchFound",
-      data: { 
-        gameId,
-        opponentId: player2.userId,
-        opponentName: player2.username
-      }
-    }));
+    // CREATE THE GAME IN THE DATABASE
+    createGame(gameId, player1.userId, player2.userId)
+      .then(() => {
+        // Notify both players
+        player1.socket.send(JSON.stringify({
+          event: "matchFound",
+          data: { 
+            gameId,
+            opponentId: player2.userId,
+            opponentName: player2.username
+          }
+        }));
+        
+        player2.socket.send(JSON.stringify({
+          event: "matchFound",
+          data: { 
+            gameId,
+            opponentId: player1.userId,
+            opponentName: player1.username
+          }
+        }));
+      })
+      .catch(error => {
+        console.error("❌ Error creating game:", error);
+        // Notify players of the error
+        const errorMessage = JSON.stringify({
+          event: "matchmakingError",
+          data: { message: "Failed to create game. Please try again." }
+        });
+        player1.socket.send(errorMessage);
+        player2.socket.send(errorMessage);
+      });
+  }
+}
+
+async function createGame(gameId: string, player1Id: string, player2Id: string): Promise<void> {
+  try {
+    // Create the game record
+    await client.queryObject(`
+      INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id)
+      VALUES ($1, $2, $3, 'waiting', $2)
+    `, [gameId, player1Id, player2Id]);
     
-    player2.socket.send(JSON.stringify({
-      event: "matchFound",
-      data: { 
-        gameId,
-        opponentId: player1.userId,
-        opponentName: player1.username
-      }
-    }));
+    // Create the board record
+    await client.queryObject(`
+      INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
+      VALUES ($1, false, 60, 1)
+    `, [gameId]);
+    
+    console.log(`✅ Game ${gameId} created with players ${player1Id} and ${player2Id}`);
+  } catch (error) {
+    console.error("❌ Error creating game in database:", error);
+    throw error;
   }
 }
 

@@ -73,15 +73,21 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
   try {
     const { opponentId, usePurpleExpedition } = await ctx.request.body({ type: "json" }).value;
     const userId = ctx.state.user.id;
+    const gameId = Date.now(); // Use timestamp for ID
     
     // Create game entry
     const gameResult = await client.queryObject<{id: number}>(
-      `INSERT INTO games (player1_id, player2_id, status) 
-       VALUES ($1, $2, 'waiting') RETURNING id`,
-      [userId, opponentId]
+      `INSERT INTO games (id, player1_id, player2_id, status) 
+       VALUES ($1, $2, $3, 'waiting') RETURNING id`,
+      [gameId, userId, opponentId]
     );
     
-    const gameId = gameResult.rows[0].id;
+    // ENSURE THIS EXISTS: Create board for this game
+    await client.queryObject(
+      `INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
+       VALUES ($1, $2, 60, 1)`,
+      [gameId, usePurpleExpedition]
+    );
     
     // Create board for this game
     await client.queryObject(
@@ -427,21 +433,29 @@ gameRouter.post("/lost-cities/games/:id/chat", authMiddleware, async (ctx) => {
 
 // Helper function to load game state from database
 async function loadGameState(gameId: string | number): Promise<LostCitiesGame> {
-  // Get basic game info
+  // Get basic game info with LEFT JOIN to handle missing board
   const gameResult = await client.queryObject(`
     SELECT g.*, b.use_purple_expedition, b.current_round
     FROM games g
-    JOIN board b ON g.id = b.game_id
+    LEFT JOIN board b ON g.id = b.game_id
     WHERE g.id = $1
   `, [gameId]);
   
+  if (gameResult.rows.length === 0) {
+    throw new Error("Game not found");
+  }
+  
   const gameData = gameResult.rows[0];
+  
+  // Handle case where board might be null
+  const usePurpleExpedition = gameData.use_purple_expedition ?? false;
+  const currentRound = gameData.current_round ?? 1;
   
   // Create game instance
   const game = new LostCitiesGame({
     gameId,
-    usePurpleExpedition: gameData.use_purple_expedition,
-    totalRounds: 3, // Default to 3 rounds
+    usePurpleExpedition,
+    totalRounds: 3,
     player1: { id: gameData.player1_id },
     player2: { id: gameData.player2_id }
   });
