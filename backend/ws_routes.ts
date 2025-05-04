@@ -732,6 +732,12 @@ async function getUserIdFromUsername(username: string): Promise<string> {
 
 // Handle requests for game state
 async function handleGameStateRequest(data: any, socket: WebSocket, username: string) {
+
+  if (socket.readyState !== WebSocket.OPEN) {
+    console.log(`WebSocket not open for ${username}, skipping game state send`);
+    return;
+  }
+
   const { gameId } = data;
   
   console.log(`🎮 User ${username} requested game state for game ${gameId}`);
@@ -759,19 +765,32 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
     
     console.log(`📤 Sending game state to ${username}:`, JSON.stringify(gameState, null, 2));
     
-    // Send game state to requesting player
-    socket.send(JSON.stringify({
-      event: 'gameUpdated',
-      data: { gameState }
-    }));
+    try {
+      socket.send(JSON.stringify({
+        event: 'gameUpdated',
+        data: { gameState }
+      }));
+      console.log(`✅ Sent game state to ${username} for game ${gameId}`);
+    } catch (error) {
+      console.error(`Failed to send game state to ${username}: WebSocket closed`);
+    }
     
-    console.log(`✅ Sent game state to ${username} for game ${gameId}`);
   } catch (error) {
     console.error(`❌ Error getting game state for ${gameId}:`, error);
     socket.send(JSON.stringify({
       event: 'error',
       data: { message: 'Failed to get game state' }
     }));
+    if (socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(JSON.stringify({
+          event: 'error',
+          data: { message: 'Failed to get game state' }
+        }));
+      } catch (e) {
+        console.error('Failed to send error message: WebSocket closed');
+      }
+    }
   }
 }
 

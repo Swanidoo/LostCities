@@ -257,7 +257,9 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
   try {
     const gameId = ctx.params.id;
     const userId = ctx.state.user.id;
-    
+
+    console.log(`[GET /lost-cities/games/${gameId}] Starting request for user ${userId}`);
+
     // Get game info - convert all BigInts to strings
     const gameResult = await client.queryObject(`
       SELECT g.id::text as id,  -- Convert BigInt to text
@@ -280,6 +282,8 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
       JOIN board b ON g.id = b.game_id
       WHERE g.id = $1
     `, [gameId]);
+
+    console.log(`[GET /lost-cities/games/${gameId}] Game query result:`, gameResult.rows.length);
     
     if (gameResult.rows.length === 0) {
       ctx.response.status = 404;
@@ -288,10 +292,29 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     }
     
     const game = gameResult.rows[0];
+    console.log(`[GET /lost-cities/games/${gameId}] Game data:`, game);
+
+    // In the game state endpoint, after getting the game data
+    console.log(`[GET /lost-cities/games/${gameId}] Player IDs - p1: ${game.player1_id} (${typeof game.player1_id}), p2: ${game.player2_id} (${typeof game.player2_id})`);
+    console.log(`[GET /lost-cities/games/${gameId}] Current user ID: ${userId} (${typeof userId})`);
     
+    // After getting the gameResult
+    const debugResult = await client.queryObject(`
+      SELECT 
+        COUNT(*) as total_cards,
+        SUM(CASE WHEN location = 'deck' THEN 1 ELSE 0 END) as deck_cards,
+        SUM(CASE WHEN location = 'player1_hand' THEN 1 ELSE 0 END) as p1_cards,
+        SUM(CASE WHEN location = 'player2_hand' THEN 1 ELSE 0 END) as p2_cards
+      FROM game_card 
+      WHERE game_id = $1
+    `, [gameId]);
+    console.log(`[GET /lost-cities/games/${gameId}] Card distribution:`, debugResult.rows[0]);
+
     // Determine which player is requesting
     const isPlayer1 = game.player1_id === userId;
     const isPlayer2 = game.player2_id === userId;
+
+    console.log(`[GET /lost-cities/games/${gameId}] User ${userId} is player1: ${isPlayer1}, is player2: ${isPlayer2}`);
     
     if (!isPlayer1 && !isPlayer2) {
       ctx.response.status = 403;
@@ -306,6 +329,8 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
       WHERE gc.game_id = $1 AND gc.location = $2
       ORDER BY gc.position
     `, [gameId, isPlayer1 ? 'player1_hand' : 'player2_hand']);
+
+    console.log(`[GET /lost-cities/games/${gameId}] Hand query result:`, handResult.rows.length);
     
     // Get expeditions for both players
     const expeditions = await getExpeditions(gameId);
@@ -317,37 +342,61 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     const gameState = {
       gameId: game.id,
       status: game.status,
-      currentRound: game.current_round,
+      currentRound: Number(game.current_round), // Convert to number
       totalRounds: 3,
-      currentPlayerId: game.current_turn_player_id,
+      currentPlayerId: Number(game.current_turn_player_id), // Convert to number
       turnPhase: game.turn_phase || 'play',
       usePurpleExpedition: game.use_purple_expedition,
-      cardsInDeck: await getCardsInDeck(gameId),
+      cardsInDeck: Number(await getCardsInDeck(gameId)), // Ensure number
       player1: {
-        id: game.player1_id,
-        name: game.player1_name,
+        id: Number(game.player1_id), // Convert to number
         expeditions: expeditions.player1,
-        handSize: isPlayer1 ? handResult.rows.length : await getHandSize(gameId, 'player1_hand'),
+        handSize: isPlayer1 ? handResult.rows.length : Number(await getHandSize(gameId, 'player1_hand')),
         hand: isPlayer1 ? handResult.rows : undefined
       },
       player2: {
-        id: game.player2_id,
-        name: game.player2_name,
+        id: Number(game.player2_id), // Convert to number
         expeditions: expeditions.player2,
-        handSize: isPlayer2 ? handResult.rows.length : await getHandSize(gameId, 'player2_hand'),
+        handSize: isPlayer2 ? handResult.rows.length : Number(await getHandSize(gameId, 'player2_hand')),
         hand: isPlayer2 ? handResult.rows : undefined
       },
       discardPiles,
       scores: await getScores(gameId),
-      winner: game.winner_id
+      winner: game.winner_id ? Number(game.winner_id) : null
     };
+
+    function convertBigIntsToNumbers(obj: any): any {
+      if (obj === null || obj === undefined) return obj;
+      
+      if (typeof obj === 'bigint') {
+        return Number(obj);
+      }
+      
+      if (Array.isArray(obj)) {
+        return obj.map(convertBigIntsToNumbers);
+      }
+      
+      if (typeof obj === 'object') {
+        const newObj: any = {};
+        for (const key in obj) {
+          newObj[key] = convertBigIntsToNumbers(obj[key]);
+        }
+        return newObj;
+      }
+      
+      return obj;
+    }
     
-    ctx.response.body = gameState;
-    
+    ctx.response.body = convertBigIntsToNumbers(gameState);    
+
+
   } catch (err) {
-    console.error("Error getting game state:", err);
+    console.error(`[GET /lost-cities/games/:id] Detailed error:`, err);
+    console.error(`[GET /lost-cities/games/:id] Error stack:`, err.stack);
+    console.error(`[GET /lost-cities/games/:id] Error name:`, err.name);
+    console.error(`[GET /lost-cities/games/:id] Error message:`, err.message);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { error: "Internal server error", details: err.message };  
   }
 });
 
@@ -369,18 +418,162 @@ async function getHandSize(gameId, location) {
 }
 
 async function getExpeditions(gameId) {
-  // Implementation to fetch expedition data
-  return { player1: {}, player2: {} };
+  try {
+    // First get the board_id for this game
+    const boardResult = await client.queryObject<{id: number}>(
+      'SELECT id FROM board WHERE game_id = $1',
+      [gameId]
+    );
+    
+    if (boardResult.rows.length === 0) {
+      console.error(`No board found for game ${gameId}`);
+      return { player1: {}, player2: {} };
+    }
+    
+    const boardId = boardResult.rows[0].id;
+    
+    // Now query expeditions using board_id
+    const expeditionsResult = await client.queryObject(`
+      SELECT 
+        e.player_id,
+        e.color,
+        e.wager_count,
+        e.card_count,
+        e.total_value,
+        e.score,
+        e.has_started,
+        array_agg(
+          json_build_object(
+            'id', c.id,
+            'color', c.color,
+            'type', c.type,
+            'value', c.value
+          ) ORDER BY gc.position
+        ) FILTER (WHERE c.id IS NOT NULL) as cards
+      FROM expedition e
+      LEFT JOIN game_card gc ON e.id = gc.expedition_id AND gc.game_id = $1
+      LEFT JOIN card c ON gc.card_id = c.id
+      WHERE e.board_id = $2
+      GROUP BY e.id, e.player_id, e.color, e.wager_count, e.card_count, e.total_value, e.score, e.has_started
+      ORDER BY e.player_id, e.color
+    `, [gameId, boardId]);
+    
+    // Initialize expeditions structure
+    const expeditions = {
+      player1: { red: [], green: [], white: [], blue: [], yellow: [] },
+      player2: { red: [], green: [], white: [], blue: [], yellow: [] }
+    };
+    
+    // Process results
+    for (const exp of expeditionsResult.rows) {
+      const playerKey = exp.player_id === 1 ? 'player1' : 'player2';
+      expeditions[playerKey][exp.color] = exp.cards || [];
+    }
+    
+    return expeditions;
+    
+  } catch (error) {
+    console.error('Error in getExpeditions:', error);
+    return { player1: {}, player2: {} };
+  }
 }
 
 async function getDiscardPiles(gameId) {
-  // Implementation to fetch discard pile data
-  return {};
+  try {
+    // First get the board_id for this game
+    const boardResult = await client.queryObject<{id: number}>(
+      'SELECT id FROM board WHERE game_id = $1',
+      [gameId]
+    );
+    
+    if (boardResult.rows.length === 0) {
+      console.error(`No board found for game ${gameId}`);
+      return {};
+    }
+    
+    const boardId = boardResult.rows[0].id;
+    
+    // Query discard piles using board_id
+    const discardResult = await client.queryObject(`
+      SELECT 
+        dp.color,
+        array_agg(
+          json_build_object(
+            'id', c.id,
+            'color', c.color,
+            'type', c.type,
+            'value', c.value
+          ) ORDER BY gc.position
+        ) FILTER (WHERE c.id IS NOT NULL) as cards
+      FROM discard_pile dp
+      LEFT JOIN game_card gc ON dp.id = gc.pile_id AND gc.game_id = $1
+      LEFT JOIN card c ON gc.card_id = c.id
+      WHERE dp.board_id = $2
+      GROUP BY dp.id, dp.color
+    `, [gameId, boardId]);
+    
+    const discardPiles = {
+      red: [],
+      green: [],
+      white: [],
+      blue: [],
+      yellow: []
+    };
+    
+    for (const pile of discardResult.rows) {
+      discardPiles[pile.color] = pile.cards || [];
+    }
+    
+    return discardPiles;
+    
+  } catch (error) {
+    console.error('Error in getDiscardPiles:', error);
+    return {};
+  }
 }
 
 async function getScores(gameId) {
-  // Implementation to fetch scores
-  return { player1: { total: 0 }, player2: { total: 0 } };
+  const result = await client.queryObject(`
+    SELECT 
+      b.round1_score_player1,
+      b.round1_score_player2,
+      b.round2_score_player1,
+      b.round2_score_player2,
+      b.round3_score_player1,
+      b.round3_score_player2
+    FROM board b
+    WHERE b.game_id = $1
+  `, [gameId]);
+
+  if (result.rows.length === 0) {
+    return { player1: { total: 0 }, player2: { total: 0 } };
+  }
+
+  const scores = result.rows[0];
+  for (const key in scores) {
+    if (typeof scores[key] === 'bigint') {
+      scores[key] = Number(scores[key]);
+    }
+  }
+
+  return {
+    player1: {
+      round1: scores.round1_score_player1 || 0,
+      round2: scores.round2_score_player1 || 0,
+      round3: scores.round3_score_player1 || 0,
+      total: (scores.round1_score_player1 || 0) + 
+             (scores.round2_score_player1 || 0) + 
+             (scores.round3_score_player1 || 0),
+    },
+    player2: {
+      round1: scores.round1_score_player2 || 0,
+      round2: scores.round2_score_player2 || 0,
+      round3: scores.round3_score_player2 || 0,
+      total: (scores.round1_score_player2 || 0) + 
+             (scores.round2_score_player2 || 0) + 
+             (scores.round3_score_player2 || 0),
+    },
+  };
 }
 
 // Join an existing game

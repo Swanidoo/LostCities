@@ -9,6 +9,8 @@ export const corsMiddleware = oakCors({
       "https://localhost",
       "http://localhost:3000",
       "https://localhost:3000",
+      "https://localhost:443",
+      "http://localhost:80",
       "https://lostcitiesfrontend.onrender.com"
     ];
     return allowedOrigins.includes(origin || "") ? origin : false;
