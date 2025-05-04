@@ -260,8 +260,11 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     
     // Get game info
     const gameResult = await client.queryObject(`
-      SELECT g.*, b.use_purple_expedition, b.current_round,
-             u1.username as player1_name, u2.username as player2_name
+      SELECT g.*, 
+             b.use_purple_expedition, 
+             b.current_round as board_current_round,
+             b.remaining_cards_in_deck,
+             b.id as board_id
       FROM games g
       JOIN board b ON g.id = b.game_id
       JOIN users u1 ON g.player1_id = u1.id

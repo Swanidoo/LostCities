@@ -462,6 +462,7 @@
     <!-- Éléments cachés pour stocker les données du jeu -->
     <input type="hidden" id="game-id">
     <input type="hidden" id="user-id">
+    <div id="error-message" class="error-message" style="display: none;"></div>
     
     <div class="game-container">
         <div class="header">
@@ -550,6 +551,57 @@
             <button class="btn" id="chat-btn">Chat</button>
         </div>
     </div>
+
+    <script type="module">
+        import { LostCitiesGame } from './js/lost_cities_main.js';
+    
+        const API_URL = window.location.hostname === "localhost"
+            ? "http://localhost:3000"
+            : "https://lostcitiesbackend.onrender.com";
+    
+        // Check URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId = urlParams.get('gameId');
+    
+        // Initialize the game
+        async function initializeGame(gameId) {
+            try {
+                // Fetch the game state from the backend
+                const token = localStorage.getItem('authToken');
+                const response = await fetch(`${API_URL}/lost-cities/games/${gameId}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+    
+                if (!response.ok) {
+                    throw new Error('Failed to fetch game state');
+                }
+    
+                const gameState = await response.json();
+                console.log("Game state received:", gameState);
+    
+                // Initialize the game UI and logic
+                const gameController = new LostCitiesGame();
+                gameController.setupGame(gameState);
+            } catch (error) {
+                console.error("Error initializing game:", error);
+                showError("Failed to initialize the game. Please try again.");
+            }
+        }
+    
+        // Display an error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+    
+        // Start the game initialization
+        if (gameId) {
+            initializeGame(gameId);
+        } else {
+            showError("Invalid game ID. Please try again.");
+        }
+    </script>
     
     <!-- Chat -->
     <div class="chat-area" id="chat-area">

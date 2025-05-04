@@ -6,7 +6,7 @@
 import { GameWebSocket } from './game_websocket.js';
 import { GameUIController } from './game_ui_controller.js';
 
-class LostCitiesGame {
+export class LostCitiesGame {
   constructor() {
     console.log("Initializing game controller");
     
@@ -45,9 +45,7 @@ class LostCitiesGame {
       console.error('No authentication token found. Redirecting to login...');
       setTimeout(() => window.location.href = '/login/login.html', 1000);
       return;
-    }
-    
-    console.log(`Game: ${this.gameId}, User: ${this.userId}`);
+    }chat/chat.htmlonsole.log(`Game: ${this.gameId}, User: ${this.userId}`);
   }
   
   /**
