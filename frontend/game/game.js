@@ -3,20 +3,29 @@ const API_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000" // URL du backend local
   : "https://lostcitiesbackend.onrender.com"; // URL de production
 
+// Configuration WebSocket
+const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_HOST = window.location.hostname === "localhost" 
+    ? 'localhost:3000' 
+    : 'lostcitiesbackend.onrender.com';
+const WS_URL = `${WS_PROTOCOL}//${WS_HOST}/ws`;
+
 // État du jeu
 const gameState = {
     gameId: null,
     userId: null,
     username: null,
+    socket: null,
     gameData: null,
     selectedCard: null,
     selectedPile: null,
     currentPhase: null, // 'play' ou 'draw'
     isPlayerTurn: false,
+    isConnected: false,
     cardElements: new Map() // Pour stocker les références aux éléments DOM des cartes
 };
 
-// Initial DOMContentLoaded for gameId parsing
+// At the beginning of your game.js file
 document.addEventListener('DOMContentLoaded', () => {
     // Get gameId from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -33,7 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Store gameId in hidden input for later use
     document.getElementById('game-id').value = gameId;
-});
+    
+  });
+
 
 // Éléments DOM
 const elements = {
@@ -132,7 +143,33 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Configurer les écouteurs d'événements
     setupEventListeners();
+    
+    // Établir la connexion WebSocket
+    connectWebSocket();
 });
+
+
+// Connexion au WebSocket
+function connectWebSocket() {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    // Clean the token (like in chat.js)
+    const cleanToken = token.trim();
+    
+    // Use the same WebSocket protocol detection as your chat.js
+    const isLocalhost = window.location.hostname === "localhost";
+    const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
+    const wsHost = isLocalhost ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
+    const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(cleanToken)}`;
+    
+    console.log("Connecting to WebSocket URL:", wsUrl.substring(0, wsUrl.indexOf('?') + 15) + "...");
+    
+    gameState.socket = new WebSocket(wsUrl);
+    
+    // Gestion des événements WebSocket
+    setupWebSocketEventListeners();
+}
 
 // Configuration des écouteurs d'événements
 function setupEventListeners() {
@@ -140,10 +177,7 @@ function setupEventListeners() {
     elements.playBtn.addEventListener('click', () => {
         if (gameState.selectedCard) {
             const color = gameState.selectedCard.color;
-            // Let the main controller handle this
-            if (window.gameController && window.gameController.playCard) {
-                window.gameController.playCard(gameState.selectedCard.id, color);
-            }
+            playCard(gameState.selectedCard.id, color);
         } else {
             updateGameStatus("Vous devez d'abord sélectionner une carte");
         }
@@ -151,10 +185,7 @@ function setupEventListeners() {
     
     elements.discardBtn.addEventListener('click', () => {
         if (gameState.selectedCard) {
-            // Let the main controller handle this
-            if (window.gameController && window.gameController.discardCard) {
-                window.gameController.discardCard(gameState.selectedCard.id);
-            }
+            discardCard(gameState.selectedCard.id);
         } else {
             updateGameStatus("Vous devez d'abord sélectionner une carte");
         }
@@ -175,13 +206,7 @@ function setupEventListeners() {
         elements.surrenderModal.classList.add('visible');
     });
     
-    elements.confirmSurrenderBtn.addEventListener('click', () => {
-        // Let the main controller handle surrender
-        if (window.gameController && window.gameController.surrender) {
-            window.gameController.surrender();
-        }
-        elements.surrenderModal.classList.remove('visible');
-    });
+    elements.confirmSurrenderBtn.addEventListener('click', surrenderGame);
     
     elements.cancelSurrenderBtn.addEventListener('click', () => {
         elements.surrenderModal.classList.remove('visible');
@@ -189,10 +214,12 @@ function setupEventListeners() {
     
     // Boutons de fin de partie
     elements.newGameBtn.addEventListener('click', () => {
+        // Rediriger vers la page de matchmaking
         window.location.href = '/matchmaking.html';
     });
     
     elements.backBtn.addEventListener('click', () => {
+        // Rediriger vers la page d'accueil
         window.location.href = '/index.html';
     });
     
@@ -205,23 +232,15 @@ function setupEventListeners() {
         elements.chatArea.classList.remove('open');
     });
     
-    elements.sendChatBtn.addEventListener('click', handleSendChatMessage);
+    elements.sendChatBtn.addEventListener('click', sendChatMessage);
     
     elements.chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            handleSendChatMessage();
+            sendChatMessage();
         }
     });
 }
 
-// Handle sending chat message
-function handleSendChatMessage() {
-    const message = elements.chatInput.value.trim();
-    if (message && window.gameController && window.gameController.sendChatMessage) {
-        window.gameController.sendChatMessage(message);
-        elements.chatInput.value = '';
-    }
-}
 
 // Function to cancel a card selection
 function cancelCardSelection() {
@@ -236,26 +255,160 @@ function cancelCardSelection() {
     updateGameStatus("Sélection annulée");
 }
 
+// Function to play a card to an expedition
+function playCard(cardId, color) {
+    if (!gameState.isConnected || !gameState.isPlayerTurn || gameState.currentPhase !== 'play') {
+        return;
+    }
+    
+    // Send the move to the server
+    gameState.socket.send(JSON.stringify({
+        event: "gameAction",
+        data: {
+            gameId: gameState.gameId,
+            action: "play_card",
+            cardId: cardId,
+            color: color,
+            destination: "expedition"
+        }
+    }));
+    
+    // Reset selection
+    cancelCardSelection();
+}
+
+// Function to discard a card
+function discardCard(cardId) {
+    if (!gameState.isConnected || !gameState.isPlayerTurn || gameState.currentPhase !== 'play') {
+        return;
+    }
+    
+    // Send the move to the server
+    gameState.socket.send(JSON.stringify({
+        event: "gameAction",
+        data: {
+            gameId: gameState.gameId,
+            action: "discard_card",
+            cardId: cardId
+        }
+    }));
+    
+    // Reset selection
+    cancelCardSelection();
+}
+
+// Function to draw a card from the deck or discard pile
+function drawCard(source, color) {
+    if (!gameState.isConnected || !gameState.isPlayerTurn || gameState.currentPhase !== 'draw') {
+        return;
+    }
+    
+    // Send the move to the server
+    gameState.socket.send(JSON.stringify({
+        event: "gameAction",
+        data: {
+            gameId: gameState.gameId,
+            action: "draw_card",
+            source: source,
+            color: color
+        }
+    }));
+}
+
+// Function to surrender the game
+function surrenderGame() {
+    if (!gameState.isConnected) {
+        return;
+    }
+    
+    // Send surrender action to the server
+    gameState.socket.send(JSON.stringify({
+        event: "gameAction",
+        data: {
+            gameId: gameState.gameId,
+            action: "surrender"
+        }
+    }));
+    
+    // Close the surrender modal
+    elements.surrenderModal.classList.remove('visible');
+    
+    updateGameStatus("Vous avez abandonné la partie.");
+}
+
+// Function to send a chat message
+function sendChatMessage() {
+    if (!gameState.isConnected) {
+        return;
+    }
+    
+    const chatInput = elements.chatInput;
+    const message = chatInput.value.trim();
+    
+    if (message) {
+        // Send the chat message
+        gameState.socket.send(JSON.stringify({
+            event: "chatMessage",
+            data: {
+                gameId: gameState.gameId,
+                message: message
+            }
+        }));
+        
+        // Add the message to the chat area
+        const chatMessages = elements.chatMessages;
+        const messageElement = document.createElement('div');
+        messageElement.className = 'chat-message self';
+        messageElement.innerHTML = `<div class="chat-sender">Vous</div><div class="chat-text">${message}</div>`;
+        chatMessages.appendChild(messageElement);
+        
+        // Clear the input field
+        chatInput.value = '';
+        
+        // Scroll to the bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+}
+
+// Handle chat messages from other players
+function handleChatMessage(data) {
+    if (!data || !data.username || !data.message) {
+        return;
+    }
+    
+    // Add the message to the chat area
+    const chatMessages = elements.chatMessages;
+    const messageElement = document.createElement('div');
+    messageElement.className = 'chat-message other';
+    messageElement.innerHTML = `<div class="chat-sender">${data.username}</div><div class="chat-text">${data.message}</div>`;
+    chatMessages.appendChild(messageElement);
+    
+    // Scroll to the bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Handle system messages
+function handleSystemMessage(data) {
+    if (!data || !data.message) {
+        return;
+    }
+    
+    // Add the message to the chat area
+    const chatMessages = elements.chatMessages;
+    const messageElement = document.createElement('div');
+    messageElement.className = 'chat-message system';
+    messageElement.innerHTML = `<div class="chat-text">${data.message}</div>`;
+    chatMessages.appendChild(messageElement);
+    
+    // Scroll to the bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
 // Update game status message
 function updateGameStatus(message) {
     if (elements.gameStatus) {
         elements.gameStatus.textContent = message;
     }
-}
-
-// Show error message
-function showError(message) {
-    // Create and show an error notification
-    const errorElement = document.createElement('div');
-    errorElement.className = 'error-message';
-    errorElement.textContent = message;
-    
-    document.body.appendChild(errorElement);
-    
-    // Remove after a few seconds
-    setTimeout(() => {
-        errorElement.remove();
-    }, 5000);
 }
 
 // Create a card element
@@ -279,9 +432,6 @@ function createCardElement(card) {
     
     return cardElement;
 }
-
-// UI helper functions that will be used by the new architecture
-// Keeping these for now until they're fully moved to game_ui_controller.js
 
 // Handle card click in the player's hand
 function handleCardClick(card, cardElement) {
@@ -307,16 +457,273 @@ function handleCardClick(card, cardElement) {
     }
 }
 
-// These functions will eventually be moved to game_ui_controller.js
+// Handle expedition click
+function handleExpeditionClick(color) {
+    if (!gameState.selectedCard || gameState.currentPhase !== 'play') {
+        return;
+    }
+    
+    const cardElement = gameState.cardElements.get(gameState.selectedCard);
+    if (!cardElement) return;
+    
+    const cardColor = cardElement.dataset.color;
+    
+    // Check if the card can be played to this expedition
+    if (cardColor !== color) {
+        updateGameStatus("La couleur de la carte doit correspondre à l'expédition");
+        return;
+    }
+    
+    // Play the card
+    playCard(gameState.selectedCard, color);
+}
+
+// Handle discard pile click during draw phase
+function handleDiscardPileClick(color) {
+    if (gameState.currentPhase !== 'draw') {
+        return;
+    }
+    
+    // Draw a card from this discard pile
+    drawCard('discard_pile', color);
+}
+
+// Handle deck click
+function handleDeckClick() {
+    if (gameState.currentPhase !== 'draw') {
+        return;
+    }
+    
+    // Draw a card from the deck
+    drawCard('deck');
+}
+
+// Show game end screen
+function showGameEnd() {
+    // Fill in the game end modal with results
+    const playerScore = gameState.gameData.scores[gameState.playerSide].total;
+    const opponentScore = gameState.gameData.scores[gameState.opponentSide].total;
+    const isWinner = gameState.gameData.winner === gameState.userId;
+    
+    elements.gameResult.textContent = isWinner ? "Victoire !" : "Défaite";
+    elements.winnerText.textContent = isWinner ? "Vous avez gagné la partie !" : "Votre adversaire a gagné la partie.";
+    
+    elements.playerFinalName.textContent = gameState.username;
+    elements.opponentFinalName.textContent = elements.opponentName.textContent;
+    
+    elements.playerFinalScore.textContent = playerScore;
+    elements.opponentFinalScore.textContent = opponentScore;
+    
+    // Show the modal
+    elements.gameEndModal.classList.add('visible');
+}
+
+// Show error message
+function showError(message) {
+    // Create and show an error notification
+    const errorElement = document.createElement('div');
+    errorElement.className = 'error-message';
+    errorElement.textContent = message;
+    
+    document.body.appendChild(errorElement);
+    
+    // Remove after a few seconds
+    setTimeout(() => {
+        errorElement.remove();
+    }, 5000);
+}
+
+// Update turn indicators
+function updateTurnIndicators() {
+    if (gameState.isPlayerTurn) {
+        elements.playerTurn.textContent = "Votre tour";
+        elements.playerTurn.classList.add('active');
+        elements.opponentTurn.textContent = "En attente";
+        elements.opponentTurn.classList.remove('active');
+    } else {
+        elements.playerTurn.textContent = "En attente";
+        elements.playerTurn.classList.remove('active');
+        elements.opponentTurn.textContent = "Tour adverse";
+        elements.opponentTurn.classList.add('active');
+    }
+}
+
+// Update game status message based on current game state
+function updateGameStatusMessage() {
+    if (gameState.gameData.status === 'finished') {
+        updateGameStatus(gameState.gameData.winner === gameState.userId ? 
+            "Partie terminée. Vous avez gagné !" : 
+            "Partie terminée. Vous avez perdu.");
+    } else if (gameState.isPlayerTurn) {
+        updateGameStatus(gameState.currentPhase === 'play' ?
+            "À vous de jouer. Jouez ou défaussez une carte." :
+            "Piochez une carte du paquet ou d'une défausse.");
+    } else {
+        updateGameStatus("En attente de l'autre joueur...");
+    }
+}
+
+// Exporter les fonctions nécessaires
+window.gameController = {
+    cancelCardSelection,
+    playCard,
+    discardCard,
+    drawCard,
+    surrenderGame,
+    sendChatMessage
+}; WebSocket
+function setupWebSocketEventListeners() {
+    const socket = gameState.socket;
+    
+    // Connexion établie
+    socket.addEventListener('open', () => {
+        console.log("WebSocket connexion établie");
+        gameState.isConnected = true;
+        updateGameStatus("Connecté au serveur de jeu");
+        
+        // S'abonner aux mises à jour de la partie
+        subscribeToGame();
+    });
+    
+    // Erreur de connexion
+    socket.addEventListener('error', (error) => {
+        console.error("Erreur WebSocket:", error);
+        gameState.isConnected = false;
+        updateGameStatus("Erreur de connexion au serveur");
+    });
+    
+    // Fermeture de la connexion
+    socket.addEventListener('close', (event) => {
+        console.log(`WebSocket déconnecté: ${event.code} - ${event.reason}`);
+        gameState.isConnected = false;
+        updateGameStatus("Déconnecté du serveur");
+        
+        // Tentative de reconnexion après 5 secondes
+        setTimeout(() => {
+            if (!gameState.isConnected) {
+                connectWebSocket();
+            }
+        }, 5000);
+    });
+    
+    // Réception de message
+    socket.addEventListener('message', handleWebSocketMessage);
+}
+
+// Traitement des messages WebSocket
+function handleWebSocketMessage(event) {
+    try {
+        const data = JSON.parse(event.data);
+        console.log("Message reçu:", data);
+        
+        switch (data.event) {
+            case "gameUpdated":
+                handleGameUpdate(data.data);
+                break;
+                
+            case "gameSubscribed":
+                console.log(`Abonné à la partie ${data.data.gameId}`);
+                // Demander l'état actuel de la partie
+                requestGameState();
+                break;
+                
+            case "chatMessage":
+                handleChatMessage(data.data);
+                break;
+                
+            case "systemMessage":
+                handleSystemMessage(data.data);
+                break;
+                
+            default:
+                console.log("Type de message non reconnu:", data.event);
+        }
+    } catch (error) {
+        console.error("Erreur lors de l'analyse du message:", error);
+    }
+}
+
+// S'abonner aux mises à jour de la partie
+function subscribeToGame() {
+    if (!gameState.isConnected || !gameState.gameId) {
+        return;
+    }
+    
+    gameState.socket.send(JSON.stringify({
+        event: "subscribeGame",
+        data: { gameId: gameState.gameId }
+    }));
+}
+
+// Demander l'état actuel de la partie
+function requestGameState() {
+    if (!gameState.isConnected || !gameState.gameId) {
+        return;
+    }
+    
+    gameState.socket.send(JSON.stringify({
+        event: "gameAction",
+        data: { 
+            gameId: gameState.gameId,
+            action: "request_state"
+        }
+    }));
+}
+
+// Gestion des mises à jour de la partie
+function handleGameUpdate(data) {
+    if (!data.gameState) return;
+    
+    // Store the game state
+    gameState.gameData = data.gameState;
+    
+    // Debug log
+    console.log('Game state received:', data.gameState);
+    
+    // Determine player side
+    const playerSide = data.gameState.player1.id === Number(gameState.userId) ? 'player1' : 'player2';
+    const opponentSide = playerSide === 'player1' ? 'player2' : 'player1';
+    gameState.playerSide = playerSide;
+    gameState.opponentSide = opponentSide;
+    
+    // Update current phase and turn
+    gameState.currentPhase = data.gameState.turnPhase;
+    gameState.isPlayerTurn = data.gameState.currentPlayerId === Number(gameState.userId);
+    
+    // Update interface
+    updateGameInterface();
+    
+    // Hide loading overlay
+    elements.loadingOverlay.classList.add('hidden');
+
+    // Vérifier si la partie est terminée
+    if (gameState.gameData.status === 'finished') {
+        showGameEnd();
+    }
+}
+
+// Mettre à jour l'interface du jeu
 function updateGameInterface() {
+    // Mettre à jour les informations générales
     updateGameInfo();
+    
+    // Mettre à jour la main du joueur
     updatePlayerHand();
+    
+    // Mettre à jour les expéditions
     updateExpeditions();
+    
+    // Mettre à jour les défausses et le paquet
     updateDiscardAndDeck();
+    
+    // Mettre à jour les indicateurs de tour
     updateTurnIndicators();
+    
+    // Mise à jour du message de statut
     updateGameStatusMessage();
 }
 
+// Mettre à jour les informations générales du jeu
 function updateGameInfo() {
     // Mettre à jour les noms des joueurs (si disponibles)
     if (gameState.gameData.player1.name) {
@@ -341,6 +748,7 @@ function updateGameInfo() {
     elements.phaseIndicator.textContent = `Phase: ${gameState.currentPhase === 'play' ? 'Jouer' : 'Piocher'}`;
 }
 
+// Mettre à jour la main du joueur
 function updatePlayerHand() {
     // Vider la main actuelle
     elements.playerHand.innerHTML = '';
@@ -374,6 +782,7 @@ function updatePlayerHand() {
     });
 }
 
+// Mettre à jour les expéditions
 function updateExpeditions() {
     // Récupérer les références aux expéditions des joueurs
     const playerExpeditions = gameState.gameData[gameState.playerSide].expeditions;
@@ -428,6 +837,7 @@ function updateExpeditions() {
     }
 }
 
+// Mettre à jour les défausses et le paquet
 function updateDiscardAndDeck() {
     // Mettre à jour le nombre de cartes dans le paquet
     elements.deckPile.dataset.count = gameState.gameData.cardsInDeck;
@@ -470,41 +880,3 @@ function updateDiscardAndDeck() {
         elements.deckPile.classList.remove('selectable');
     }
 }
-
-function updateTurnIndicators() {
-    if (gameState.isPlayerTurn) {
-        elements.playerTurn.textContent = "Votre tour";
-        elements.playerTurn.classList.add('active');
-        elements.opponentTurn.textContent = "En attente";
-        elements.opponentTurn.classList.remove('active');
-    } else {
-        elements.playerTurn.textContent = "En attente";
-        elements.playerTurn.classList.remove('active');
-        elements.opponentTurn.textContent = "Tour adverse";
-        elements.opponentTurn.classList.add('active');
-    }
-}
-
-function updateGameStatusMessage() {
-    if (gameState.gameData.status === 'finished') {
-        updateGameStatus(gameState.gameData.winner === gameState.userId ? 
-            "Partie terminée. Vous avez gagné !" : 
-            "Partie terminée. Vous avez perdu.");
-    } else if (gameState.isPlayerTurn) {
-        updateGameStatus(gameState.currentPhase === 'play' ?
-            "À vous de jouer. Jouez ou défaussez une carte." :
-            "Piochez une carte du paquet ou d'une défausse.");
-    } else {
-        updateGameStatus("En attente de l'autre joueur...");
-    }
-}
-
-// Export functions to be used by the main controller
-window.gameUtils = {
-    elements,
-    gameState,
-    updateGameInterface,
-    updateGameStatus,
-    showError,
-    cancelCardSelection
-};

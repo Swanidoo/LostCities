@@ -33,13 +33,8 @@ export class GameWebSocket {
    * Establish WebSocket connection
    */
   connect() {
-    // First, determine the API URL like in game.js
-    const API_URL = window.location.hostname === "localhost"
-      ? "http://localhost:3000"
-      : "https://lostcitiesbackend.onrender.com";
-    
-    // Use the same protocol detection as game.js
-    const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
+    // Determine the WebSocket URL based on environment
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? 
       'localhost:3000' : 
       'lostcitiesbackend.onrender.com';
@@ -200,6 +195,8 @@ export class GameWebSocket {
   isCurrentlyConnected() {
     return this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN;
   }
+
+  // in game_websocket.js
 
   // Subscribe to a specific game
   subscribeToGame() {
