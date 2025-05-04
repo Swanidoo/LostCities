@@ -440,7 +440,7 @@ function handleCardClick(card, cardElement) {
     }
     
     // Toggle selection
-    if (gameState.selectedCard === card.id) {
+    if (gameState.selectedCard && gameState.selectedCard.id === card.id) {
         cancelCardSelection();
     } else {
         // Deselect any previously selected card
@@ -449,7 +449,7 @@ function handleCardClick(card, cardElement) {
         });
         
         // Select this card
-        gameState.selectedCard = card.id;
+        gameState.selectedCard = card; // Store the entire card object
         cardElement.classList.add('selected');
         
         // Show action buttons
@@ -695,7 +695,7 @@ function handleGameUpdate(data) {
     
     // Hide loading overlay
     elements.loadingOverlay.classList.add('hidden');
-     
+
     // Vérifier si la partie est terminée
     if (gameState.gameData.status === 'finished') {
         showGameEnd();

@@ -1,15 +1,21 @@
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 
-
 export const corsMiddleware = oakCors({
-  origin: [
-    "http://localhost:8080", 
-    "http://localhost",
-    "https://localhost:8080", 
-    "https://localhost", 
-    "https://lostcitiesfrontend.onrender.com"
-  ],
+  origin: (origin) => {
+    const allowedOrigins = [
+      "http://localhost:8080",
+      "http://localhost",
+      "https://localhost:8080",
+      "https://localhost",
+      "http://localhost:3000",
+      "https://localhost:3000",
+      "https://lostcitiesfrontend.onrender.com"
+    ];
+    return allowedOrigins.includes(origin || "") ? origin : false;
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Upgrade", "Connection"],
+  exposedHeaders: ["*"],
+  maxAge: 86400,
 });

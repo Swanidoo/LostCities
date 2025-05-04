@@ -175,17 +175,27 @@ wsRouter.get("/ws", async (ctx) => {
                     handleGameStateRequest(data.data, socket, clientData.username);
                 }
                 break;
-            case "gameAction":
-                if (data.data?.gameId && data.data?.action) {
-                    if (data.data.action === "request_state") {
-                        // Handle game state request
-                        handleGameStateRequest(data.data, socket, clientData.username);
-                    } else {
-                        // Handle other game actions
-                        console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
-                    }
-                }
-                break;
+                case "gameAction":
+                  if (data.data?.gameId && data.data?.action) {
+                      switch (data.data.action) {
+                          case "request_state":
+                              // Handle game state request
+                              handleGameStateRequest(data.data, socket, clientData.username);
+                              break;
+                          case "play_card":
+                              handlePlayCard(data.data, socket, clientData.username);
+                              break;
+                          case "discard_card":
+                              handleDiscardCard(data.data, socket, clientData.username);
+                              break;
+                          case "draw_card":
+                              handleDrawCard(data.data, socket, clientData.username);
+                              break;
+                          default:
+                              console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
+                      }
+                  }
+                  break;
             default:
                 console.warn("⚠️ Unknown message type or missing data:", data);
           }
@@ -379,6 +389,125 @@ function handleMatchmaking(socket, username, userId) {
   
   // Try to find a match
   tryFindMatch();
+}
+
+// Handle play card action
+async function handlePlayCard(data: any, socket: WebSocket, username: string) {
+  const { gameId, cardId, color, destination } = data;
+  
+  try {
+    console.log(`🎮 Player ${username} playing card ${cardId} to ${destination}`);
+    
+    // Load the game
+    const game = await loadGameFromDatabase(gameId);
+    const userId = await getUserIdFromUsername(username);
+    
+    // Make the move
+    let success = false;
+    if (destination === 'expedition') {
+      success = game.playCardToExpedition(userId, cardId, color);
+    }
+    
+    if (success) {
+      // Save the updated game state
+      await game.save();
+      
+      // Notify all players
+      const gameState = game.getGameState();
+      notifyGamePlayers(gameId, gameState);
+    } else {
+      // Send error back to player
+      socket.send(JSON.stringify({
+        event: 'error',
+        data: { message: 'Invalid move' }
+      }));
+    }
+  } catch (error) {
+    console.error(`❌ Error handling play card: ${error}`);
+    socket.send(JSON.stringify({
+      event: 'error',
+      data: { message: 'Failed to play card' }
+    }));
+  }
+}
+
+// Handle discard card action
+async function handleDiscardCard(data: any, socket: WebSocket, username: string) {
+  const { gameId, cardId } = data;
+  
+  try {
+    console.log(`🎮 Player ${username} discarding card ${cardId}`);
+    
+    // Load the game
+    const game = await loadGameFromDatabase(gameId);
+    const userId = await getUserIdFromUsername(username);
+    
+    // Make the move
+    const success = game.discardCard(userId, cardId);
+    
+    if (success) {
+      // Save the updated game state
+      await game.save();
+      
+      // Notify all players
+      const gameState = game.getGameState();
+      notifyGamePlayers(gameId, gameState);
+    } else {
+      // Send error back to player
+      socket.send(JSON.stringify({
+        event: 'error',
+        data: { message: 'Invalid move' }
+      }));
+    }
+  } catch (error) {
+    console.error(`❌ Error handling discard card: ${error}`);
+    socket.send(JSON.stringify({
+      event: 'error',
+      data: { message: 'Failed to discard card' }
+    }));
+  }
+}
+
+// Handle draw card action
+async function handleDrawCard(data: any, socket: WebSocket, username: string) {
+  const { gameId, source, color } = data;
+  
+  try {
+    console.log(`🎮 Player ${username} drawing card from ${source}`);
+    
+    // Load the game
+    const game = await loadGameFromDatabase(gameId);
+    const userId = await getUserIdFromUsername(username);
+    
+    // Make the move
+    let success = false;
+    if (source === 'deck') {
+      success = game.drawCardFromDeck(userId);
+    } else if (source === 'discard_pile') {
+      success = game.drawCardFromDiscardPile(userId, color);
+    }
+    
+    if (success) {
+      // Save the updated game state
+      await game.save();
+      
+      // Notify all players
+      const gameState = game.getGameState();
+      notifyGamePlayers(gameId, gameState);
+    } else {
+      // Send error back to player
+      socket.send(JSON.stringify({
+        event: 'error',
+        data: { message: 'Invalid move' }
+      }));
+    }
+  } catch (error) {
+    console.error(`❌ Error handling draw card: ${error}`);
+    socket.send(JSON.stringify({
+      event: 'error',
+      data: { message: 'Failed to draw card' }
+    }));
+  }
 }
 
 function removeFromMatchmaking(socket: WebSocket) {
