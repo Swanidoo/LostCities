@@ -441,17 +441,117 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
   try {
     // Create the game record
     await client.queryObject(`
-      INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id)
-      VALUES ($1, $2, $3, 'waiting', $2)
+      INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id, turn_phase, started_at)
+      VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP)
     `, [gameId, player1Id, player2Id]);
     
     // Create the board record
-    await client.queryObject(`
-      INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
-      VALUES ($1, false, 60, 1)
-    `, [gameId]);
+    const boardResult = await client.queryObject<{id: number}>(
+      `INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
+       VALUES ($1, false, 60, 1) RETURNING id`,
+      [gameId]
+    );
     
-    console.log(`✅ Game ${gameId} created with players ${player1Id} and ${player2Id}`);
+    const boardId = boardResult.rows[0].id;
+    console.log(`✅ Board created with ID ${boardId}`);
+    
+    // Initialize expedition slots
+    const colors = ['red', 'green', 'white', 'blue', 'yellow'];
+    
+    // Create expedition entries for both players
+    for (const color of colors) {
+      await client.queryObject(
+        `INSERT INTO expedition (board_id, player_id, color, wager_count, card_count)
+         VALUES ($1, $2, $3, 0, 0)`,
+        [boardId, player1Id, color]
+      );
+      
+      await client.queryObject(
+        `INSERT INTO expedition (board_id, player_id, color, wager_count, card_count)
+         VALUES ($1, $2, $3, 0, 0)`,
+        [boardId, player2Id, color]
+      );
+      
+      // Create discard pile for this color
+      await client.queryObject(
+        `INSERT INTO discard_pile (board_id, color)
+         VALUES ($1, $2)`,
+        [boardId, color]
+      );
+    }
+    
+    // Create a deck of cards
+    const deck: { id: string; color: string; type: string; value: number | string }[] = [];
+    
+    for (const color of colors) {
+      // Add expedition cards (2-10)
+      for (let value = 2; value <= 10; value++) {
+        deck.push({
+          id: `${color}_${value}`,
+          color: color,
+          type: 'expedition',
+          value: value
+        });
+      }
+      
+      // Add wager cards (3 per color)
+      for (let i = 0; i < 3; i++) {
+        deck.push({
+          id: `${color}_wager_${i}`,
+          color: color,
+          type: 'wager',
+          value: 'W'
+        });
+      }
+    }
+    
+    // Shuffle the deck
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    
+    // Deal initial hands (8 cards each)
+    const player1Hand = deck.splice(0, 8);
+    const player2Hand = deck.splice(0, 8);
+    
+    // Add cards to database - Player 1 hand
+    for (let i = 0; i < player1Hand.length; i++) {
+      const card = player1Hand[i];
+      await client.queryObject(
+        `INSERT INTO game_card (game_id, card_id, location, position)
+         VALUES ($1, $2, 'player1_hand', $3)`,
+        [gameId, card.id, i]
+      );
+    }
+    
+    // Add cards to database - Player 2 hand
+    for (let i = 0; i < player2Hand.length; i++) {
+      const card = player2Hand[i];
+      await client.queryObject(
+        `INSERT INTO game_card (game_id, card_id, location, position)
+         VALUES ($1, $2, 'player2_hand', $3)`,
+        [gameId, card.id, i]
+      );
+    }
+    
+    // Add remaining cards to deck
+    for (let i = 0; i < deck.length; i++) {
+      const card = deck[i];
+      await client.queryObject(
+        `INSERT INTO game_card (game_id, card_id, location, position)
+         VALUES ($1, $2, 'deck', $3)`,
+        [gameId, card.id, i]
+      );
+    }
+    
+    // Update deck count in board
+    await client.queryObject(
+      `UPDATE board SET remaining_cards_in_deck = $1 WHERE game_id = $2`,
+      [deck.length, gameId]
+    );
+    
+    console.log(`✅ Game ${gameId} created successfully with ${deck.length} cards in deck, 8 cards per player`);
   } catch (error) {
     console.error("❌ Error creating game in database:", error);
     throw error;

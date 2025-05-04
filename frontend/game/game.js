@@ -420,15 +420,15 @@ function createCardElement(card) {
     cardElement.dataset.type = card.type;
     cardElement.dataset.value = card.value;
     
-    const cardInner = document.createElement('div');
-    cardInner.className = 'card-inner';
+    const cardContent = document.createElement('div');
+    cardContent.className = 'card-content';
     
     const valueElement = document.createElement('div');
     valueElement.className = 'card-value';
     valueElement.textContent = card.type === 'wager' ? 'W' : card.value;
     
-    cardInner.appendChild(valueElement);
-    cardElement.appendChild(cardInner);
+    cardContent.appendChild(valueElement);
+    cardElement.appendChild(cardContent);
     
     return cardElement;
 }
@@ -674,25 +674,28 @@ function requestGameState() {
 function handleGameUpdate(data) {
     if (!data.gameState) return;
     
-    // Masquer l'écran de chargement
-    elements.loadingOverlay.classList.add('hidden');
-    
-    // Mettre à jour l'état du jeu
+    // Store the game state
     gameState.gameData = data.gameState;
     
-    // Déterminer quel joueur est le joueur actuel
-    const playerSide = gameState.gameData.player1.id === gameState.userId ? 'player1' : 'player2';
+    // Debug log
+    console.log('Game state received:', data.gameState);
+    
+    // Determine player side
+    const playerSide = data.gameState.player1.id === Number(gameState.userId) ? 'player1' : 'player2';
     const opponentSide = playerSide === 'player1' ? 'player2' : 'player1';
     gameState.playerSide = playerSide;
     gameState.opponentSide = opponentSide;
     
-    // Mettre à jour la phase actuelle et le tour
-    gameState.currentPhase = gameState.gameData.turnPhase;
-    gameState.isPlayerTurn = gameState.gameData.currentPlayerId === gameState.userId;
+    // Update current phase and turn
+    gameState.currentPhase = data.gameState.turnPhase;
+    gameState.isPlayerTurn = data.gameState.currentPlayerId === Number(gameState.userId);
     
-    // Mettre à jour l'interface
+    // Update interface
     updateGameInterface();
     
+    // Hide loading overlay
+    elements.loadingOverlay.classList.add('hidden');
+     
     // Vérifier si la partie est terminée
     if (gameState.gameData.status === 'finished') {
         showGameEnd();

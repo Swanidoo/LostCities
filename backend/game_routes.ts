@@ -258,17 +258,26 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     const gameId = ctx.params.id;
     const userId = ctx.state.user.id;
     
-    // Get game info
+    // Get game info - convert all BigInts to strings
     const gameResult = await client.queryObject(`
-      SELECT g.*, 
+      SELECT g.id::text as id,  -- Convert BigInt to text
+             g.player1_id, 
+             g.player2_id,
+             g.status,
+             g.winner_id,
+             g.score_player1,
+             g.score_player2,
+             g.current_turn_player_id,
+             g.turn_phase,
+             g.current_round,
+             g.started_at,
+             g.ended_at,
              b.use_purple_expedition, 
              b.current_round as board_current_round,
              b.remaining_cards_in_deck,
-             b.id as board_id
+             b.id::text as board_id  -- Convert board ID to text too
       FROM games g
       JOIN board b ON g.id = b.game_id
-      JOIN users u1 ON g.player1_id = u1.id
-      JOIN users u2 ON g.player2_id = u2.id
       WHERE g.id = $1
     `, [gameId]);
     

@@ -45,7 +45,8 @@ export class LostCitiesGame {
       console.error('No authentication token found. Redirecting to login...');
       setTimeout(() => window.location.href = '/login/login.html', 1000);
       return;
-    }chat/chat.htmlonsole.log(`Game: ${this.gameId}, User: ${this.userId}`);
+    }
+    console.log(`Game: ${this.gameId}, User: ${this.userId}`);
   }
   
   /**
@@ -137,9 +138,13 @@ export class LostCitiesGame {
   handleMessage(data) {
     if (!data || !data.event) return;
     
+    console.log('Received WebSocket message:', data);
+    
     switch (data.event) {
       case 'gameUpdated':
-        this.handleGameUpdate(data.data?.gameState);
+        if (data.data && data.data.gameState) {
+          this.handleGameUpdate(data.data.gameState);
+        }
         break;
         
       case 'gameSubscribed':

@@ -148,18 +148,21 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   console.log(`🔍 Loading game state for game ${gameId}`);
   
   // First check if we have any cards for this game
-  const cardCountResult = await client.queryObject(`
+  const cardCountResult = await client.queryObject<{count: number}>(`
     SELECT COUNT(*) as count FROM game_card WHERE game_id = $1
   `, [gameId]);
+  
   console.log(`🎴 Total cards in game_card table for game ${gameId}: ${cardCountResult.rows[0].count}`);
   
-  if (cardCountResult.rows[0].count === 0) {
-    console.error(`❌ No cards found for game ${gameId} in game_card table`);
-  }
-  
-  // Get basic game info
+  // Get basic game info - convert ID to text to handle BigInt
   const gameResult = await client.queryObject<any>(`
-    SELECT g.*, 
+    SELECT g.id::text as id,  -- Convert to text
+           g.player1_id, 
+           g.player2_id,
+           g.status,
+           g.current_turn_player_id,
+           g.turn_phase,
+           g.winner_id,
            b.use_purple_expedition, 
            b.current_round as board_current_round,
            b.remaining_cards_in_deck,
