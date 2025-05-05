@@ -565,30 +565,42 @@
     
         // Initialize the game
         async function initializeGame(gameId) {
-            if (!window.gameInitialized) {
-                window.gameInitialized = true;
-                try {
-                    // Fetch the game state from the backend
-                    const token = localStorage.getItem('authToken');
-                    const response = await fetch(`${API_URL}/lost-cities/games/${gameId}`, {
-                        headers: { "Authorization": `Bearer ${token}` }
-                    });
-        
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch game state');
-                    }
-        
-                    const gameState = await response.json();
-                    console.log("Game state received:", gameState);
-        
-                    // Initialize the game UI and logic
-                    const gameController = new LostCitiesGame();
-                    gameController.handleGameUpdate(gameState);
-                } catch (error) {
-                    console.error("Error initializing game:", error);
-                    showError("Failed to initialize the game. Please try again.");
-                }
+            // Create simple global initialization flag
+            window.gameInitialized = false;
+
+            document.addEventListener('DOMContentLoaded', async function() {
+            // Prevent multiple initializations
+            if (window.gameInitialized) {
+                console.warn("Game already initialized, skipping");
+                return;
             }
+            
+            window.gameInitialized = true;
+            
+            try {
+                // Get game ID from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const gameId = urlParams.get('gameId');
+                
+                if (!gameId) {
+                console.error("No game ID found in URL");
+                document.getElementById('game-status').textContent = "Error: No game ID found";
+                return;
+                }
+                
+                console.log("Loading game with ID:", gameId);
+                
+                // Initialize the game controller (using ES6 import)
+                import('./js/game_controller.js').then(module => {
+                const GameController = module.default;
+                window.gameController = new GameController(gameId);
+                });
+                
+            } catch (error) {
+                console.error("Error initializing game:", error);
+                document.getElementById('game-status').textContent = "Failed to initialize the game. Please try again.";
+            }
+            });
         }
     
         // Display an error message
