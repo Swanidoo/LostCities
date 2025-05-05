@@ -40,6 +40,10 @@ export class GameUIController {
      * Update the UI based on the current game state
      */
     updateGameState(gameState) {
+      if (!this.elements.gameStats) {
+        console.warn("Game stats element not found");
+        return;
+      }
       console.log('Updating game state:', gameState);
       
       if (!gameState) {

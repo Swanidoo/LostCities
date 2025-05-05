@@ -565,26 +565,29 @@
     
         // Initialize the game
         async function initializeGame(gameId) {
-            try {
-                // Fetch the game state from the backend
-                const token = localStorage.getItem('authToken');
-                const response = await fetch(`${API_URL}/lost-cities/games/${gameId}`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-    
-                if (!response.ok) {
-                    throw new Error('Failed to fetch game state');
+            if (!window.gameInitialized) {
+                window.gameInitialized = true;
+                try {
+                    // Fetch the game state from the backend
+                    const token = localStorage.getItem('authToken');
+                    const response = await fetch(`${API_URL}/lost-cities/games/${gameId}`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+        
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch game state');
+                    }
+        
+                    const gameState = await response.json();
+                    console.log("Game state received:", gameState);
+        
+                    // Initialize the game UI and logic
+                    const gameController = new LostCitiesGame();
+                    gameController.handleGameUpdate(gameState);
+                } catch (error) {
+                    console.error("Error initializing game:", error);
+                    showError("Failed to initialize the game. Please try again.");
                 }
-    
-                const gameState = await response.json();
-                console.log("Game state received:", gameState);
-    
-                // Initialize the game UI and logic
-                const gameController = new LostCitiesGame();
-                gameController.setupGame(gameState);
-            } catch (error) {
-                console.error("Error initializing game:", error);
-                showError("Failed to initialize the game. Please try again.");
             }
         }
     

@@ -33,6 +33,12 @@ export class GameWebSocket {
    * Establish WebSocket connection
    */
   connect() {
+
+    if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+      console.log("Closing existing connection before reconnecting");
+      this.socket.close(1000, "Reconnecting");
+    }
+    
     // Determine the WebSocket URL based on environment
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? 
