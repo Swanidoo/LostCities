@@ -356,7 +356,7 @@ function notifyGamePlayers(gameId: string, gameState: any): void {
   if (!subscribers) return;
 
   const message = JSON.stringify({
-    event: "gameUpdate",
+    event: "gameUpdated",
     data: { gameId, gameState }
   });
 

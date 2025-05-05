@@ -3,8 +3,8 @@
  * Coordinates WebSocket, UI, and game logic for Lost Cities
  */
 
-import { GameWebSocket } from './game_websocket.js';
-import { GameUIController } from './game_ui_controller.js';
+import { NetworkClient } from './network_client.js';
+import { UIController } from './ui_controller.js';
 
 export class LostCitiesGame {
   constructor() {
@@ -14,7 +14,7 @@ export class LostCitiesGame {
     this.parseIds();
     
     // Initialize UI controller
-    this.ui = new GameUIController(this.gameId, this.userId);
+    this.ui = new UIController(this.gameId, this.userId);
     this.ui.setGameMessage('Connecting to game server...');
     
     // Set up UI event handlers
@@ -54,7 +54,7 @@ export class LostCitiesGame {
    */
   initializeWebSocket() {
     // Create WebSocket with handlers
-    this.ws = new GameWebSocket(this.gameId, this.token, {
+    this.ws = new NetworkClient(this.gameId, this.token, {
       onConnect: this.handleConnect.bind(this),
       onMessage: this.handleMessage.bind(this),
       onDisconnect: this.handleDisconnect.bind(this),
@@ -94,11 +94,6 @@ export class LostCitiesGame {
   handleConnect(event) {
     console.log('Connected to game server');
     this.ui.setGameMessage('Connected. Loading game state...');
-    
-    // First subscribe to the game
-    // This is handled automatically by your GameWebSocket class
-    
-    // Then fetch initial game state via HTTP
     this.fetchInitialGameState();
   }
   

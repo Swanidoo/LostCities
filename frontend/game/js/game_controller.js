@@ -1,7 +1,7 @@
 import { NetworkClient } from './network_client.js';
 import { UIController } from './ui_controller.js';
 
-export default class GameController {
+export class GameController {
   constructor(gameId) {
     console.log("Initializing game controller for game:", gameId);
     
