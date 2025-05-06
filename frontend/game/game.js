@@ -22,93 +22,19 @@ const gameState = {
     currentPhase: null, // 'play' ou 'draw'
     isPlayerTurn: false,
     isConnected: false,
-    cardElements: new Map() // Pour stocker les références aux éléments DOM des cartes
+    cardElements: new Map(), // Pour stocker les références aux éléments DOM des cartes
+    playerSide: null,
+    opponentSide: null
 };
-
-// At the beginning of your game.js file
-document.addEventListener('DOMContentLoaded', () => {
-    // Get gameId from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const gameId = urlParams.get('gameId');
-    
-    if (!gameId) {
-      console.error("No game ID found in URL");
-      // Show error message to user
-      document.getElementById('game-status').textContent = "Error: No game ID found";
-      return;
-    }
-    
-    console.log("Loading game with ID:", gameId);
-    
-    // Store gameId in hidden input for later use
-    document.getElementById('game-id').value = gameId;
-    
-  });
-
 
 // Éléments DOM
-const elements = {
-    // Infos générales
-    gameId: document.getElementById('game-id'),
-    userId: document.getElementById('user-id'),
-    gameStatus: document.getElementById('game-status'),
-    phaseIndicator: document.getElementById('phase-indicator'),
-    playerName: document.getElementById('player-name'),
-    opponentName: document.getElementById('opponent-name'),
-    playerScore: document.getElementById('player-score'),
-    opponentScore: document.getElementById('opponent-score'),
-    gameRound: document.getElementById('game-round'),
-    deckCount: document.getElementById('deck-count'),
-    playerTurn: document.getElementById('player-turn'),
-    opponentTurn: document.getElementById('opponent-turn'),
-    
-    // Zones de jeu
-    playerHand: document.getElementById('player-hand'),
-    playerArea: document.getElementById('player-area'),
-    opponentArea: document.getElementById('opponent-area'),
-    deckPile: document.getElementById('deck-pile'),
-    discardPiles: document.getElementById('discard-piles'),
-    
-    // Boutons d'action
-    actionButtons: document.getElementById('action-buttons'),
-    playBtn: document.getElementById('play-btn'),
-    discardBtn: document.getElementById('discard-btn'),
-    cancelActionBtn: document.getElementById('cancel-action-btn'),
-    
-    // Contrôles de jeu
-    rulesBtn: document.getElementById('rules-btn'),
-    surrenderBtn: document.getElementById('surrender-btn'),
-    chatBtn: document.getElementById('chat-btn'),
-    
-    // Chat
-    chatArea: document.getElementById('chat-area'),
-    closeChatBtn: document.getElementById('close-chat-btn'),
-    chatMessages: document.getElementById('chat-messages'),
-    chatInput: document.getElementById('chat-input'),
-    sendChatBtn: document.getElementById('send-chat-btn'),
-    
-    // Modals
-    rulesModal: document.getElementById('rules-modal'),
-    closeRulesBtn: document.getElementById('close-rules-btn'),
-    surrenderModal: document.getElementById('surrender-modal'),
-    confirmSurrenderBtn: document.getElementById('confirm-surrender-btn'),
-    cancelSurrenderBtn: document.getElementById('cancel-surrender-btn'),
-    gameEndModal: document.getElementById('game-end-modal'),
-    gameResult: document.getElementById('game-result'),
-    winnerText: document.getElementById('winner-text'),
-    playerFinalName: document.getElementById('player-final-name'),
-    opponentFinalName: document.getElementById('opponent-final-name'),
-    playerFinalScore: document.getElementById('player-final-score'),
-    opponentFinalScore: document.getElementById('opponent-final-score'),
-    newGameBtn: document.getElementById('new-game-btn'),
-    backBtn: document.getElementById('back-btn'),
-    
-    // Écran de chargement
-    loadingOverlay: document.getElementById('loading-overlay')
-};
+let elements = {};
 
-// Initialisation
+// Initialisation principale
 document.addEventListener('DOMContentLoaded', () => {
+    // Cache all DOM elements
+    initDOMElements();
+    
     // Vérifier si l'utilisateur est connecté
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -148,16 +74,78 @@ document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
 });
 
+// Initialize all DOM elements
+function initDOMElements() {
+    elements = {
+        // Infos générales
+        gameId: document.getElementById('game-id'),
+        userId: document.getElementById('user-id'),
+        gameStatus: document.getElementById('game-status'),
+        phaseIndicator: document.getElementById('phase-indicator'),
+        playerName: document.getElementById('player-name'),
+        opponentName: document.getElementById('opponent-name'),
+        playerScore: document.getElementById('player-score'),
+        opponentScore: document.getElementById('opponent-score'),
+        gameRound: document.getElementById('game-round'),
+        deckCount: document.getElementById('deck-count'),
+        playerTurn: document.getElementById('player-turn'),
+        opponentTurn: document.getElementById('opponent-turn'),
+        
+        // Zones de jeu
+        playerHand: document.getElementById('player-hand'),
+        playerArea: document.getElementById('player-area'),
+        opponentArea: document.getElementById('opponent-area'),
+        deckPile: document.getElementById('deck-pile'),
+        discardPiles: document.getElementById('discard-piles'),
+        
+        // Boutons d'action
+        actionButtons: document.getElementById('action-buttons'),
+        playBtn: document.getElementById('play-btn'),
+        discardBtn: document.getElementById('discard-btn'),
+        cancelActionBtn: document.getElementById('cancel-action-btn'),
+        
+        // Contrôles de jeu
+        rulesBtn: document.getElementById('rules-btn'),
+        surrenderBtn: document.getElementById('surrender-btn'),
+        chatBtn: document.getElementById('chat-btn'),
+        
+        // Chat
+        chatArea: document.getElementById('chat-area'),
+        closeChatBtn: document.getElementById('close-chat-btn'),
+        chatMessages: document.getElementById('chat-messages'),
+        chatInput: document.getElementById('chat-input'),
+        sendChatBtn: document.getElementById('send-chat-btn'),
+        
+        // Modals
+        rulesModal: document.getElementById('rules-modal'),
+        closeRulesBtn: document.getElementById('close-rules-btn'),
+        surrenderModal: document.getElementById('surrender-modal'),
+        confirmSurrenderBtn: document.getElementById('confirm-surrender-btn'),
+        cancelSurrenderBtn: document.getElementById('cancel-surrender-btn'),
+        gameEndModal: document.getElementById('game-end-modal'),
+        gameResult: document.getElementById('game-result'),
+        winnerText: document.getElementById('winner-text'),
+        playerFinalName: document.getElementById('player-final-name'),
+        opponentFinalName: document.getElementById('opponent-final-name'),
+        playerFinalScore: document.getElementById('player-final-score'),
+        opponentFinalScore: document.getElementById('opponent-final-score'),
+        newGameBtn: document.getElementById('new-game-btn'),
+        backBtn: document.getElementById('back-btn'),
+        
+        // Écran de chargement
+        loadingOverlay: document.getElementById('loading-overlay')
+    };
+}
 
 // Connexion au WebSocket
 function connectWebSocket() {
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
-    // Clean the token (like in chat.js)
+    // Clean the token
     const cleanToken = token.trim();
     
-    // Use the same WebSocket protocol detection as your chat.js
+    // Use the same WebSocket protocol detection
     const isLocalhost = window.location.hostname === "localhost";
     const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
     const wsHost = isLocalhost ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
@@ -214,19 +202,15 @@ function setupEventListeners() {
     
     // Boutons de fin de partie
     elements.newGameBtn.addEventListener('click', () => {
-        // Rediriger vers la page de matchmaking
         window.location.href = '/matchmaking.html';
     });
     
     elements.backBtn.addEventListener('click', () => {
-        // Rediriger vers la page d'accueil
         window.location.href = '/index.html';
     });
     
-    // Chat
-    elements.chatBtn.addEventListener('click', () => {
-        elements.chatArea.classList.toggle('open');
-    });
+    // Chat - Fix: Ensure the chat button toggles the 'open' class properly
+    elements.chatBtn.addEventListener('click', toggleChat);
     
     elements.closeChatBtn.addEventListener('click', () => {
         elements.chatArea.classList.remove('open');
@@ -241,6 +225,15 @@ function setupEventListeners() {
     });
 }
 
+// Toggle chat visibility
+function toggleChat() {
+    console.log("Toggle chat clicked"); // Debug
+    if (elements.chatArea.classList.contains('open')) {
+        elements.chatArea.classList.remove('open');
+    } else {
+        elements.chatArea.classList.add('open');
+    }
+}
 
 // Function to cancel a card selection
 function cancelCardSelection() {
@@ -430,6 +423,15 @@ function createCardElement(card) {
     cardContent.appendChild(valueElement);
     cardElement.appendChild(cardContent);
     
+    // Update this line to include the card value in the file path
+    if (card.type === 'wager') {
+        // For wager cards: red_wager_0.png, red_wager_1.png, etc.
+        cardElement.style.backgroundImage = `url('/frontend/game/assets/cards/${card.color}_wager_${card.value}.png')`;
+    } else {
+        // For number cards: red_5.png, blue_3.png, etc.
+        cardElement.style.backgroundImage = `url('/frontend/game/assets/cards/${card.color}_${card.value}.png')`;
+    }
+    
     return cardElement;
 }
 
@@ -463,7 +465,7 @@ function handleExpeditionClick(color) {
         return;
     }
     
-    const cardElement = gameState.cardElements.get(gameState.selectedCard);
+    const cardElement = document.querySelector(`.card[data-id="${gameState.selectedCard.id}"]`);
     if (!cardElement) return;
     
     const cardColor = cardElement.dataset.color;
@@ -475,7 +477,7 @@ function handleExpeditionClick(color) {
     }
     
     // Play the card
-    playCard(gameState.selectedCard, color);
+    playCard(gameState.selectedCard.id, color);
 }
 
 // Handle discard pile click during draw phase
@@ -503,7 +505,7 @@ function showGameEnd() {
     // Fill in the game end modal with results
     const playerScore = gameState.gameData.scores[gameState.playerSide].total;
     const opponentScore = gameState.gameData.scores[gameState.opponentSide].total;
-    const isWinner = gameState.gameData.winner === gameState.userId;
+    const isWinner = gameState.gameData.winner === Number(gameState.userId);
     
     elements.gameResult.textContent = isWinner ? "Victoire !" : "Défaite";
     elements.winnerText.textContent = isWinner ? "Vous avez gagné la partie !" : "Votre adversaire a gagné la partie.";
@@ -521,16 +523,16 @@ function showGameEnd() {
 // Show error message
 function showError(message) {
     // Create and show an error notification
-    const errorElement = document.createElement('div');
-    errorElement.className = 'error-message';
-    errorElement.textContent = message;
-    
-    document.body.appendChild(errorElement);
-    
-    // Remove after a few seconds
-    setTimeout(() => {
-        errorElement.remove();
-    }, 5000);
+    const errorElement = document.getElementById('error-message');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            errorElement.style.display = 'none';
+        }, 5000);
+    }
 }
 
 // Update turn indicators
@@ -551,7 +553,7 @@ function updateTurnIndicators() {
 // Update game status message based on current game state
 function updateGameStatusMessage() {
     if (gameState.gameData.status === 'finished') {
-        updateGameStatus(gameState.gameData.winner === gameState.userId ? 
+        updateGameStatus(gameState.gameData.winner === Number(gameState.userId) ? 
             "Partie terminée. Vous avez gagné !" : 
             "Partie terminée. Vous avez perdu.");
     } else if (gameState.isPlayerTurn) {
@@ -563,15 +565,7 @@ function updateGameStatusMessage() {
     }
 }
 
-// Exporter les fonctions nécessaires
-window.gameController = {
-    cancelCardSelection,
-    playCard,
-    discardCard,
-    drawCard,
-    surrenderGame,
-    sendChatMessage
-}; WebSocket
+// WebSocket event listeners
 function setupWebSocketEventListeners() {
     const socket = gameState.socket;
     
@@ -617,6 +611,7 @@ function handleWebSocketMessage(event) {
         console.log("Message reçu:", data);
         
         switch (data.event) {
+            case "gameUpdate":
             case "gameUpdated":
                 handleGameUpdate(data.data);
                 break;
@@ -677,7 +672,6 @@ function handleGameUpdate(data) {
     // Store the game state
     gameState.gameData = data.gameState;
     
-    // Debug log
     console.log('Game state received:', data.gameState);
     
     // Determine player side
@@ -824,14 +818,19 @@ function updateExpeditions() {
     // Ajouter des gestionnaires d'événements pour les expéditions du joueur
     if (gameState.isPlayerTurn && gameState.currentPhase === 'play' && gameState.selectedCard) {
         playerSlots.forEach(slot => {
-            slot.addEventListener('click', () => {
-                handleExpeditionClick(slot.dataset.color);
+            const color = slot.dataset.color;
+            
+            // Remove previous event listeners by cloning and replacing
+            const newSlot = slot.cloneNode(true);
+            slot.parentNode.replaceChild(newSlot, slot);
+            
+            newSlot.addEventListener('click', () => {
+                handleExpeditionClick(color);
             });
             
             // Mettre en évidence les expéditions valides
-            const color = slot.dataset.color;
             if (gameState.selectedCard && gameState.selectedCard.color === color) {
-                slot.classList.add('valid-target');
+                newSlot.classList.add('valid-target');
             }
         });
     }
@@ -846,37 +845,55 @@ function updateDiscardAndDeck() {
     const discardPiles = document.querySelectorAll('.discard-pile');
     
     discardPiles.forEach(pile => {
-        pile.innerHTML = '';
-        const color = pile.dataset.color;
+        // Clone to remove previous event listeners
+        const newPile = pile.cloneNode(false);
+        pile.parentNode.replaceChild(newPile, pile);
+        
+        const color = newPile.dataset.color;
         const cards = gameState.gameData.discardPiles[color] || [];
         
         // Afficher seulement la carte du dessus
         if (cards.length > 0) {
             const topCard = cards[cards.length - 1];
             const cardElement = createCardElement(topCard);
-            pile.appendChild(cardElement);
+            newPile.appendChild(cardElement);
             
             // Ajouter un compteur si plusieurs cartes
             if (cards.length > 1) {
                 const counter = document.createElement('div');
                 counter.className = 'pile-counter';
                 counter.textContent = cards.length;
-                pile.appendChild(counter);
+                newPile.appendChild(counter);
             }
             
             // Ajouter un gestionnaire pour la phase de pioche
             if (gameState.isPlayerTurn && gameState.currentPhase === 'draw') {
-                pile.classList.add('selectable');
-                pile.addEventListener('click', () => handleDiscardPileClick(color));
+                newPile.classList.add('selectable');
+                newPile.addEventListener('click', () => handleDiscardPileClick(color));
             }
         }
     });
     
     // Ajouter un gestionnaire pour le paquet
     if (gameState.isPlayerTurn && gameState.currentPhase === 'draw') {
+        // Remove previous event listeners by cloning
+        const newDeckPile = elements.deckPile.cloneNode(true);
+        elements.deckPile.parentNode.replaceChild(newDeckPile, elements.deckPile);
+        elements.deckPile = newDeckPile;
+        
         elements.deckPile.classList.add('selectable');
         elements.deckPile.addEventListener('click', handleDeckClick);
     } else {
         elements.deckPile.classList.remove('selectable');
     }
 }
+
+// Export des fonctions pour l'objet global gameController
+window.gameController = {
+    cancelCardSelection,
+    playCard,
+    discardCard,
+    drawCard,
+    surrenderGame,
+    sendChatMessage
+};
