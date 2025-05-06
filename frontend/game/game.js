@@ -792,18 +792,67 @@ function updateExpeditions() {
         slot.innerHTML = '';
     });
     
+    // Add helper function for color backgrounds
+    function getColorBackground(color) {
+        const colorMap = {
+            'red': '#ff3b3b',
+            'green': '#4caf50',
+            'white': '#ffffff',
+            'blue': '#2196f3',
+            'yellow': '#ffeb3b',
+            'purple': '#6f42c1'
+        };
+        return colorMap[color] || '#333333';
+    }
+    
     // Fonction d'aide pour remplir les expéditions
     function fillExpeditionSlots(expeditions, slots) {
         slots.forEach(slot => {
             const color = slot.dataset.color;
             const cards = expeditions[color] || [];
             
-            cards.forEach((card, index) => {
+            // Create a stack container
+            const stackElement = document.createElement('div');
+            stackElement.className = 'expedition-stack';
+            slot.appendChild(stackElement);
+            
+            // Add cards to the stack
+            cards.forEach(card => {
                 const cardElement = createCardElement(card);
-                cardElement.style.position = 'absolute';
-                cardElement.style.top = `${index * 20}px`;
-                slot.appendChild(cardElement);
+                stackElement.appendChild(cardElement);
             });
+            
+            // If there are 5+ cards, add mini-previews for hidden cards
+            if (cards.length > 4) {
+                // Create mini-preview container
+                const previewContainer = document.createElement('div');
+                previewContainer.className = 'card-preview-container';
+                
+                // Add mini-preview of the first card
+                const firstCardPreview = document.createElement('div');
+                firstCardPreview.className = 'card-mini-preview first';
+                firstCardPreview.innerHTML = `<span>${cards[0].type === 'wager' ? 'W' : cards[0].value}</span>`;
+                firstCardPreview.style.backgroundColor = getColorBackground(cards[0].color);
+                previewContainer.appendChild(firstCardPreview);
+                
+                // Add summary indicator
+                const summaryElement = document.createElement('div');
+                summaryElement.className = 'expedition-summary';
+                
+                // Calculate total value and wager multiplier
+                const wagerCount = cards.filter(c => c.type === 'wager').length;
+                const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+                const expValues = cards.filter(c => c.type !== 'wager').map(c => typeof c.value === 'number' ? c.value : 0);
+                const valueSum = expValues.reduce((sum, val) => sum + val, 0);
+                
+                // Format the summary
+                summaryElement.innerHTML = `<div>${cards.length} cards</div>
+                                          <div>${valueSum} pts</div>
+                                          <div>x${multiplier}</div>`;
+                                          
+                previewContainer.appendChild(summaryElement);
+                stackElement.appendChild(previewContainer);
+            }
         });
     }
     
@@ -850,25 +899,40 @@ function updateDiscardAndDeck() {
         const color = newPile.dataset.color;
         const cards = gameState.gameData.discardPiles[color] || [];
         
-        // Afficher seulement la carte du dessus
-        if (cards.length > 0) {
-            const topCard = cards[cards.length - 1];
-            const cardElement = createCardElement(topCard);
+        // Instead of just showing the top card, show up to 5 most recent cards
+        // This creates the fan effect
+        const visibleCards = cards.slice(-5); // Get the last 5 cards
+        
+        visibleCards.forEach(card => {
+            const cardElement = createCardElement(card);
             newPile.appendChild(cardElement);
-            
-            // Ajouter un compteur si plusieurs cartes
-            if (cards.length > 1) {
-                const counter = document.createElement('div');
-                counter.className = 'pile-counter';
-                counter.textContent = cards.length;
-                newPile.appendChild(counter);
-            }
-            
-            // Ajouter un gestionnaire pour la phase de pioche
-            if (gameState.isPlayerTurn && gameState.currentPhase === 'draw') {
-                newPile.classList.add('selectable');
-                newPile.addEventListener('click', () => handleDiscardPileClick(color));
-            }
+        });
+        
+        // Add a counter if there are more cards than shown
+        if (cards.length > 5) {
+            const counter = document.createElement('div');
+            counter.className = 'pile-counter';
+            counter.textContent = cards.length;
+            counter.style.position = 'absolute';
+            counter.style.top = '-10px';
+            counter.style.right = '-10px';
+            counter.style.backgroundColor = 'white';
+            counter.style.color = 'black';
+            counter.style.borderRadius = '50%';
+            counter.style.width = '20px';
+            counter.style.height = '20px';
+            counter.style.display = 'flex';
+            counter.style.justifyContent = 'center';
+            counter.style.alignItems = 'center';
+            counter.style.fontSize = '12px';
+            counter.style.fontWeight = 'bold';
+            newPile.appendChild(counter);
+        }
+        
+        // Ajouter un gestionnaire pour la phase de pioche
+        if (gameState.isPlayerTurn && gameState.currentPhase === 'draw') {
+            newPile.classList.add('selectable');
+            newPile.addEventListener('click', () => handleDiscardPileClick(color));
         }
     });
     
