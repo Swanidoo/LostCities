@@ -150,7 +150,7 @@ body {
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
     position: relative;
-    background-image: url('/frontend/game/assets/cards/card-back.png');
+    background-image: url('/game/assets/cards/card-back.png');
     background-size: cover;
 }
 
@@ -182,11 +182,13 @@ body {
     background-color: rgba(0, 0, 0, 0.3);
 }
 
-/* Card styles */
+/* Card styles - base structure */
 .card {
     width: 70px;
     height: 100px;
-    background-color: white;
+    background-color: transparent !important;
+    background-size: cover !important;
+    background-position: center !important;
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     position: relative;
@@ -195,55 +197,17 @@ body {
     cursor: pointer;
 }
 
+/* Hide the card content text to show only your custom images */
 .card-content {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    display: none;
 }
 
-.card-value {
-    font-size: 28px;
-    font-weight: bold;
-}
-
-/* Card colors */
-.card.red .card-value { color: #ff3b3b; }
-.card.green .card-value { color: #4CAF50; }
-.card.white .card-value { color: #757575; }
-.card.blue .card-value { color: #2196F3; }
-.card.yellow .card-value { color: #FFC107; }
-.card.purple .card-value { color: #6f42c1; }
-
-/* Ensure cards display the dynamically set background images */
-.card {
-    background-size: cover;
-    background-position: center;
-}
-
-
+/* Hide the colored bar at the top of each card */
 .card:before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 15px;
+    display: none;
 }
 
-.card.red:before { background-color: #ff3b3b; }
-.card.green:before { background-color: #4CAF50; }
-.card.white:before { background-color: #9e9e9e; }
-.card.blue:before { background-color: #2196F3; }
-.card.yellow:before { background-color: #FFC107; }
-.card.purple:before { background-color: #6f42c1; }
-
-.card.wager .card-value:after {
-    content: "W";
-}
-
+/* Interactive effects - keep these for gameplay */
 .card.selectable:hover {
     transform: translateY(-15px);
 }
@@ -253,6 +217,7 @@ body {
     box-shadow: 0 0 10px 2px gold;
 }
 
+/* Styling for opponent cards that are face-down */
 .card.opponent-card {
     background-color: #2c3e50;
 }

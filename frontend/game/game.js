@@ -423,13 +423,11 @@ function createCardElement(card) {
     cardContent.appendChild(valueElement);
     cardElement.appendChild(cardContent);
     
-    // Update this line to include the card value in the file path
     if (card.type === 'wager') {
-        // For wager cards: red_wager_0.png, red_wager_1.png, etc.
-        cardElement.style.backgroundImage = `url('/frontend/game/assets/cards/${card.color}_wager_${card.value}.png')`;
+        const wagerIndex = card.value !== null && card.value !== undefined ? card.value : 0;
+        cardElement.style.backgroundImage = `url('/game/assets/cards/${card.color}_wager_${wagerIndex}.png')`;
     } else {
-        // For number cards: red_5.png, blue_3.png, etc.
-        cardElement.style.backgroundImage = `url('/frontend/game/assets/cards/${card.color}_${card.value}.png')`;
+        cardElement.style.backgroundImage = `url('/game/assets/cards/${card.color}_${card.value}.png')`;
     }
     
     return cardElement;
