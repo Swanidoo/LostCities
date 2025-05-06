@@ -350,27 +350,74 @@ function handleGetOnlinePlayers(socket) {
   }));
 }
 
+// Helper function to get username from socket
+function getUsernameFromSocket(socket: WebSocket): string | null {
+  const clientEntry = connectedClients.find(client => client.socket === socket);
+  return clientEntry ? clientEntry.username : null;
+}
+
 // Notify game players about updates
-function notifyGamePlayers(gameId: string, gameState: any): void {
+async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> {
   const subscribers = gameSubscriptions.get(gameId);
   if (!subscribers) return;
 
-  const message = JSON.stringify({
-    event: "gameUpdated",
-    data: { gameId, gameState }
-  });
+  console.log(`Notifying ${subscribers.size} players about game ${gameId} update`);
 
-  subscribers.forEach((socket) => {
-    if (socket.readyState === WebSocket.OPEN) {
+  // Load the full game state from database to ensure we have all data
+  try {
+    const fullGame = await loadGameState(gameId);
+    
+    // For each connected player
+    for (const socket of subscribers) {
+      if (socket.readyState !== WebSocket.OPEN) continue;
+      
       try {
-        socket.send(message);
+        // Get username for this socket
+        const username = getUsernameFromSocket(socket);
+        if (!username) {
+          console.log("Unknown user, sending generic update");
+          socket.send(JSON.stringify({
+            event: "gameUpdated",
+            data: { gameId, gameState }
+          }));
+          continue;
+        }
+        
+        // Get user ID
+        const userId = await getUserIdFromUsername(username);
+        console.log(`Preparing personalized update for ${username} (ID: ${userId})`);
+        
+        // Get player-specific game state with hand data included
+        const playerState = fullGame.getGameState(userId);
+        
+        // Debug log to check hand data presence
+        console.log(`Hand data for ${username}: ${playerState.player1.hand ? playerState.player1.hand.length : 'none'} P1 cards, ${playerState.player2.hand ? playerState.player2.hand.length : 'none'} P2 cards`);
+        
+        // Send personalized state
+        socket.send(JSON.stringify({
+          event: "gameUpdated",
+          data: { gameId, gameState: playerState }
+        }));
+        
+        console.log(`Sent personalized update to ${username}`);
       } catch (error) {
-        console.error(`❌ Error notifying player in game ${gameId}:`, error);
+        console.error(`Error sending update to player: ${error}`);
       }
     }
-  });
+  } catch (error) {
+    console.error(`Failed to load full game data: ${error}`);
+    
+    // Fall back to sending the original state if loading full game fails
+    subscribers.forEach(socket => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+          event: "gameUpdated", 
+          data: { gameId, gameState }
+        }));
+      }
+    });
+  }
 }
-
 
 function handleMatchmaking(socket, username, userId) {
   console.log(`🎮 User ${username} (${userId}) is looking for a match`);
@@ -399,21 +446,26 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
     console.log(`🎮 Player ${username} playing card ${cardId} to ${destination}`);
     
     // Load the game
-    const game = await loadGameFromDatabase(gameId);
+    const game = await loadGameState(gameId);
     const userId = await getUserIdFromUsername(username);
     
-    // Make the move
-    let success = false;
-    if (destination === 'expedition') {
-      success = game.playCardToExpedition(userId, cardId, color);
-    }
+    // Make the move - DEBUG
+    console.log(`Before move: ${game.player1.hand.length} cards in P1 hand`);
+    const success = game.playCardToExpedition(userId, cardId, color);
+    console.log(`After move: ${game.player1.hand.length} cards in P1 hand`);
     
     if (success) {
       // Save the updated game state
       await game.save();
       
-      // Notify all players
-      const gameState = game.getGameState();
+      // Get updated game state to notify players
+      const updatedGame = await loadGameState(gameId);
+      const gameState = updatedGame.getGameState();
+      
+      // Debug
+      console.log(`State to broadcast: P1 ${gameState.player1.handSize} cards, P2 ${gameState.player2.handSize} cards`);
+      
+      // Notify all players with the full game
       notifyGamePlayers(gameId, gameState);
     } else {
       // Send error back to player
@@ -724,6 +776,7 @@ async function getUserIdFromUsername(username: string): Promise<string> {
   );
   
   if (result.rows.length === 0) {
+    console.warn(`User not found: ${username}`);
     throw new Error(`User not found: ${username}`);
   }
   
