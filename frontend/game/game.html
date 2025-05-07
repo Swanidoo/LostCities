@@ -44,9 +44,10 @@
         </div>
         
         <div class="board">
+            <!-- Add phase indicator here -->
             <div class="phase-indicator" id="phase-indicator">Phase: Jouer</div>
             
-            <!-- Opponent area -->
+            <!-- Opponent area with slots -->
             <div class="opponent-area" id="opponent-area">
                 <div class="expedition-slot red" data-color="red"></div>
                 <div class="expedition-slot green" data-color="green"></div>
@@ -55,21 +56,17 @@
                 <div class="expedition-slot yellow" data-color="yellow"></div>
             </div>
             
-            <!-- Central area with deck and discard piles -->
+            <!-- Central area -->
             <div class="central-area">
                 <div class="deck-area">
                     <div class="discard-piles" id="discard-piles">
                         <div class="discard-pile red" data-color="red"></div>
                         <div class="discard-pile green" data-color="green"></div>
                         <div class="discard-pile white" data-color="white"></div>
-                    </div>
-                    
-                    <div class="deck-pile" id="deck-pile" data-count="44"></div>
-                    
-                    <div class="discard-piles">
                         <div class="discard-pile blue" data-color="blue"></div>
                         <div class="discard-pile yellow" data-color="yellow"></div>
                     </div>
+                    <div class="deck-pile" id="deck-pile" data-count="44"></div>
                 </div>
                 
                 <div class="action-buttons" id="action-buttons">

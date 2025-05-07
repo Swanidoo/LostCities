@@ -181,6 +181,60 @@ function setupEventListeners() {
     
     elements.cancelActionBtn.addEventListener('click', cancelCardSelection);
     
+    // Expedition preview on hover (cursor following)
+    document.querySelectorAll('.expedition-slot').forEach(slot => {
+        slot.addEventListener('mouseenter', (e) => {
+            const color = slot.dataset.color;
+            const cards = slot.querySelector('.expedition-stack')?.children || [];
+            
+            if (cards.length === 0) return;
+            
+            // Find or create preview container
+            let preview = document.getElementById('expedition-preview');
+            if (!preview) {
+                preview = document.createElement('div');
+                preview.id = 'expedition-preview';
+                preview.className = 'card-preview-container';
+                document.body.appendChild(preview);
+            }
+            
+            // Calculate stats as before
+            const cardArray = Array.from(cards);
+            const wagerCount = cardArray.filter(c => c.dataset.type === 'wager').length;
+            const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+            const expValues = cardArray
+                .filter(c => c.dataset.type !== 'wager')
+                .map(c => parseInt(c.dataset.value) || 0);
+            const valueSum = expValues.reduce((sum, val) => sum + val, 0);
+            
+            // Update preview content
+            preview.innerHTML = `<div>${cards.length} cards</div>
+                               <div>${valueSum} pts</div>
+                               <div>x${multiplier}</div>`;
+            
+            // Show preview
+            preview.style.display = 'flex';
+            
+            // Position it near cursor
+            const updatePosition = (e) => {
+                preview.style.left = `${e.clientX + 15}px`;
+                preview.style.top = `${e.clientY - 15}px`;
+            };
+            
+            // Update position immediately
+            updatePosition(e);
+            
+            // Move preview with cursor
+            slot.addEventListener('mousemove', updatePosition);
+            
+            // Hide preview when leaving
+            slot.addEventListener('mouseleave', () => {
+                preview.style.display = 'none';
+                slot.removeEventListener('mousemove', updatePosition);
+            });
+        });
+    });
+    
     // Boutons de contrôle
     elements.rulesBtn.addEventListener('click', () => {
         elements.rulesModal.classList.add('visible');
@@ -413,19 +467,9 @@ function createCardElement(card) {
     cardElement.dataset.type = card.type;
     cardElement.dataset.value = card.value;
     
-    const cardContent = document.createElement('div');
-    cardContent.className = 'card-content';
-    
-    const valueElement = document.createElement('div');
-    valueElement.className = 'card-value';
-    valueElement.textContent = card.type === 'wager' ? 'W' : card.value;
-    
-    cardContent.appendChild(valueElement);
-    cardElement.appendChild(cardContent);
-    
+    // Set the background image properly
     if (card.type === 'wager') {
-        const wagerIndex = card.value !== null && card.value !== undefined ? card.value : 0;
-        cardElement.style.backgroundImage = `url('/game/assets/cards/${card.color}_wager_${wagerIndex}.png')`;
+        cardElement.style.backgroundImage = `url('/game/assets/cards/${card.color}_wager_${card.value || 0}.png')`;
     } else {
         cardElement.style.backgroundImage = `url('/game/assets/cards/${card.color}_${card.value}.png')`;
     }
@@ -775,6 +819,8 @@ function updatePlayerHand() {
 }
 
 // Mettre à jour les expéditions
+
+ // Find this function in your game.js file and replace it
 function updateExpeditions() {
     // Récupérer les références aux expéditions des joueurs
     const playerExpeditions = gameState.gameData[gameState.playerSide].expeditions;
@@ -792,75 +838,70 @@ function updateExpeditions() {
         slot.innerHTML = '';
     });
     
-    // Add helper function for color backgrounds
-    function getColorBackground(color) {
-        const colorMap = {
-            'red': '#ff3b3b',
-            'green': '#4caf50',
-            'white': '#ffffff',
-            'blue': '#2196f3',
-            'yellow': '#ffeb3b',
-            'purple': '#6f42c1'
-        };
-        return colorMap[color] || '#333333';
-    }
-    
     // Fonction d'aide pour remplir les expéditions
-    function fillExpeditionSlots(expeditions, slots) {
+    function fillExpeditionSlots(expeditions, slots, isOpponent = false) {
         slots.forEach(slot => {
             const color = slot.dataset.color;
-            const cards = expeditions[color] || [];
+            let cards = expeditions[color] || [];
             
             // Create a stack container
             const stackElement = document.createElement('div');
             stackElement.className = 'expedition-stack';
+            
+            // Add isOpponent class to help with CSS targeting if needed
+            if (isOpponent) {
+                stackElement.classList.add('opponent-stack');
+            }
+            
             slot.appendChild(stackElement);
             
-            // Add cards to the stack
+            // Sort cards by value (wager cards first, then ascending value)
+            cards.sort((a, b) => {
+                // Wager cards always come first
+                if (a.type === 'wager' && b.type !== 'wager') return -1;
+                if (a.type !== 'wager' && b.type === 'wager') return 1;
+                
+                // For expedition cards, sort by value
+                if (a.type === 'expedition' && b.type === 'expedition') {
+                    return a.value - b.value;
+                }
+                
+                return 0;
+            });
+            
+            // Add cards to the stack (in sorted order)
             cards.forEach(card => {
                 const cardElement = createCardElement(card);
+                if (isOpponent) {
+                    cardElement.classList.add('opponent-card');
+                }
                 stackElement.appendChild(cardElement);
             });
             
-            // If there are 5+ cards, add mini-previews for hidden cards
-            if (cards.length > 4) {
-                // Create mini-preview container
-                const previewContainer = document.createElement('div');
-                previewContainer.className = 'card-preview-container';
-                
-                // Add mini-preview of the first card
-                const firstCardPreview = document.createElement('div');
-                firstCardPreview.className = 'card-mini-preview first';
-                firstCardPreview.innerHTML = `<span>${cards[0].type === 'wager' ? 'W' : cards[0].value}</span>`;
-                firstCardPreview.style.backgroundColor = getColorBackground(cards[0].color);
-                previewContainer.appendChild(firstCardPreview);
-                
-                // Add summary indicator
-                const summaryElement = document.createElement('div');
-                summaryElement.className = 'expedition-summary';
-                
+            // Create summary info if there are cards
+            if (cards.length > 0) {
                 // Calculate total value and wager multiplier
                 const wagerCount = cards.filter(c => c.type === 'wager').length;
                 const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
                 const expValues = cards.filter(c => c.type !== 'wager').map(c => typeof c.value === 'number' ? c.value : 0);
                 const valueSum = expValues.reduce((sum, val) => sum + val, 0);
                 
-                // Format the summary
-                summaryElement.innerHTML = `<div>${cards.length} cards</div>
-                                          <div>${valueSum} pts</div>
-                                          <div>x${multiplier}</div>`;
-                                          
-                previewContainer.appendChild(summaryElement);
-                stackElement.appendChild(previewContainer);
+                // Add summary element if useful
+                if (cards.length > 1) {
+                    const summaryElement = document.createElement('div');
+                    summaryElement.className = 'expedition-summary';
+                    summaryElement.innerHTML = `${cards.length} cards • ${valueSum} pts • x${multiplier}`;
+                    stackElement.appendChild(summaryElement);
+                }
             }
         });
     }
     
     // Remplir les expéditions du joueur
-    fillExpeditionSlots(playerExpeditions, playerSlots);
+    fillExpeditionSlots(playerExpeditions, playerSlots, false);
     
-    // Remplir les expéditions de l'adversaire
-    fillExpeditionSlots(opponentExpeditions, opponentSlots);
+    // Remplir les expéditions de l'adversaire - pass true to indicate opponent
+    fillExpeditionSlots(opponentExpeditions, opponentSlots, true);
     
     // Ajouter des gestionnaires d'événements pour les expéditions du joueur
     if (gameState.isPlayerTurn && gameState.currentPhase === 'play' && gameState.selectedCard) {
@@ -881,9 +922,76 @@ function updateExpeditions() {
             }
         });
     }
+    
+    // Set up expedition hover previews
+    setupExpeditionHoverPreview();
 }
 
-// Mettre à jour les défausses et le paquet
+// Make sure this function is properly defined elsewhere in your code
+function setupExpeditionHoverPreview() {
+    // Clear any existing listeners to prevent duplicates
+    document.querySelectorAll('.expedition-slot').forEach(slot => {
+        const newSlot = slot.cloneNode(true);
+        slot.parentNode.replaceChild(newSlot, slot);
+    });
+    
+    // Set up hover preview on all expedition slots
+    document.querySelectorAll('.expedition-slot').forEach(slot => {
+        slot.addEventListener('mouseenter', (e) => {
+            const stackElement = slot.querySelector('.expedition-stack');
+            if (!stackElement || stackElement.children.length === 0) return;
+            
+            // Get all cards in the expedition
+            const cardElements = Array.from(stackElement.querySelectorAll('.card'));
+            if (cardElements.length === 0) return;
+            
+            // Find or create preview element
+            let preview = document.getElementById('expedition-preview');
+            if (!preview) {
+                preview = document.createElement('div');
+                preview.id = 'expedition-preview';
+                document.body.appendChild(preview);
+            }
+            
+            // Calculate expedition stats
+            const wagerCount = cardElements.filter(card => card.dataset.type === 'wager').length;
+            const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+            const expValues = cardElements
+                .filter(card => card.dataset.type !== 'wager')
+                .map(card => parseInt(card.dataset.value) || 0);
+            const valueSum = expValues.reduce((sum, val) => sum + val, 0);
+            
+            // Update preview content
+            preview.innerHTML = `
+                <div>${cardElements.length} cards</div>
+                <div>${valueSum} pts</div>
+                <div>x${multiplier}</div>
+            `;
+            
+            // Show and position preview
+            preview.style.display = 'flex';
+            
+            // Function to update position with cursor
+            const updatePosition = (e) => {
+                preview.style.left = `${e.clientX + 15}px`;
+                preview.style.top = `${e.clientY + 15}px`;
+            };
+            
+            // Initial position
+            updatePosition(e);
+            
+            // Move with cursor
+            slot.addEventListener('mousemove', updatePosition);
+            
+            // Hide when leaving
+            slot.addEventListener('mouseleave', () => {
+                preview.style.display = 'none';
+                slot.removeEventListener('mousemove', updatePosition);
+            });
+        });
+    });
+}
+
 function updateDiscardAndDeck() {
     // Mettre à jour le nombre de cartes dans le paquet
     elements.deckPile.dataset.count = gameState.gameData.cardsInDeck;
@@ -899,12 +1007,22 @@ function updateDiscardAndDeck() {
         const color = newPile.dataset.color;
         const cards = gameState.gameData.discardPiles[color] || [];
         
-        // Instead of just showing the top card, show up to 5 most recent cards
-        // This creates the fan effect
+        // Set relative positioning on the pile to contain absolute positioned cards
+        newPile.style.position = 'relative';
+        
+        // Display up to 5 most recent cards in a fan effect
         const visibleCards = cards.slice(-5); // Get the last 5 cards
         
-        visibleCards.forEach(card => {
+        visibleCards.forEach((card, index) => {
             const cardElement = createCardElement(card);
+            
+            // Position cards to create stacking/fan effect
+            cardElement.style.position = 'absolute';
+            cardElement.style.top = '0';
+            cardElement.style.left = '0';
+            cardElement.style.zIndex = index + 1;
+            cardElement.style.transform = `rotate(${(index - 2) * 3}deg)`;
+            
             newPile.appendChild(cardElement);
         });
         
@@ -916,16 +1034,8 @@ function updateDiscardAndDeck() {
             counter.style.position = 'absolute';
             counter.style.top = '-10px';
             counter.style.right = '-10px';
-            counter.style.backgroundColor = 'white';
-            counter.style.color = 'black';
-            counter.style.borderRadius = '50%';
-            counter.style.width = '20px';
-            counter.style.height = '20px';
-            counter.style.display = 'flex';
-            counter.style.justifyContent = 'center';
-            counter.style.alignItems = 'center';
-            counter.style.fontSize = '12px';
-            counter.style.fontWeight = 'bold';
+            counter.style.zIndex = '10'; // Higher than any card
+            
             newPile.appendChild(counter);
         }
         
