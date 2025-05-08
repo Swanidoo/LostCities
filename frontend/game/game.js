@@ -67,11 +67,41 @@ document.addEventListener('DOMContentLoaded', () => {
     
     elements.gameId.value = gameState.gameId;
     
+    // Create tooltip element that we'll reuse
+    const tooltip = document.createElement('div');
+    tooltip.id = 'expedition-tooltip'; // Must match your CSS selector 
+    document.body.appendChild(tooltip);
+    
+    // Global mouse tracking to ensure tooltip follows cursor
+    document.addEventListener('mousemove', (e) => {
+        const tooltip = document.getElementById('expedition-tooltip');
+        if (tooltip && tooltip.style.display === 'flex') {
+            tooltip.style.left = (e.clientX + 15) + 'px';
+            tooltip.style.top = (e.clientY + 15) + 'px';
+        }
+    });
+    
+    // Hide tooltip when cursor leaves the window
+    document.addEventListener('mouseout', () => {
+        tooltip.style.display = 'none';
+    });
+    
     // Configurer les écouteurs d'événements
     setupEventListeners();
     
     // Établir la connexion WebSocket
     connectWebSocket();
+
+    // Hide action buttons container completely
+    const actionButtons = document.getElementById('action-buttons');
+    if (actionButtons) {
+        // Only remove background and border but keep the buttons accessible
+        actionButtons.style.background = 'none';
+        actionButtons.style.border = 'none';
+        
+        // Initially hidden, but can be shown later
+        actionButtons.classList.remove('visible');
+    }
 });
 
 // Initialize all DOM elements
@@ -209,8 +239,8 @@ function setupEventListeners() {
             
             // Update preview content
             preview.innerHTML = `<div>${cards.length} cards</div>
-                               <div>${valueSum} pts</div>
-                               <div>x${multiplier}</div>`;
+                            <div>${valueSum} pts</div>
+                            <div>x${multiplier}</div>`;
             
             // Show preview
             preview.style.display = 'flex';
@@ -848,7 +878,6 @@ function updateExpeditions() {
             const stackElement = document.createElement('div');
             stackElement.className = 'expedition-stack';
             
-            // Add isOpponent class to help with CSS targeting if needed
             if (isOpponent) {
                 stackElement.classList.add('opponent-stack');
             }
@@ -886,12 +915,15 @@ function updateExpeditions() {
                 const expValues = cards.filter(c => c.type !== 'wager').map(c => typeof c.value === 'number' ? c.value : 0);
                 const valueSum = expValues.reduce((sum, val) => sum + val, 0);
                 
+                // Calculate actual score with the 20-point cost subtracted
+                const expeditionScore = (valueSum - 20) * multiplier;
+                const scoreDisplay = expeditionScore >= 0 ? `+${expeditionScore}` : `${expeditionScore}`;
+                const scoreClass = expeditionScore >= 0 ? 'score-positive' : 'score-negative';
+                
                 // Add summary element if useful
                 if (cards.length > 1) {
                     const summaryElement = document.createElement('div');
                     summaryElement.className = 'expedition-summary';
-                    summaryElement.innerHTML = `${cards.length} cards • ${valueSum} pts • x${multiplier}`;
-                    stackElement.appendChild(summaryElement);
                 }
             }
         });
@@ -927,69 +959,145 @@ function updateExpeditions() {
     setupExpeditionHoverPreview();
 }
 
-// Make sure this function is properly defined elsewhere in your code
+// Update the calculation in both functions
+
+// In updateExpeditions function:
+function fillExpeditionSlots(expeditions, slots, isOpponent = false) {
+    slots.forEach(slot => {
+        const color = slot.dataset.color;
+        let cards = expeditions[color] || [];
+        
+        // Create a stack container
+        const stackElement = document.createElement('div');
+        stackElement.className = 'expedition-stack';
+        
+        if (isOpponent) {
+            stackElement.classList.add('opponent-stack');
+        }
+        
+        slot.appendChild(stackElement);
+        
+        // Sort cards by value (wager cards first, then ascending value)
+        cards.sort((a, b) => {
+            // Wager cards always come first
+            if (a.type === 'wager' && b.type !== 'wager') return -1;
+            if (a.type !== 'wager' && b.type === 'wager') return 1;
+            
+            // For expedition cards, sort by value
+            if (a.type === 'expedition' && b.type === 'expedition') {
+                return a.value - b.value;
+            }
+            
+            return 0;
+        });
+        
+        // Add cards to the stack (in sorted order)
+        cards.forEach(card => {
+            const cardElement = createCardElement(card);
+            if (isOpponent) {
+                cardElement.classList.add('opponent-card');
+            }
+            stackElement.appendChild(cardElement);
+        });
+        
+        // Create summary info if there are cards
+        if (cards.length > 0) {
+            // Calculate total value and wager multiplier
+            const wagerCount = cards.filter(c => c.type === 'wager').length;
+            const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+            const expValues = cards.filter(c => c.type !== 'wager').map(c => typeof c.value === 'number' ? c.value : 0);
+            const valueSum = expValues.reduce((sum, val) => sum + val, 0);
+            
+            // Calculate actual score with the 20-point cost subtracted
+            const expeditionScore = (valueSum - 20) * multiplier;
+            const scoreDisplay = expeditionScore >= 0 ? `+${expeditionScore}` : `${expeditionScore}`;
+            const scoreClass = expeditionScore >= 0 ? 'score-positive' : 'score-negative';
+            
+            // Add summary element if useful
+            if (cards.length > 1) {
+                const summaryElement = document.createElement('div');
+                summaryElement.className = 'expedition-summary';
+                summaryElement.innerHTML = `${cards.length} cards • <span class="${scoreClass}">${scoreDisplay}</span> pts • x${multiplier}`;
+                stackElement.appendChild(summaryElement);
+            }
+        }
+    });
+}
+
 function setupExpeditionHoverPreview() {
-    // Clear any existing listeners to prevent duplicates
+    // Get tooltip element
+    const tooltip = document.getElementById('expedition-tooltip');
+    if (!tooltip) return;
+    
+    // Remove any existing expedition-preview
+    const existingPreview = document.getElementById('expedition-preview');
+    if (existingPreview) {
+        existingPreview.remove();
+    }
+    
+    // For expedition SLOTS (these contain the stacks)
     document.querySelectorAll('.expedition-slot').forEach(slot => {
         const newSlot = slot.cloneNode(true);
         slot.parentNode.replaceChild(newSlot, slot);
-    });
-    
-    // Set up hover preview on all expedition slots
-    document.querySelectorAll('.expedition-slot').forEach(slot => {
-        slot.addEventListener('mouseenter', (e) => {
-            const stackElement = slot.querySelector('.expedition-stack');
-            if (!stackElement || stackElement.children.length === 0) return;
-            
-            // Get all cards in the expedition
-            const cardElements = Array.from(stackElement.querySelectorAll('.card'));
-            if (cardElements.length === 0) return;
-            
-            // Find or create preview element
-            let preview = document.getElementById('expedition-preview');
-            if (!preview) {
-                preview = document.createElement('div');
-                preview.id = 'expedition-preview';
-                document.body.appendChild(preview);
-            }
-            
-            // Calculate expedition stats
-            const wagerCount = cardElements.filter(card => card.dataset.type === 'wager').length;
-            const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
-            const expValues = cardElements
-                .filter(card => card.dataset.type !== 'wager')
-                .map(card => parseInt(card.dataset.value) || 0);
-            const valueSum = expValues.reduce((sum, val) => sum + val, 0);
-            
-            // Update preview content
-            preview.innerHTML = `
-                <div>${cardElements.length} cards</div>
-                <div>${valueSum} pts</div>
-                <div>x${multiplier}</div>
-            `;
-            
-            // Show and position preview
-            preview.style.display = 'flex';
-            
-            // Function to update position with cursor
-            const updatePosition = (e) => {
-                preview.style.left = `${e.clientX + 15}px`;
-                preview.style.top = `${e.clientY + 15}px`;
-            };
-            
-            // Initial position
-            updatePosition(e);
-            
-            // Move with cursor
-            slot.addEventListener('mousemove', updatePosition);
-            
-            // Hide when leaving
-            slot.addEventListener('mouseleave', () => {
-                preview.style.display = 'none';
-                slot.removeEventListener('mousemove', updatePosition);
-            });
+        
+        // Create mouseover handler for the entire slot
+        newSlot.addEventListener('mouseenter', () => {
+            showExpeditionTooltip(newSlot, tooltip);
+        });
+        
+        newSlot.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
         });
     });
+    
+    // IMPORTANT: Add separate listeners for each CARD in the expeditions
+    // This will be called after cards are added to expeditions
+    setTimeout(() => {
+        document.querySelectorAll('.expedition-slot .card').forEach(card => {
+            card.addEventListener('mouseenter', (e) => {
+                // Find the parent slot
+                const slot = card.closest('.expedition-slot');
+                if (slot) {
+                    showExpeditionTooltip(slot, tooltip);
+                    // Stop event propagation to prevent multiple triggers
+                    e.stopPropagation();
+                }
+            });
+        });
+    }, 500); // Small delay to ensure cards are rendered
+}
+
+// Helper function to show tooltip for an expedition
+function showExpeditionTooltip(slot, tooltip) {
+    const stackElement = slot.querySelector('.expedition-stack');
+    if (!stackElement || stackElement.children.length === 0) return;
+    
+    // Get all cards in the expedition
+    const cardElements = Array.from(stackElement.querySelectorAll('.card'));
+    if (cardElements.length === 0) return;
+    
+    // Calculate expedition stats
+    const wagerCount = cardElements.filter(card => card.dataset.type === 'wager').length;
+    const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+    const expValues = cardElements
+        .filter(card => card.dataset.type !== 'wager')
+        .map(card => parseInt(card.dataset.value) || 0);
+    const valueSum = expValues.reduce((sum, val) => sum + val, 0);
+    
+    // Calculate the actual score with the 20-point cost subtracted
+    const expeditionScore = (valueSum - 20) * multiplier;
+    const scoreDisplay = expeditionScore >= 0 ? `+${expeditionScore}` : `${expeditionScore}`;
+    const scoreClass = expeditionScore >= 0 ? 'score-positive' : 'score-negative';
+    
+    // Update tooltip content
+    tooltip.innerHTML = `
+        <div>${cardElements.length} cards</div>
+        <div class="${scoreClass}">${scoreDisplay} pts</div>
+        <div>x${multiplier}</div>
+    `;
+    
+    // Show tooltip
+    tooltip.style.display = 'flex';
 }
 
 function updateDiscardAndDeck() {
