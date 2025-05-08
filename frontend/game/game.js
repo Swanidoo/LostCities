@@ -127,12 +127,7 @@ function initDOMElements() {
         opponentArea: document.getElementById('opponent-area'),
         deckPile: document.getElementById('deck-pile'),
         discardPiles: document.getElementById('discard-piles'),
-        
-        // Boutons d'action
-        actionButtons: document.getElementById('action-buttons'),
-        playBtn: document.getElementById('play-btn'),
-        discardBtn: document.getElementById('discard-btn'),
-        cancelActionBtn: document.getElementById('cancel-action-btn'),
+    
         
         // Contrôles de jeu
         rulesBtn: document.getElementById('rules-btn'),
@@ -191,26 +186,6 @@ function connectWebSocket() {
 
 // Configuration des écouteurs d'événements
 function setupEventListeners() {
-    // Boutons d'action
-    elements.playBtn.addEventListener('click', () => {
-        if (gameState.selectedCard) {
-            const color = gameState.selectedCard.color;
-            playCard(gameState.selectedCard.id, color);
-        } else {
-            updateGameStatus("Vous devez d'abord sélectionner une carte");
-        }
-    });
-    
-    elements.discardBtn.addEventListener('click', () => {
-        if (gameState.selectedCard) {
-            discardCard(gameState.selectedCard.id);
-        } else {
-            updateGameStatus("Vous devez d'abord sélectionner une carte");
-        }
-    });
-    
-    elements.cancelActionBtn.addEventListener('click', cancelCardSelection);
-    
     // Expedition preview on hover (cursor following)
     document.querySelectorAll('.expedition-slot').forEach(slot => {
         slot.addEventListener('mouseenter', (e) => {
@@ -322,14 +297,19 @@ function toggleChat() {
 // Function to cancel a card selection
 function cancelCardSelection() {
     gameState.selectedCard = null;
-    gameState.selectedPile = null;
     
-    // Remove highlights from all cards
-    document.querySelectorAll('.card.selected, .drop-target').forEach(el => {
-        el.classList.remove('selected', 'drop-target');
+    // Only remove the 'selected' class from cards, not their color classes
+    document.querySelectorAll('.card.selected').forEach(el => {
+        el.classList.remove('selected');
+        // Don't remove color classes!
     });
     
-    updateGameStatus("Sélection annulée");
+    // Remove valid-target class from all elements
+    document.querySelectorAll('.valid-target').forEach(el => {
+        el.classList.remove('valid-target');
+    });
+    
+    updateGameStatus("Sélectionnez une carte à jouer ou défausser");
 }
 
 // Function to play a card to an expedition
@@ -513,21 +493,50 @@ function handleCardClick(card, cardElement) {
         return;
     }
     
-    // Toggle selection
-    if (gameState.selectedCard && gameState.selectedCard.id === card.id) {
-        cancelCardSelection();
-    } else {
-        // Deselect any previously selected card
-        document.querySelectorAll('.card.selected').forEach(el => {
-            el.classList.remove('selected');
+    // Clear any previous selection first
+    cancelCardSelection();
+    
+    // Select this card
+    gameState.selectedCard = card;
+    
+    // Add selected class AND the card's color class
+    cardElement.classList.add('selected');
+    cardElement.classList.add(card.color); // This ensures the color-specific highlight
+    
+    // Update UI to show potential targets
+    highlightValidTargets(card.color);
+    
+    // Update game status
+    updateGameStatus(`Carte sélectionnée. Choisissez l'expédition ou la défausse ${card.color}.`);
+}
+
+function highlightValidTargets(color) {
+    // Highlight PLAYER'S expedition slot of the same color
+    const expeditionSlot = document.querySelector(`#player-area .expedition-slot[data-color="${color}"]`);
+    if (expeditionSlot) {
+        // Just add valid-target class - the slot should already have the color class
+        expeditionSlot.classList.add('valid-target');
+        
+        // Add click handler to play to expedition
+        expeditionSlot.addEventListener('click', () => {
+            if (gameState.selectedCard) {
+                playCard(gameState.selectedCard.id, color);
+            }
         });
+    }
+    
+    // Highlight the discard pile of the same color
+    const discardPile = document.querySelector(`.discard-pile[data-color="${color}"]`);
+    if (discardPile) {
+        // Just add valid-target class - the pile should already have the color class
+        discardPile.classList.add('valid-target');
         
-        // Select this card
-        gameState.selectedCard = card; // Store the entire card object
-        cardElement.classList.add('selected');
-        
-        // Show action buttons
-        elements.actionButtons.classList.add('visible');
+        // Add click handler to discard
+        discardPile.addEventListener('click', () => {
+            if (gameState.selectedCard) {
+                discardCard(gameState.selectedCard.id);
+            }
+        });
     }
 }
 
@@ -770,6 +779,9 @@ function handleGameUpdate(data) {
 
 // Mettre à jour l'interface du jeu
 function updateGameInterface() {
+
+    clearAllTargetHighlighting();
+
     // Mettre à jour les informations générales
     updateGameInfo();
     
@@ -787,6 +799,12 @@ function updateGameInterface() {
     
     // Mise à jour du message de statut
     updateGameStatusMessage();
+}
+
+function clearAllTargetHighlighting() {
+    document.querySelectorAll('.valid-target').forEach(el => {
+        el.classList.remove('valid-target');
+    });
 }
 
 // Mettre à jour les informations générales du jeu
@@ -849,30 +867,58 @@ function updatePlayerHand() {
 }
 
 // Mettre à jour les expéditions
-
- // Find this function in your game.js file and replace it
 function updateExpeditions() {
-    // Récupérer les références aux expéditions des joueurs
+    // Get player and opponent expeditions
     const playerExpeditions = gameState.gameData[gameState.playerSide].expeditions;
     const opponentExpeditions = gameState.gameData[gameState.opponentSide].expeditions;
     
-    // Effacer les expéditions actuelles
+    // Check if purple expedition is enabled
+    const isPurpleEnabled = gameState.gameData.usePurpleExpedition;
+    
+    // Get all existing expedition slots
     const playerSlots = elements.playerArea.querySelectorAll('.expedition-slot');
     const opponentSlots = elements.opponentArea.querySelectorAll('.expedition-slot');
     
+    // Clear existing content from slots
     playerSlots.forEach(slot => {
         slot.innerHTML = '';
+        // Remove any previous event listeners by cloning the node
+        const newSlot = slot.cloneNode(false);
+        slot.parentNode.replaceChild(newSlot, slot);
     });
     
     opponentSlots.forEach(slot => {
         slot.innerHTML = '';
+        // Remove any previous event listeners
+        const newSlot = slot.cloneNode(false);
+        slot.parentNode.replaceChild(newSlot, slot);
     });
     
-    // Fonction d'aide pour remplir les expéditions
+    // If purple is enabled, make sure the UI includes it
+    if (isPurpleEnabled) {
+        // Check if purple slots already exist
+        if (!elements.playerArea.querySelector('.expedition-slot.purple')) {
+            const playerPurpleSlot = document.createElement('div');
+            playerPurpleSlot.className = 'expedition-slot purple';
+            playerPurpleSlot.dataset.color = 'purple';
+            elements.playerArea.appendChild(playerPurpleSlot);
+            
+            const opponentPurpleSlot = document.createElement('div');
+            opponentPurpleSlot.className = 'expedition-slot purple';
+            opponentPurpleSlot.dataset.color = 'purple';
+            elements.opponentArea.appendChild(opponentPurpleSlot);
+        }
+    }
+    
+    // Get fresh references to slots after potential DOM changes
+    const freshPlayerSlots = elements.playerArea.querySelectorAll('.expedition-slot');
+    const freshOpponentSlots = elements.opponentArea.querySelectorAll('.expedition-slot');
+    
+    // Helper function to fill expedition slots
     function fillExpeditionSlots(expeditions, slots, isOpponent = false) {
         slots.forEach(slot => {
             const color = slot.dataset.color;
-            let cards = expeditions[color] || [];
+            const cards = expeditions[color] || [];
             
             // Create a stack container
             const stackElement = document.createElement('div');
@@ -885,7 +931,7 @@ function updateExpeditions() {
             slot.appendChild(stackElement);
             
             // Sort cards by value (wager cards first, then ascending value)
-            cards.sort((a, b) => {
+            const sortedCards = [...cards].sort((a, b) => {
                 // Wager cards always come first
                 if (a.type === 'wager' && b.type !== 'wager') return -1;
                 if (a.type !== 'wager' && b.type === 'wager') return 1;
@@ -899,7 +945,7 @@ function updateExpeditions() {
             });
             
             // Add cards to the stack (in sorted order)
-            cards.forEach(card => {
+            sortedCards.forEach(card => {
                 const cardElement = createCardElement(card);
                 if (isOpponent) {
                     cardElement.classList.add('opponent-card');
@@ -912,7 +958,8 @@ function updateExpeditions() {
                 // Calculate total value and wager multiplier
                 const wagerCount = cards.filter(c => c.type === 'wager').length;
                 const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
-                const expValues = cards.filter(c => c.type !== 'wager').map(c => typeof c.value === 'number' ? c.value : 0);
+                const expValues = cards.filter(c => c.type !== 'wager')
+                    .map(c => typeof c.value === 'number' ? c.value : 0);
                 const valueSum = expValues.reduce((sum, val) => sum + val, 0);
                 
                 // Calculate actual score with the 20-point cost subtracted
@@ -924,38 +971,35 @@ function updateExpeditions() {
                 if (cards.length > 1) {
                     const summaryElement = document.createElement('div');
                     summaryElement.className = 'expedition-summary';
+                    summaryElement.innerHTML = `${cards.length} cards • <span class="${scoreClass}">${scoreDisplay}</span> pts • x${multiplier}`;
+                    stackElement.appendChild(summaryElement);
                 }
             }
         });
     }
     
-    // Remplir les expéditions du joueur
-    fillExpeditionSlots(playerExpeditions, playerSlots, false);
+    // Fill player and opponent expedition slots
+    fillExpeditionSlots(playerExpeditions, freshPlayerSlots, false);
+    fillExpeditionSlots(opponentExpeditions, freshOpponentSlots, true);
     
-    // Remplir les expéditions de l'adversaire - pass true to indicate opponent
-    fillExpeditionSlots(opponentExpeditions, opponentSlots, true);
-    
-    // Ajouter des gestionnaires d'événements pour les expéditions du joueur
+    // Add highlighting and event handlers for selected card
     if (gameState.isPlayerTurn && gameState.currentPhase === 'play' && gameState.selectedCard) {
-        playerSlots.forEach(slot => {
+        freshPlayerSlots.forEach(slot => {
             const color = slot.dataset.color;
             
-            // Remove previous event listeners by cloning and replacing
-            const newSlot = slot.cloneNode(true);
-            slot.parentNode.replaceChild(newSlot, slot);
-            
-            newSlot.addEventListener('click', () => {
-                handleExpeditionClick(color);
-            });
-            
-            // Mettre en évidence les expéditions valides
-            if (gameState.selectedCard && gameState.selectedCard.color === color) {
-                newSlot.classList.add('valid-target');
+            // If the selected card color matches this expedition slot, highlight it as a valid target
+            if (gameState.selectedCard.color === color) {
+                slot.classList.add('valid-target', color);
+                
+                // Add click handler for direct play
+                slot.addEventListener('click', () => {
+                    playCard(gameState.selectedCard.id, color);
+                });
             }
         });
     }
     
-    // Set up expedition hover previews
+    // Setup expedition hover preview
     setupExpeditionHoverPreview();
 }
 
@@ -1101,12 +1145,24 @@ function showExpeditionTooltip(slot, tooltip) {
 }
 
 function updateDiscardAndDeck() {
-    // Mettre à jour le nombre de cartes dans le paquet
+    // Update deck pile counter
     elements.deckPile.dataset.count = gameState.gameData.cardsInDeck;
     
-    // Effacer les défausses actuelles
+    // Check if purple expedition is enabled
+    const isPurpleEnabled = gameState.gameData.usePurpleExpedition;
+    
+    // Make sure we have a purple discard pile if needed
+    if (isPurpleEnabled && !document.querySelector('.discard-pile.purple')) {
+        const purpleDiscard = document.createElement('div');
+        purpleDiscard.className = 'discard-pile purple';
+        purpleDiscard.dataset.color = 'purple';
+        elements.discardPiles.appendChild(purpleDiscard);
+    }
+    
+    // Get all discard piles (including potential purple one)
     const discardPiles = document.querySelectorAll('.discard-pile');
     
+    // Process each discard pile
     discardPiles.forEach(pile => {
         // Clone to remove previous event listeners
         const newPile = pile.cloneNode(false);
@@ -1147,24 +1203,46 @@ function updateDiscardAndDeck() {
             newPile.appendChild(counter);
         }
         
-        // Ajouter un gestionnaire pour la phase de pioche
-        if (gameState.isPlayerTurn && gameState.currentPhase === 'draw') {
-            newPile.classList.add('selectable');
-            newPile.addEventListener('click', () => handleDiscardPileClick(color));
+        // Add highlighting and event handlers based on game phase
+        if (gameState.isPlayerTurn) {
+            if (gameState.currentPhase === 'play' && gameState.selectedCard) {
+                // During play phase, highlight matching discard pile for selected card
+                if (gameState.selectedCard.color === color) {
+                    newPile.classList.add('valid-target', color);
+                    
+                    // Add click handler for direct discard
+                    newPile.addEventListener('click', () => {
+                        discardCard(gameState.selectedCard.id);
+                    });
+                }
+            } else if (gameState.currentPhase === 'draw' && cards.length > 0) {
+                // During draw phase, highlight all non-empty discard piles
+                newPile.classList.add('valid-target', color);
+                
+                // Add click handler for drawing from discard
+                newPile.addEventListener('click', () => {
+                    drawCard('discard_pile', color);
+                });
+            }
         }
     });
     
-    // Ajouter un gestionnaire pour le paquet
+    // Handle deck pile interaction
+    // Remove previous event listeners by cloning
+    const newDeckPile = elements.deckPile.cloneNode(true);
+    elements.deckPile.parentNode.replaceChild(newDeckPile, elements.deckPile);
+    elements.deckPile = newDeckPile;
+    
+    // Add highlighting and event handler for draw phase
     if (gameState.isPlayerTurn && gameState.currentPhase === 'draw') {
-        // Remove previous event listeners by cloning
-        const newDeckPile = elements.deckPile.cloneNode(true);
-        elements.deckPile.parentNode.replaceChild(newDeckPile, elements.deckPile);
-        elements.deckPile = newDeckPile;
+        elements.deckPile.classList.add('valid-target', 'white'); // Use white for deck highlighting
         
-        elements.deckPile.classList.add('selectable');
-        elements.deckPile.addEventListener('click', handleDeckClick);
+        // Add click handler
+        elements.deckPile.addEventListener('click', () => {
+            drawCard('deck');
+        });
     } else {
-        elements.deckPile.classList.remove('selectable');
+        elements.deckPile.classList.remove('valid-target', 'white');
     }
 }
 

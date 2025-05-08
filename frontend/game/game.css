@@ -379,40 +379,36 @@ body {
     box-shadow: 0 0 10px 2px gold;
 }
 
+/* Card selection highlighting with card color */
+.card.selected.red { box-shadow: 0 0 10px 2px rgba(255, 59, 59, 0.8) !important; }
+.card.selected.green { box-shadow: 0 0 10px 2px rgba(76, 175, 80, 0.8) !important; }
+.card.selected.white { box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.8) !important; }
+.card.selected.blue { box-shadow: 0 0 10px 2px rgba(33, 150, 243, 0.8) !important; }
+.card.selected.yellow { box-shadow: 0 0 10px 2px rgba(255, 235, 59, 0.8) !important; }
+.card.selected.purple { box-shadow: 0 0 10px 2px rgba(111, 66, 193, 0.8) !important; }
+
 .card.opponent-card {
     background-color: #2c3e50;
 }
 
-/* FIXED: Action buttons - removed black background */
-.action-buttons {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: none;
-    gap: 10px;
-    z-index: 50;
-    background: none;
-    padding: 10px;
-    border-radius: 5px;
-}
-
-.action-buttons.visible {
-    display: flex;
-}
-
-.action-btn {
-    padding: 10px 15px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
+.valid-target {
+    box-shadow: 0 0 15px 3px gold;
     cursor: pointer;
-    font-size: 14px;
+    animation: pulse 1.5s infinite;
 }
 
-.action-btn.cancel {
-    background-color: #FF5722;
+/* Color-specific highlighting for valid targets */
+.valid-target.red { box-shadow: 0 0 15px 3px rgba(255, 59, 59, 0.8) !important; }
+.valid-target.green { box-shadow: 0 0 15px 3px rgba(76, 175, 80, 0.8) !important; }
+.valid-target.white { box-shadow: 0 0 15px 3px rgba(255, 255, 255, 0.8) !important; }
+.valid-target.blue { box-shadow: 0 0 15px 3px rgba(33, 150, 243, 0.8) !important; }
+.valid-target.yellow { box-shadow: 0 0 15px 3px rgba(255, 235, 59, 0.8) !important; }
+.valid-target.purple { box-shadow: 0 0 15px 3px rgba(111, 66, 193, 0.8) !important; }
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.4); }
+    50% { box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.8); }
+    100% { box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.4); }
 }
 
 /* Game controls */
