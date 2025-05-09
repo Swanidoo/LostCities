@@ -91,9 +91,10 @@ body {
     width: 100%;
     max-width: 1000px;
     margin: 0 auto;
-    gap: 10px; /* Réduit l'espacement */
+    gap: 10px; /* Espacement réduit */
     padding: 60px 0 80px 0; /* Espace pour header et controls */
 }
+
 
 
 .opponent-area, .player-area {
@@ -104,14 +105,18 @@ body {
     max-width: 800px;
 }
 
+/* Ajustements pour les zones d'expédition */
 .opponent-area {
     margin-top: 10px;
     margin-bottom: 20px;
+    transform: translateY(-10vh);
+    z-index: 50;
 }
 
 .player-area {
     margin-top: 20px;
-    margin-bottom: 5px;
+    transform: translateY(10vh);
+    z-index: 50;
 }
 
 .central-area {
@@ -141,6 +146,20 @@ body {
 .expedition-slot.blue { border-color: rgba(33, 150, 243, 0.5); }
 .expedition-slot.yellow { border-color: rgba(255, 235, 59, 0.5); }
 .expedition-slot.purple { border-color: rgba(111, 66, 193, 0.5); }
+
+
+/* Augmenter le z-index des slots pendant la phase de jeu */
+.play-phase .expedition-slot.valid-target {
+    z-index: 50 !important; /* Supérieur au z-index de hand-area */
+    position: relative; /* Nécessaire pour que z-index fonctionne */
+}
+
+/* Similaire pour les piles de défausse */
+.play-phase .discard-pile.valid-target,
+.draw-phase .discard-pile.valid-target {
+    z-index: 50 !important;
+    position: relative;
+}
 
 /* Card stacking in expeditions */
 .expedition-stack {
@@ -364,14 +383,18 @@ body {
 /* Player hand area */
 .hand-area {
     height: 180px;
-    position: relative;
+    position: fixed; /* Position fixe */
+    bottom: 75px; /* 75px du bas pour laisser de la place aux contrôles */
+    left: 0;
     width: 100%;
-    max-width: 800px;
-    margin: 10px auto;
+    max-width: 1200px;
+    margin: 0 auto;
     perspective: 800px;
     overflow: visible;
+    z-index: 10;
+    left: 50%; /* Centre depuis la gauche */
+    transform: translateX(-50%); /* Ajustement pour un centrage parfait */
 }
-
 
 /* Card styles */
 .card {
@@ -485,6 +508,15 @@ body {
     display: flex;
     justify-content: space-between;
     z-index: 100;
+    pointer-events: none; /* Important: désactive les événements de souris sur le conteneur */
+}
+
+.game-button, 
+.game-controls-left,
+#chat-btn, 
+#rules-btn, 
+#surrender-btn {
+    pointer-events: auto; /* Permet de cliquer sur les boutons */
 }
 
 /* Groupe de boutons à gauche */
