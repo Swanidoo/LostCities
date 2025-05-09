@@ -511,27 +511,60 @@ function handleCardClick(card, cardElement) {
 }
 
 function highlightValidTargets(color) {
-    // Highlight PLAYER'S expedition slot of the same color
-    const expeditionSlot = document.querySelector(`#player-area .expedition-slot[data-color="${color}"]`);
-    if (expeditionSlot) {
-        // Just add valid-target class - the slot should already have the color class
-        expeditionSlot.classList.add('valid-target');
-        
-        // Add click handler to play to expedition
-        expeditionSlot.addEventListener('click', () => {
-            if (gameState.selectedCard) {
-                playCard(gameState.selectedCard.id, color);
+    // Get the selected card
+    const selectedCard = gameState.selectedCard;
+    if (!selectedCard) return;
+    
+    // Get the player's expedition for this color
+    const playerExpedition = gameState.gameData[gameState.playerSide].expeditions[color] || [];
+    
+    // Check if the card can be played to the expedition
+    let canPlayToExpedition = true;
+    
+    // If the expedition has cards, check placement rules
+    if (playerExpedition.length > 0) {
+        // If selected card is a wager but expedition already has non-wager cards, can't play it
+        if (selectedCard.type === 'wager') {
+            const hasNonWagerCards = playerExpedition.some(card => card.type !== 'wager');
+            if (hasNonWagerCards) {
+                canPlayToExpedition = false;
             }
-        });
+        } 
+        // If selected card is expedition (numbered) card, check if value is higher than highest card
+        else if (selectedCard.type === 'expedition') {
+            // Get highest expedition card (excluding wagers)
+            const expeditionCards = playerExpedition.filter(card => card.type === 'expedition');
+            if (expeditionCards.length > 0) {
+                const highestCard = expeditionCards.reduce((highest, card) => 
+                    (card.value > highest.value) ? card : highest, expeditionCards[0]);
+                
+                // If selected card value is lower, can't play it
+                if (selectedCard.value <= highestCard.value) {
+                    canPlayToExpedition = false;
+                }
+            }
+        }
+    }
+
+    // Highlight expedition slot only if placement is valid
+    if (canPlayToExpedition) {
+        const expeditionSlot = document.querySelector(`#player-area .expedition-slot[data-color="${color}"]`);
+        if (expeditionSlot) {
+            expeditionSlot.classList.add('valid-target');
+            
+            expeditionSlot.addEventListener('click', () => {
+                if (gameState.selectedCard) {
+                    playCard(gameState.selectedCard.id, color);
+                }
+            });
+        }
     }
     
-    // Highlight the discard pile of the same color
+    // Always highlight discard pile (discarding is always valid)
     const discardPile = document.querySelector(`.discard-pile[data-color="${color}"]`);
     if (discardPile) {
-        // Just add valid-target class - the pile should already have the color class
         discardPile.classList.add('valid-target');
         
-        // Add click handler to discard
         discardPile.addEventListener('click', () => {
             if (gameState.selectedCard) {
                 discardCard(gameState.selectedCard.id);
@@ -780,6 +813,11 @@ function handleGameUpdate(data) {
 // Mettre à jour l'interface du jeu
 function updateGameInterface() {
 
+    document.body.classList.toggle('opponent-turn', !gameState.isPlayerTurn);
+    document.body.classList.toggle('player-turn', gameState.isPlayerTurn);
+    document.body.classList.toggle('play-phase', gameState.currentPhase === 'play');
+    document.body.classList.toggle('draw-phase', gameState.currentPhase === 'draw');
+
     clearAllTargetHighlighting();
 
     // Mettre à jour les informations générales
@@ -845,11 +883,65 @@ function updatePlayerHand() {
         return;
     }
     
-    // Créer et ajouter chaque carte
-    hand.forEach(card => {
+    // Calculs pour l'éventail basés sur le nombre de cartes
+    const totalCards = hand.length;
+    
+    // Paramètres de l'arc
+    const arcRadius = 400;
+    const arcAngle = Math.min(60, totalCards * 5);
+    const cardWidth = 70;
+    const centerYOffset = -50;
+    
+    // NOUVEAU: Calculer les z-index de gauche à droite
+    // La carte la plus à gauche a le z-index le plus bas, la plus à droite le plus élevé
+    const baseZIndex = 10;
+    
+    hand.forEach((card, index) => {
         const cardElement = createCardElement(card);
         
-        // Ajouter la classe selectable si c'est le tour du joueur
+        // Calculer l'angle de cette carte dans l'arc
+        const totalAngleInRadians = (arcAngle * Math.PI) / 180;
+        const cardAngleInRadians = totalAngleInRadians * (index / (totalCards - 1) - 0.5);
+        const cardAngleInDegrees = (cardAngleInRadians * 180) / Math.PI;
+        
+        const x = Math.sin(cardAngleInRadians) * arcRadius;
+        const y = Math.cos(cardAngleInRadians) * arcRadius - arcRadius + centerYOffset;
+        
+        // MODIFICATION: Calcul du z-index basé sur la position horizontale
+        // La carte la plus à gauche (x négatif élevé) a le z-index le plus bas
+        // La carte la plus à droite (x positif élevé) a le z-index le plus élevé
+        const zIndex = baseZIndex + index; // Plus simple et plus cohérent
+        
+        // Appliquer transformation
+        cardElement.style.position = 'absolute';
+        cardElement.style.left = `calc(50% + ${x}px - ${cardWidth/2}px)`;
+        cardElement.style.bottom = `${y}px`;
+        cardElement.style.transform = `rotate(${cardAngleInDegrees}deg)`;
+        cardElement.style.transformOrigin = 'bottom center';
+        cardElement.style.zIndex = zIndex;
+        
+        // Stocker le z-index original dans un attribut data pour pouvoir y revenir
+        cardElement.dataset.originalZIndex = zIndex;
+        
+        // Effet de survol
+        cardElement.addEventListener('mouseenter', () => {
+            const hoverDistance = 20;
+            const hoverX = Math.sin(cardAngleInRadians) * hoverDistance;
+            const hoverY = Math.cos(cardAngleInRadians) * hoverDistance;
+            
+            const upwardMovement = 40;
+            
+            cardElement.style.transform = `rotate(${cardAngleInDegrees}deg) translate(${hoverX}px, ${hoverY - upwardMovement}px) scale(1.1)`;
+            cardElement.style.zIndex = 100 + index; // Ajouter l'index pour préserver l'ordre relatif
+        });
+        
+        // CORRECTION: S'assurer que le z-index revient à sa valeur d'origine
+        cardElement.addEventListener('mouseleave', () => {
+            cardElement.style.transform = `rotate(${cardAngleInDegrees}deg)`;
+            cardElement.style.zIndex = cardElement.dataset.originalZIndex;
+        });
+        
+        // Ajouter la classe selectable si nécessaire
         if (gameState.isPlayerTurn && gameState.currentPhase === 'play') {
             cardElement.classList.add('selectable');
         }
@@ -1171,13 +1263,11 @@ function updateDiscardAndDeck() {
         const color = newPile.dataset.color;
         const cards = gameState.gameData.discardPiles[color] || [];
         
-        // Set relative positioning on the pile to contain absolute positioned cards
+        // IMPORTANT: Make sure position is set to relative
         newPile.style.position = 'relative';
         
-        // Display up to 5 most recent cards in a fan effect
-        const visibleCards = cards.slice(-5); // Get the last 5 cards
-        
-        visibleCards.forEach((card, index) => {
+        // Display all cards in the pile with proper z-index
+        cards.forEach((card, index) => {
             const cardElement = createCardElement(card);
             
             // Position cards to create stacking/fan effect
@@ -1185,7 +1275,7 @@ function updateDiscardAndDeck() {
             cardElement.style.top = '0';
             cardElement.style.left = '0';
             cardElement.style.zIndex = index + 1;
-            cardElement.style.transform = `rotate(${(index - 2) * 3}deg)`;
+            cardElement.classList.add(`card-position-${index}`);
             
             newPile.appendChild(cardElement);
         });
