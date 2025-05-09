@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const token = localStorage.getItem('authToken');
     if (!token) {
         // Rediriger vers la page de connexion si non connecté
-        window.location.href = '/login/login.html';
+        window.location.href = '../login/login.html';
         return;
     }
 
@@ -156,7 +156,7 @@ function handleWebSocketMessage(event) {
 
                 // Redirect to game page
                 setTimeout(() => {
-                    window.location.href = `/game/game.html?gameId=${data.data.gameId}`;
+                    window.location.href = `../game/game.html?gameId=${data.data.gameId}`;
                 }, 1500);
                 break;
 
@@ -184,15 +184,21 @@ function handleWebSocketMessage(event) {
 // Démarrer la recherche de partie
 function startMatchmaking() {
     if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
+        // Récupérer les options sélectionnées
+        const gameMode = document.querySelector('input[name="game-mode"]:checked')?.value || 'classic';
+        const useExtension = document.querySelector('#use-extension')?.checked || false;
+        
         // Update UI to show searching state
         updateStatus("Recherche d'un adversaire en cours...", true);
 
-        // Send matchmaking request
+        // Send matchmaking request with game options
         matchmakingState.socket.send(JSON.stringify({
             event: "findMatch",
             data: {
                 userId: matchmakingState.userId,
-                username: matchmakingState.username
+                username: matchmakingState.username,
+                gameMode: gameMode,         // Ajout du mode de jeu
+                useExtension: useExtension  // Ajout de l'option d'extension
             }
         }));
 

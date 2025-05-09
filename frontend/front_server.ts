@@ -20,7 +20,7 @@ redirectRouter.get("/admin", (ctx) => {
 });
 
 redirectRouter.get("/matchmaking", (ctx) => {
-  ctx.response.redirect("/matchmaking.html");
+  ctx.response.redirect("/matchmaking/matchmaking.html");
 });
 
 // 2. Game-specific dynamic routes

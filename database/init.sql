@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS games (
     current_round INTEGER DEFAULT 1,
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ended_at TIMESTAMP,
-    settings_id INTEGER
+    settings_id INTEGER,
+    game_mode VARCHAR(10) DEFAULT 'classic'
 );
 
 -- Board table for game configuration and state
@@ -109,6 +110,20 @@ CREATE TABLE IF NOT EXISTS chat_message (
     sender_id INTEGER NOT NULL,
     message TEXT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Leaderboard table for tracking high scores
+CREATE TABLE IF NOT EXISTS leaderboard (
+    id SERIAL PRIMARY KEY,
+    player_id INTEGER NOT NULL,
+    player VARCHAR(50) NOT NULL,
+    score INTEGER NOT NULL,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    month INTEGER,
+    year INTEGER,
+    game_mode VARCHAR(10) DEFAULT 'classic',
+    with_extension BOOLEAN DEFAULT false,
+    FOREIGN KEY (player_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Now add the foreign key constraints (without IF NOT EXISTS which isn't supported in older PostgreSQL)
@@ -294,3 +309,25 @@ CREATE INDEX IF NOT EXISTS idx_expedition_player_id ON expedition(player_id);
 CREATE INDEX IF NOT EXISTS idx_discardpile_board_id ON discard_pile(board_id);
 CREATE INDEX IF NOT EXISTS idx_move_game_id ON move(game_id);
 CREATE INDEX IF NOT EXISTS idx_move_player_id ON move(player_id);
+
+-- Create indexes for leaderboard
+CREATE INDEX IF NOT EXISTS idx_leaderboard_score ON leaderboard(score DESC);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_game_mode ON leaderboard(game_mode);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_with_extension ON leaderboard(with_extension);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_date ON leaderboard(date DESC);
+
+-- Create a trigger to automatically set month and year fields
+CREATE OR REPLACE FUNCTION set_leaderboard_date() 
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.month := EXTRACT(MONTH FROM NEW.date);
+    NEW.year := EXTRACT(YEAR FROM NEW.date);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_set_leaderboard_date ON leaderboard;
+CREATE TRIGGER trigger_set_leaderboard_date
+BEFORE INSERT ON leaderboard
+FOR EACH ROW
+EXECUTE FUNCTION set_leaderboard_date();

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost Cities - Matchmaking</title>
+    <link rel="stylesheet" href="/shared/global.css">
+    <link rel="stylesheet" href="./matchmaking.css">
+</head>
+<body>
+    <div class="header">
+        <h1>LOST CITIES</h1>
+    </div>
+    
+    <div class="container">
+        <div class="matchmaking-box">
+            <h2>Recherche de partie</h2>
+            <p class="status" id="status-message">Prêt à jouer</p>
+            <div class="spinner" id="spinner"></div>
+            
+            <!-- Nouvelles options de jeu -->
+            <div class="game-options">
+                <div class="option-group">
+                    <h3>Mode de jeu</h3>
+                    <label>
+                        <input type="radio" name="game-mode" value="classic" checked>
+                        Mode Classique (3 manches)
+                    </label>
+                    <label>
+                        <input type="radio" name="game-mode" value="quick">
+                        Mode Rapide (1 manche)
+                    </label>
+                </div>
+                
+                <div class="option-group">
+                    <h3>Extension</h3>
+                    <label>
+                        <input type="checkbox" name="use-extension" id="use-extension">
+                        Utiliser l'extension (cartes violettes)
+                    </label>
+                </div>
+            </div>
+            
+            <button class="btn" id="search-game-btn">Rechercher une partie</button>
+            <button class="btn btn-secondary hidden" id="cancel-search-btn">Annuler</button>
+        </div>
+        
+        <div class="player-list">
+            <h3>Joueurs en ligne</h3>
+            <div id="online-players">
+                <!-- Les joueurs en ligne seront ajoutés ici dynamiquement -->
+                <div class="player">
+                    <span>Aucun joueur en ligne pour le moment</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./matchmaking.js"></script>
+</body>
+</html>
