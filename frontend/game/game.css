@@ -490,7 +490,17 @@ body {
 /* Groupe de boutons à gauche */
 .game-controls-left {
     display: flex;
-    gap: 15px; /* Espace entre les boutons à gauche */
+    flex-direction: column; /* Changez de row (par défaut) à column */
+    gap: 10px; /* Espace entre les boutons empilés */
+    align-items: flex-start; /* Alignez à gauche */
+}
+
+#rules-btn, #surrender-btn {
+    width: 150px; /* Ou la largeur désirée pour vos boutons */
+}
+
+#rules-btn::before, #surrender-btn::before {
+    margin-right: 8px; /* Pour maintenir un espace entre l'icône et le texte */
 }
 
 /* Modern button styling with gradients and shadows */
@@ -544,6 +554,11 @@ body {
 
 #chat-btn {
     background: linear-gradient(135deg, #3498db, #2980b9);
+    width: auto;
+    height: auto;
+    padding: 10px 18px; /* Utiliser le padding original */
+    flex-shrink: 0; /* Empêche le chat de rétrécir */
+    align-self: flex-end; /* Aligne le bouton chat en bas */
 }
 
 #chat-btn:hover {
