@@ -4,7 +4,8 @@ const API_URL = window.location.hostname === "localhost"
 
 let chatWebSocket = null;
 let chatConnected = false;
-const MAX_MESSAGE_LENGTH = 500; // Limite de 500 caractères
+let chatInput = null;
+const MAX_MESSAGE_LENGTH = 500
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginSection = document.getElementById('login-section');
@@ -112,6 +113,47 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Chat toggle button:', document.getElementById('chat-toggle-btn'));
 });
 
+if (window.innerWidth <= 768) {
+    createMobileTabs();
+}
+
+function createMobileTabs() {
+    // Créer le container de tabs
+    const tabsContainer = document.createElement('div');
+    tabsContainer.className = 'mobile-tabs';
+    
+    // Créer les tabs
+    const tabs = [
+        { name: 'Menu', target: 'left-panel' },
+        { name: 'Classement', target: 'center-panel' },
+        { name: 'Chat', target: 'right-panel' }
+    ];
+    
+    tabs.forEach((tab, index) => {
+        const tabButton = document.createElement('button');
+        tabButton.className = 'mobile-tab';
+        tabButton.textContent = tab.name;
+        if (index === 0) tabButton.classList.add('active');
+        
+        tabButton.addEventListener('click', () => {
+            // Retirer active de tous les tabs
+            document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.main-container > div').forEach(p => p.classList.remove('active'));
+            
+            // Activer le tab et panel cliqué
+            tabButton.classList.add('active');
+            document.querySelector(`.${tab.target}`).classList.add('active');
+        });
+        
+        tabsContainer.appendChild(tabButton);
+    });
+    
+    document.body.appendChild(tabsContainer);
+    
+    // Activer le premier panel par défaut
+    document.querySelector('.left-panel').classList.add('active');
+}
+
 async function loadLeaderboard(mode, withExtension) {
     try {
         const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
@@ -160,6 +202,7 @@ function displayError() {
 function initializeChat() {
     const token = localStorage.getItem('authToken');
     if (!token) return;
+    chatInput = document.getElementById('chat-input');
     
     // Connexion WebSocket pour le chat
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -202,6 +245,7 @@ function initializeChat() {
         addSystemMessage('Déconnecté du chat');
     });
 
+
     // Fonction pour auto-resize le textarea
     function autoResizeTextarea(textarea) {
         textarea.style.height = 'auto'; // Réinitialise la hauteur pour recalculer
@@ -210,23 +254,29 @@ function initializeChat() {
 
     // Gérer l'envoi de messages
     const chatForm = document.getElementById('chat-form');
-    const chatInput = document.getElementById('chat-input');
 
-    if (chatForm) {
-        // Empêcher la soumission normale du formulaire
+    if (chatForm && chatInput) {
+        // Gestionnaire pour le bouton d'envoi
+        const sendButton = document.querySelector('.chat-send');
+        if (sendButton) {
+            sendButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendChatMessage();
+            });
+        }
+        
+        // Gestionnaire pour le formulaire
         chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
             sendChatMessage();
         });
         
-        // Gérer les touches Entrée et Shift+Entrée
+        // Gestionnaire pour Entrée/Shift+Entrée
         chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
-                // Entrée sans Shift = envoyer
                 e.preventDefault();
                 sendChatMessage();
             }
-            // Shift+Entrée = comportement normal (nouvelle ligne)
         });
         
         // Auto-resize et compteur
@@ -239,9 +289,10 @@ function initializeChat() {
 
 // Fonction pour envoyer le message
 function sendChatMessage() {
+    if (!chatInput) return;  // Vérifier si chatInput existe
+    
     const message = chatInput.value.trim();
     
-    // Vérifier la longueur
     if (message.length > MAX_MESSAGE_LENGTH) {
         alert(`Le message est trop long. Maximum ${MAX_MESSAGE_LENGTH} caractères.`);
         return;
