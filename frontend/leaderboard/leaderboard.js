@@ -36,14 +36,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadLeaderboard(mode, withExtension) {
-    // Utilisez directement le port 3000 du backend
     const API_URL = window.location.hostname === "localhost"
-        ? "http://localhost:3000"  // Backend direct, pas le frontend !
+        ? "http://localhost:3000"
         : "https://lostcitiesbackend.onrender.com";
     
     try {
         const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
         
+        // Utilisez la variable 'url' ici, pas une URL relative !
         const response = await fetch(url);
         
         if (!response.ok) {

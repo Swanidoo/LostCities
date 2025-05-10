@@ -12,16 +12,16 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
         }
         
         .header {
             text-align: center;
-            margin-bottom: 40px;
+            margin: 40px 0;
+            width: 100%;
         }
         
         .header h1 {
@@ -37,11 +37,30 @@
             margin-top: 5px;
         }
         
+        .main-container {
+            display: flex;
+            gap: 40px;
+            max-width: 1200px;
+            width: 90%;
+            margin: 0 auto;
+            align-items: flex-start;
+        }
+        
+        .left-panel {
+            flex: 1;
+            min-width: 300px;
+            max-width: 400px;
+        }
+        
+        .right-panel {
+            flex: 2;
+            min-width: 500px;
+        }
+        
         .menu-container {
             background-color: rgba(0, 0, 0, 0.5);
             padding: 30px;
             border-radius: 10px;
-            width: 300px;
             text-align: center;
         }
         
@@ -80,12 +99,80 @@
             color: #AAA;
         }
         
-        #login-section, #user-section {
-            width: 100%;
+        .leaderboard-container {
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 20px;
         }
+        
+        .leaderboard-container h2 {
+            color: #FFD700;
+            margin-top: 0;
+            text-align: center;
+        }
+        
+        .leaderboard-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .tab-button {
+            padding: 8px 15px;
+            background-color: #555;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        
+        .tab-button.active {
+            background-color: #4CAF50;
+        }
+        
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .leaderboard-table th {
+            background-color: rgba(0, 0, 0, 0.3);
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .leaderboard-table tr:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .leaderboard-table tr:nth-child(1) td:first-child::before { content: "🥇 "; }
+        .leaderboard-table tr:nth-child(2) td:first-child::before { content: "🥈 "; }
+        .leaderboard-table tr:nth-child(3) td:first-child::before { content: "🥉 "; }
         
         .hidden {
             display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .left-panel, .right-panel {
+                max-width: 100%;
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -95,87 +182,61 @@
         <p>Le duel de cartes archéologique</p>
     </div>
     
-    <div class="menu-container">
-        <!-- Section visiteur (non connecté) -->
-        <div id="login-section">
-            <div class="menu">
-                <button class="menu-button" id="login-btn">Se connecter</button>
-                <button class="menu-button secondary" id="register-btn">S'inscrire</button>
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="menu-container">
+                <!-- Section visiteur (non connecté) -->
+                <div id="login-section">
+                    <div class="menu">
+                        <button class="menu-button" id="login-btn">Se connecter</button>
+                        <button class="menu-button secondary" id="register-btn">S'inscrire</button>
+                    </div>
+                </div>
+                
+                <!-- Section utilisateur (connecté) -->
+                <div id="user-section" class="hidden">
+                    <div class="menu">
+                        <button class="menu-button" id="play-btn">Jouer</button>
+                        <button class="menu-button secondary" id="stats-btn">Statistiques</button>
+                        <button class="menu-button secondary" id="chat-btn">Chat</button>
+                        <button class="menu-button secondary" id="logout-btn">Déconnexion</button>
+                    </div>
+                    <div class="user-info">
+                        Connecté en tant que <span id="username">Joueur</span>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <!-- Section utilisateur (connecté) -->
-        <div id="user-section" class="hidden">
-            <div class="menu">
-                <button class="menu-button" id="play-btn">Jouer</button>
-                <button class="menu-button secondary" id="stats-btn">Statistiques</button>
-                <button class="menu-button secondary" id="leaderboard-btn">Classement</button>
-                <button class="menu-button secondary" id="chat-btn">Chat</button>
-                <button class="menu-button secondary" id="logout-btn">Déconnexion</button>
-            </div>
-            <div class="user-info">
-                Connecté en tant que <span id="username">Joueur</span>
+        <div class="right-panel">
+            <div class="leaderboard-container">
+                <h2>Classement</h2>
+                
+                <div class="leaderboard-tabs">
+                    <button class="tab-button active" data-mode="classic">Classique</button>
+                    <button class="tab-button" data-mode="quick">Rapide</button>
+                </div>
+                
+                <div class="leaderboard-tabs">
+                    <button class="tab-button active" data-extension="false">Sans Extension</button>
+                    <button class="tab-button" data-extension="true">Avec Extension</button>
+                </div>
+                
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Rang</th>
+                            <th>Joueur</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-data">
+                        <tr><td colspan="3" style="text-align: center;">Chargement...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const loginSection = document.getElementById('login-section');
-            const userSection = document.getElementById('user-section');
-            const usernameSpan = document.getElementById('username');
-            
-            // Vérifier si l'utilisateur est connecté
-            const token = localStorage.getItem('authToken');
-            if (token) {
-                // Extraire le nom d'utilisateur du token JWT
-                try {
-                    const tokenParts = token.split('.');
-                    if (tokenParts.length === 3) {
-                        const payload = JSON.parse(atob(tokenParts[1]));
-                        usernameSpan.textContent = payload.username || payload.email;
-                    }
-                } catch (error) {
-                    console.error("Erreur lors de la lecture du token:", error);
-                }
-                
-                // Afficher la section utilisateur
-                loginSection.classList.add('hidden');
-                userSection.classList.remove('hidden');
-            }
-            
-            // Gestionnaires d'événements pour les boutons
-            document.getElementById('login-btn').addEventListener('click', () => {
-                window.location.href = '/login/login.html';
-            });
-            
-            document.getElementById('register-btn').addEventListener('click', () => {
-                window.location.href = '/login/register.html';
-            });
-            
-            document.getElementById('play-btn').addEventListener('click', () => {
-                window.location.href = '/matchmaking/matchmaking.html';
-            });
-            
-            document.getElementById('stats-btn').addEventListener('click', () => {
-                window.location.href = '/stats.html';
-            });
-            
-            document.getElementById('chat-btn').addEventListener('click', () => {
-                window.location.href = '/chat/chat.html';
-            });
-            
-            document.getElementById('logout-btn').addEventListener('click', () => {
-                // Supprimer le token et rediriger vers la page d'accueil
-                localStorage.removeItem('authToken');
-                window.location.reload();
-            });
-            
-            document.getElementById('leaderboard-btn').addEventListener('click', () => {
-                window.location.href = '/leaderboard/leaderboard.html';
-            });
-        });
-    </script>
-    <script src="./leaderboard/leaderboard.js"></script>
+<script src="index.js"></script>
 </body>
 </html>

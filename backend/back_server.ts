@@ -48,6 +48,8 @@ app.use(welcomeRouter.routes());
 app.use(welcomeRouter.allowedMethods());
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
+app.use(leaderboardRouter.routes());
+app.use(leaderboardRouter.allowedMethods());
 
 // 📡 WebSocket routes (avant auth)
 app.use(wsRouter.routes());
@@ -79,8 +81,6 @@ app.use(userRouter.routes());
 app.use(userRouter.allowedMethods());
 app.use(settingsRouter.routes());
 app.use(settingsRouter.allowedMethods());
-app.use(leaderboardRouter.routes());
-app.use(leaderboardRouter.allowedMethods());
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
 
