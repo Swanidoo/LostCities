@@ -97,4 +97,99 @@ adminRouter.get("/api/admin/dashboard", requireAdmin, async (ctx) => {
   ctx.response.body = stats.rows[0];
 });
 
+// Route pour obtenir les utilisateurs détaillés
+adminRouter.get("/api/admin/users/detailed", requireAdmin, async (ctx) => {
+  // Code que j'ai fourni plus haut
+});
+
+// Route pour obtenir les messages de chat à modérer
+adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
+  try {
+    const messages = await client.queryObject(`
+      SELECT 
+        cm.id,
+        cm.game_id,
+        cm.message,
+        cm.timestamp,
+        cm.is_deleted,
+        u.username as sender_username,
+        u.id as sender_id,
+        COUNT(r.id) as report_count
+      FROM chat_message cm
+      JOIN users u ON cm.sender_id = u.id
+      LEFT JOIN reports r ON r.reported_message_id = cm.id
+      WHERE cm.timestamp > NOW() - INTERVAL '7 days'
+      GROUP BY cm.id, cm.game_id, cm.message, cm.timestamp, cm.is_deleted, u.username, u.id
+      ORDER BY report_count DESC, cm.timestamp DESC
+      LIMIT 100
+    `);
+    
+    ctx.response.body = messages.rows;
+  } catch (err) {
+    console.error("Error fetching chat messages:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+});
+
+// Route pour supprimer un message de chat
+adminRouter.delete("/api/admin/chat-messages/:id", requireAdmin, async (ctx) => {
+  const messageId = ctx.params.id;
+  const adminId = ctx.state.user.id;
+  
+  await client.queryObject(
+    `UPDATE chat_message 
+     SET is_deleted = true, deleted_at = NOW(), deleted_by = $1
+     WHERE id = $2`,
+    [adminId, messageId]
+  );
+  
+  // Logger l'action
+  await client.queryObject(
+    `INSERT INTO admin_actions (admin_id, action_type, target_message_id, reason)
+     VALUES ($1, 'delete_message', $2, 'Message supprimé par admin')`,
+    [adminId, messageId]
+  );
+  
+  ctx.response.body = { message: "Message deleted successfully" };
+});
+
+// Route pour obtenir les rapports
+adminRouter.get("/api/admin/reports", requireAdmin, async (ctx) => {
+  const { status = 'pending' } = helpers.getQuery(ctx);
+  
+  const reports = await client.queryObject(`
+    SELECT 
+      r.*,
+      reporter.username as reporter_username,
+      reported.username as reported_username,
+      cm.message as reported_message
+    FROM reports r
+    JOIN users reporter ON r.reporter_id = reporter.id
+    LEFT JOIN users reported ON r.reported_user_id = reported.id
+    LEFT JOIN chat_message cm ON r.reported_message_id = cm.id
+    WHERE r.status = $1
+    ORDER BY r.created_at DESC
+  `, [status]);
+  
+  ctx.response.body = reports.rows;
+});
+
+// Route pour résoudre un rapport
+adminRouter.put("/api/admin/reports/:id/resolve", requireAdmin, async (ctx) => {
+  const reportId = ctx.params.id;
+  const { resolution, notes } = await ctx.request.body({ type: "json" }).value;
+  const adminId = ctx.state.user.id;
+  
+  await client.queryObject(
+    `UPDATE reports 
+     SET status = $1, resolution_notes = $2, resolved_by = $3, resolved_at = NOW()
+     WHERE id = $4`,
+    [resolution, notes, adminId, reportId]
+  );
+  
+  ctx.response.body = { message: "Report resolved successfully" };
+});
+
+
 export default adminRouter;

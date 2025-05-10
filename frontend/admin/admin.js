@@ -38,6 +38,70 @@ async function loadUsers() {
     }
 }
 
+// Fonction pour charger les statistiques du dashboard
+async function loadDashboardStats() {
+    try {
+        const response = await fetch(`${API_URL}/api/admin/dashboard`, {
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("token")}`
+            }
+        });
+        
+        const stats = await response.json();
+        updateDashboardUI(stats);
+    } catch (error) {
+        console.error("Error loading dashboard stats:", error);
+    }
+}
+
+// Fonction pour mute un utilisateur
+async function muteUser(userId) {
+    const duration = prompt("Durée du mute en secondes (laisser vide pour permanent):");
+    const reason = prompt("Raison du mute:");
+    
+    try {
+        const response = await fetch(`${API_URL}/api/admin/users/${userId}/mute`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ duration: duration ? parseInt(duration) : null, reason })
+        });
+        
+        if (response.ok) {
+            alert("Utilisateur muté avec succès!");
+            loadUsers();
+        }
+    } catch (error) {
+        console.error("Error muting user:", error);
+    }
+}
+
+// Fonction pour bannir un utilisateur
+async function banUser(userId) {
+    const duration = prompt("Durée du ban en secondes (laisser vide pour permanent):");
+    const reason = prompt("Raison du ban:");
+    
+    try {
+        const response = await fetch(`${API_URL}/api/admin/users/${userId}/ban`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ duration: duration ? parseInt(duration) : null, reason })
+        });
+        
+        if (response.ok) {
+            alert("Utilisateur banni avec succès!");
+            loadUsers();
+        }
+    } catch (error) {
+        console.error("Error banning user:", error);
+    }
+}
+
 // Fonction pour supprimer un utilisateur
 async function deleteUser(userId) {
     try {

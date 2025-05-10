@@ -11,12 +11,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vérifier si l'utilisateur est connecté
     const token = localStorage.getItem('authToken');
     if (token) {
-        // Extraire le nom d'utilisateur du token JWT
         try {
             const tokenParts = token.split('.');
             if (tokenParts.length === 3) {
                 const payload = JSON.parse(atob(tokenParts[1]));
                 usernameSpan.textContent = payload.username || payload.email;
+                
+                // NOUVEAU : Vérifier si l'utilisateur est admin
+                if (payload.role === 'admin') {
+                    const adminBtn = document.getElementById('admin-btn');
+                    if (adminBtn) {
+                        adminBtn.style.display = 'block';
+                        adminBtn.addEventListener('click', () => {
+                            window.location.href = '/admin/admin.html';
+                        });
+                    }
+                }
             }
         } catch (error) {
             console.error("Erreur lors de la lecture du token:", error);

@@ -35,6 +35,7 @@ services:
       - db-data:/var/lib/postgresql/data
       - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./database/02_test_scores.sql:/docker-entrypoint-initdb.d/02_test_scores.sql
+      - ./database/03_test_admin_data.sql:/docker-entrypoint-initdb.d/03_test_admin_data.sql
     ports:
       - "5432:5432"
     healthcheck:

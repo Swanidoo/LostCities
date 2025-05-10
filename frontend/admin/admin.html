@@ -24,6 +24,46 @@
                 <!-- Les utilisateurs seront ajoutés ici dynamiquement -->
             </tbody>
         </table>
+        <div id="dashboard-stats">
+            <h2>Statistiques</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Utilisateurs totaux</h3>
+                    <p id="total-users">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Nouveaux utilisateurs (24h)</h3>
+                    <p id="new-users">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Parties en cours</h3>
+                    <p id="active-games">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Utilisateurs bannis</h3>
+                    <p id="banned-users">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="reports-section">
+            <h2>Rapports en attente</h2>
+            <table id="reportsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Rapporteur</th>
+                        <th>Signalé</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Les rapports seront ajoutés ici -->
+                </tbody>
+            </table>
+        </div>
     </div>
     <script src="admin.js"></script>
 </body>
