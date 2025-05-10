@@ -2,20 +2,24 @@ const API_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000" // Local backend URL
   : "https://lostcitiesbackend.onrender.com"; // Render backend URL
 
-// Fonction pour charger les utilisateurs
-async function loadUsers() {
+// Variables globales pour la pagination
+let currentUsersPage = 1;
+let currentMessagesPage = 1;
+
+// Fonction pour charger les utilisateurs avec pagination
+async function loadUsers(page = 1) {
     try {
-        const response = await fetch(`${API_URL}/api/admin/users`, {
+        const response = await fetch(`${API_URL}/api/admin/users?page=${page}&limit=50`, {
             headers: {
                 "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
             },
         });
 
-        const users = await response.json();
+        const data = await response.json();
         const usersTableBody = document.querySelector("#usersTable tbody");
         usersTableBody.innerHTML = "";
 
-        users.forEach(user => {
+        data.users.forEach(user => {
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td>${user.id}</td>
@@ -30,6 +34,10 @@ async function loadUsers() {
             `;
             usersTableBody.appendChild(row);
         });
+        
+        // Ajouter les contrôles de pagination
+        updatePaginationControls('users', data.pagination);
+        
     } catch (error) {
         console.error("Error loading users:", error);
     }
@@ -75,20 +83,20 @@ async function muteUser(userId) {
     }
 }
 
-// Fonction pour charger les messages de chat
-async function loadChatMessages() {
+// Fonction pour charger les messages de chat avec pagination
+async function loadChatMessages(page = 1) {
     try {
-        const response = await fetch(`${API_URL}/api/admin/chat-messages`, {
+        const response = await fetch(`${API_URL}/api/admin/chat-messages?page=${page}&limit=50`, {
             headers: {
                 "Authorization": `Bearer ${localStorage.getItem("authToken")}`
             }
         });
         
-        const messages = await response.json();
+        const data = await response.json();
         const chatTableBody = document.querySelector("#chatMessagesTable tbody");
         chatTableBody.innerHTML = "";
         
-        messages.forEach(msg => {
+        data.messages.forEach(msg => {
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td>${msg.id}</td>
@@ -104,10 +112,57 @@ async function loadChatMessages() {
             `;
             chatTableBody.appendChild(row);
         });
+        
+        // Ajouter les contrôles de pagination
+        updatePaginationControls('messages', data.pagination);
+        
     } catch (error) {
         console.error("Error loading chat messages:", error);
     }
 }
+
+// Fonction pour mettre à jour les contrôles de pagination
+function updatePaginationControls(type, pagination) {
+    const containerId = type === 'users' ? 'users-pagination' : 'messages-pagination';
+    let container = document.getElementById(containerId);
+    
+    if (!container) {
+        // Créer le conteneur s'il n'existe pas
+        container = document.createElement('div');
+        container.id = containerId;
+        container.className = 'pagination-controls';
+        
+        const targetSection = type === 'users' ? 
+            document.getElementById('users-section') : 
+            document.getElementById('chat-messages-section');
+        
+        targetSection.appendChild(container);
+    }
+    
+    container.innerHTML = `
+        <button ${pagination.page <= 1 ? 'disabled' : ''} 
+                onclick="changePage('${type}', ${pagination.page - 1})">
+            Précédent
+        </button>
+        <span>Page ${pagination.page} sur ${pagination.totalPages}</span>
+        <button ${pagination.page >= pagination.totalPages ? 'disabled' : ''} 
+                onclick="changePage('${type}', ${pagination.page + 1})">
+            Suivant
+        </button>
+    `;
+}
+
+// Fonction pour changer de page
+function changePage(type, page) {
+    if (type === 'users') {
+        currentUsersPage = page;
+        loadUsers(page);
+    } else if (type === 'messages') {
+        currentMessagesPage = page;
+        loadChatMessages(page);
+    }
+}
+
 
 // Améliorer l'affichage des statistiques
 function updateDashboardUI(stats) {
@@ -220,4 +275,8 @@ async function deleteUser(userId) {
 }
 
 // Charger les utilisateurs au chargement de la page
-document.addEventListener("DOMContentLoaded", loadUsers);
+document.addEventListener("DOMContentLoaded", () => {
+    loadUsers();
+    loadDashboardStats();
+    loadChatMessages();
+});

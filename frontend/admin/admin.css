@@ -196,6 +196,37 @@ button:contains("Unban") {
     color: #4caf50;
 }
 
+/*Pagination*/
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+    padding: 10px;
+}
+
+.pagination-controls button {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #4caf50, #388e3c);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.pagination-controls button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.pagination-controls span {
+    color: #ddd;
+    font-weight: 600;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .stats-grid {

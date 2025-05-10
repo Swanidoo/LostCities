@@ -5,11 +5,38 @@ import { client } from "./db_client.ts";
 
 const adminRouter = new Router();
 
-// Route pour récupérer tous les utilisateurs
+// Route pour récupérer tous les utilisateurs avec pagination
 adminRouter.get("/api/admin/users", requireAdmin, async (ctx) => {
   try {
-    const users = await client.queryObject("SELECT id, username, email, role FROM users");
-    ctx.response.body = users.rows;
+    const url = new URL(ctx.request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const offset = (page - 1) * limit;
+    
+    // Compter le total des utilisateurs
+    const countResult = await client.queryObject(`
+      SELECT COUNT(*) as total FROM users
+    `);
+    
+    const totalUsers = countResult.rows[0].total;
+    
+    // Récupérer les utilisateurs avec pagination
+    const users = await client.queryObject(`
+      SELECT id, username, email, role, created_at, is_banned, is_muted
+      FROM users
+      ORDER BY created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+    
+    ctx.response.body = {
+      users: users.rows,
+      pagination: {
+        page,
+        limit,
+        total: totalUsers,
+        totalPages: Math.ceil(totalUsers / limit)
+      }
+    };
   } catch (err) {
     console.error("Error fetching users:", err);
     ctx.response.status = 500;
@@ -112,24 +139,48 @@ adminRouter.get("/api/admin/users/detailed", requireAdmin, async (ctx) => {
 // Route pour obtenir les messages de chat à modérer
 adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
   try {
-    // Lire les messages du chat général (game_id IS NULL)
+    // Récupérer les paramètres de pagination
+    const url = new URL(ctx.request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const offset = (page - 1) * limit;
+    
+    // Compter le total des messages récents
+    const countResult = await client.queryObject(`
+      SELECT COUNT(*) as total
+      FROM chat_message cm
+      WHERE cm.timestamp > NOW() - INTERVAL '1 hour'
+      AND (cm.is_deleted = false OR cm.is_deleted IS NULL)
+    `);
+    
+    const totalMessages = countResult.rows[0].total;
+    
+    // Récupérer les messages avec pagination
     const messages = await client.queryObject(`
       SELECT 
         cm.id,
         cm.message,
         cm.timestamp,
         u.username as sender_username,
-        u.id as sender_id
+        u.id as sender_id,
+        (SELECT COUNT(*) FROM reports WHERE reported_message_id = cm.id) as report_count
       FROM chat_message cm
       JOIN users u ON cm.sender_id = u.id
-      WHERE cm.game_id IS NULL  -- Messages du chat général uniquement
+      WHERE cm.timestamp > NOW() - INTERVAL '1 hour'
       AND (cm.is_deleted = false OR cm.is_deleted IS NULL)
       ORDER BY cm.timestamp DESC
-      LIMIT 50
-    `);
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
     
-    console.log("Found messages:", messages.rows.length);
-    ctx.response.body = messages.rows;
+    ctx.response.body = {
+      messages: messages.rows,
+      pagination: {
+        page,
+        limit,
+        total: totalMessages,
+        totalPages: Math.ceil(totalMessages / limit)
+      }
+    };
   } catch (err) {
     console.error("Error fetching chat messages:", err);
     ctx.response.status = 500;
