@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }, 0);
-    
+
     
     // Gestionnaires d'événements pour les boutons
     document.getElementById('login-btn').addEventListener('click', () => {
@@ -238,23 +238,41 @@ function initializeChat() {
         chatConnected = false;
         addSystemMessage('Déconnecté du chat');
     });
-    
+
+    // Fonction pour auto-resize le textarea
+    function autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto'; // Réinitialise la hauteur pour recalculer
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'; // Ajuste la hauteur avec une limite maximale
+    }
+
     // Gérer l'envoi de messages
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
-    
+
     if (chatForm) {
+        // Auto-resize du textarea
+        chatInput.addEventListener('input', (e) => {
+            autoResizeTextarea(e.target);
+        });
+
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                // Logique d'envoi du message
+                const message = chatInput.value.trim();
+                if (message && chatConnected) {
+                    chatWebSocket.send(JSON.stringify({
+                        event: 'chatMessage',
+                        data: { message }
+                    }));
+                    chatInput.value = '';
+                    autoResizeTextarea(chatInput); // Réinitialise la hauteur après l'envoi
+                }
+            }
+        });
+
         chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            
-            const message = chatInput.value.trim();
-            if (message && chatConnected) {
-                chatWebSocket.send(JSON.stringify({
-                    event: 'chatMessage',
-                    data: { message }
-                }));
-                chatInput.value = '';
-            }
         });
     }
 }

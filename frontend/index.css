@@ -208,7 +208,10 @@ body {
     min-height: 50px;
     line-height: 1.4;
     transition: all 0.3s ease;
-    resize: none; /* Empêcher le redimensionnement */
+    resize: vertical; /* Permettre le redimensionnement vertical */
+    overflow-y: auto; /* Scroll automatique si nécessaire */
+    min-height: 60px; /* Hauteur minimale appropriée */
+    max-height: 120px; /* Hauteur maximale pour éviter qu'il devienne trop grand */
 }
 
 .chat-input:focus {
@@ -224,19 +227,24 @@ body {
 }
 
 .chat-send {
-    padding: 15px 25px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 16px;
-    min-height: 50px;
-    white-space: nowrap;
+    width: 50px;  /* Largeur fixe et réduite */
+    min-width: 50px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 24px;  /* Pour l'emoji */
+}
+
+.chat-send svg {
+    width: 24px;
+    height: 24px;
+}
+
+.chat-input {
+    flex: 1;  /* Prend toute la place disponible */
+    min-width: 0;  /* Permet au flex de réduire la largeur si nécessaire */
+    margin-right: 10px;  /* Espace avec le bouton */
 }
 
 .chat-send:hover {
