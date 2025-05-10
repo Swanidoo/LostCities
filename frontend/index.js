@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const payload = JSON.parse(atob(tokenParts[1]));
                 usernameSpan.textContent = payload.username || payload.email;
                 
-                // NOUVEAU : Vérifier si l'utilisateur est admin
+                // Vérifier si l'utilisateur est admin
                 if (payload.role === 'admin') {
                     const adminBtn = document.getElementById('admin-btn');
                     if (adminBtn) {
@@ -34,7 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Erreur lors de la lecture du token:", error);
         }
-
+    
+        // Initialiser le chat automatiquement pour les utilisateurs connectés
         initializeChat();
         
         // Afficher la section utilisateur
@@ -51,16 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = '/login/register.html';
     });
     
-    document.getElementById('play-btn').addEventListener('click', () => {
-        window.location.href = '/matchmaking/matchmaking.html';
-    });
-    
     document.getElementById('stats-btn').addEventListener('click', () => {
         window.location.href = '/stats.html';
-    });
-    
-    document.getElementById('chat-toggle-btn').addEventListener('click', () => {
-        window.location.href = '/chat/chat.html';
     });
     
     document.getElementById('logout-btn').addEventListener('click', () => {
@@ -87,6 +80,32 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialiser le leaderboard
     loadLeaderboard('classic', false);
+
+        
+    const chatToggleBtn = document.getElementById('chat-toggle-btn');
+    if (chatToggleBtn) {
+        chatToggleBtn.addEventListener('click', (e) => {
+            e.preventDefault(); // Empêcher le comportement par défaut
+            
+            const chatPanel = document.getElementById('chat-panel');
+            const centerPanel = document.querySelector('.center-panel');
+            
+            if (chatPanel.classList.contains('hidden')) {
+                chatPanel.classList.remove('hidden');
+                chatToggleBtn.textContent = 'Fermer Chat';
+                if (centerPanel) centerPanel.style.maxWidth = '700px';
+                
+                // Initialiser le chat si ce n'est pas déjà fait
+                if (!chatWebSocket) {
+                    initializeChat();
+                }
+            } else {
+                chatPanel.classList.add('hidden');
+                chatToggleBtn.textContent = 'Chat Général';
+                if (centerPanel) centerPanel.style.maxWidth = '100%';
+            }
+        });
+    }
     
     // Gestionnaires pour les onglets du leaderboard
     const tabButtons = document.querySelectorAll('.tab-button');

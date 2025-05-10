@@ -174,15 +174,6 @@ body {
     flex-direction: column;
 }
 
-.chat-header {
-    color: #FFD700;
-    font-size: 1.2rem;
-    margin-bottom: 15px;
-    text-align: center;
-    border-bottom: 2px solid #444;
-    padding-bottom: 10px;
-}
-
 .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -190,65 +181,51 @@ body {
     padding: 10px;
     background-color: rgba(0, 0, 0, 0.3);
     border-radius: 5px;
-}
-
-.chat-message {
-    margin-bottom: 10px;
-    padding: 8px;
-    border-radius: 5px;
-    background-color: rgba(255, 255, 255, 0.05);
-    word-wrap: break-word;
-}
-
-.chat-message.self {
-    background-color: rgba(76, 175, 80, 0.2);
-    margin-left: 20%;
-}
-
-.chat-message.other {
-    background-color: rgba(33, 150, 243, 0.2);
-    margin-right: 20%;
-}
-
-.chat-message.system {
-    background-color: rgba(255, 152, 0, 0.2);
-    text-align: center;
-    font-style: italic;
-    font-size: 0.9em;
-}
-
-.chat-sender {
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #FFD700;
+    min-height: 0; /* Important pour le scroll */
 }
 
 .chat-form {
     display: flex;
     gap: 10px;
+    margin-top: 10px;
+    align-items: center; /* Aligner verticalement */
 }
 
+/* MODIFICATIONS ICI - Amélioration du champ de saisie */
 .chat-input {
     flex: 1;
-    padding: 10px;
-    border: none;
-    border-radius: 5px;
-    background-color: rgba(255, 255, 255, 0.1);
+    padding: 12px 15px;  /* Plus de padding */
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.15);
     color: white;
+    font-size: 16px; /* Police plus grande */
+    min-height: 45px; /* Hauteur minimale */
+    transition: all 0.3s ease;
+}
+
+.chat-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    background-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
 }
 
 .chat-input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .chat-send {
-    padding: 10px 20px;
+    padding: 12px 25px;
     background-color: #4CAF50;
     color: white;
     border: none;
-    border-radius: 5px;
+    border-radius: 8px;
     cursor: pointer;
     transition: background-color 0.3s;
+    font-size: 16px;
+    min-height: 45px; /* Même hauteur que l'input */
+    white-space: nowrap;
 }
 
 .chat-send:hover {

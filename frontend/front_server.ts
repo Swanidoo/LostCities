@@ -7,9 +7,6 @@ const app = new Application();
 
 // 1. Route redirects for section roots
 const redirectRouter = new Router();
-redirectRouter.get("/chat", (ctx) => {
-  ctx.response.redirect("/chat/chat.html");
-});
 
 redirectRouter.get("/login", (ctx) => {
   ctx.response.redirect("/login/login.html");
