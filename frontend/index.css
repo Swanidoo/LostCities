@@ -43,16 +43,14 @@ body {
 }
 
 .center-panel {
-    flex: 2;
+    flex: 1;
     min-width: 500px;
-    max-width: 100%; /* Par défaut, prend toute la place */
     transition: max-width 0.3s ease;
 }
 
 .right-panel {
-    flex: 1;
+    flex: 0 0 400px;
     min-width: 320px;
-    max-width: 400px;
     transition: all 0.3s ease;
 }
 
@@ -60,11 +58,14 @@ body {
     display: none !important;
 }
 
-.center-panel {
-    flex: 2;
-    min-width: 500px;
-    transition: max-width 0.3s ease;
+.main-container:has(.right-panel.hidden) .center-panel {
+    max-width: 100%;
 }
+
+.main-container:has(.right-panel:not(.hidden)) .center-panel {
+    max-width: calc(100% - 430px); /* 400px du chat + 30px de gap */
+}
+
 
 /* === Menu === */
 .menu-container {

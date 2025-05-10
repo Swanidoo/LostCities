@@ -1,4 +1,3 @@
-// Configuration
 const API_URL = window.location.hostname === "localhost"
     ? "http://localhost:3000"
     : "https://lostcitiesbackend.onrender.com";
@@ -43,33 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loginSection.classList.add('hidden');
         userSection.classList.remove('hidden');
     }
-
-    setTimeout(() => {
-        const chatToggleBtn = document.getElementById('chat-toggle-btn');
-        if (chatToggleBtn) {
-            chatToggleBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const chatPanel = document.getElementById('chat-panel');
-                
-                if (chatPanel) {
-                    if (chatPanel.classList.contains('hidden')) {
-                        chatPanel.classList.remove('hidden');
-                        chatToggleBtn.textContent = 'Cacher le chat';
-                        document.querySelector('.center-panel').style.maxWidth = '700px';
-                        
-                        if (!chatWebSocket) {
-                            initializeChat();
-                        }
-                    } else {
-                        chatPanel.classList.add('hidden');
-                        chatToggleBtn.textContent = 'Afficher le chat';
-                        document.querySelector('.center-panel').style.maxWidth = '100%';
-                    }
-                }
-            });
-        }
-    }, 0);
-
     
     // Gestionnaires d'événements pour les boutons
     document.getElementById('login-btn').addEventListener('click', () => {
@@ -89,51 +61,33 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = '/matchmaking/matchmaking.html';
     });
 
-    // Gestionnaire pour le bouton toggle chat
-    document.getElementById('chat-toggle-btn')?.addEventListener('click', () => {
-        const chatPanel = document.getElementById('chat-panel');
-        const chatBtn = document.getElementById('chat-toggle-btn');
-        const centerPanel = document.querySelector('.center-panel');
-        
-        if (chatPanel.classList.contains('hidden')) {
-            chatPanel.classList.remove('hidden');
-            chatBtn.textContent = 'Fermer Chat';
-            centerPanel.style.maxWidth = '700px';
-        } else {
-            chatPanel.classList.add('hidden');
-            chatBtn.textContent = 'Chat Général';
-            centerPanel.style.maxWidth = '100%';
-        }
-    });
-    
-    // Initialiser le leaderboard
-    loadLeaderboard('classic', false);
-
-        
+    // UN SEUL gestionnaire pour le bouton toggle chat
     const chatToggleBtn = document.getElementById('chat-toggle-btn');
     if (chatToggleBtn) {
         chatToggleBtn.addEventListener('click', (e) => {
-            e.preventDefault(); // Empêcher le comportement par défaut
-            
+            e.preventDefault();
             const chatPanel = document.getElementById('chat-panel');
             const centerPanel = document.querySelector('.center-panel');
             
-            if (chatPanel.classList.contains('hidden')) {
-                chatPanel.classList.remove('hidden');
-                chatToggleBtn.textContent = 'Cacher le chat';
-                if (centerPanel) centerPanel.style.maxWidth = '700px';
-                
-                // Initialiser le chat si ce n'est pas déjà fait
-                if (!chatWebSocket) {
-                    initializeChat();
+            if (chatPanel) {
+                if (chatPanel.classList.contains('hidden')) {
+                    chatPanel.classList.remove('hidden');
+                    chatToggleBtn.textContent = 'Cacher le chat';
+                    
+                    // Initialiser le chat si ce n'est pas déjà fait
+                    if (!chatWebSocket) {
+                        initializeChat();
+                    }
+                } else {
+                    chatPanel.classList.add('hidden');
+                    chatToggleBtn.textContent = 'Afficher le chat';
                 }
-            } else {
-                chatPanel.classList.add('hidden');
-                chatToggleBtn.textContent = 'Afficher le chat';
-                if (centerPanel) centerPanel.style.maxWidth = '100%';
             }
         });
     }
+    
+    // Initialiser le leaderboard
+    loadLeaderboard('classic', false);
     
     // Gestionnaires pour les onglets du leaderboard
     const tabButtons = document.querySelectorAll('.tab-button');
@@ -211,6 +165,14 @@ function initializeChat() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
     const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
+
+    const sendButton = document.querySelector('.chat-send');
+    if (sendButton) {
+        sendButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            sendChatMessage();
+        });
+    }
     
     chatWebSocket = new WebSocket(wsUrl);
     
@@ -251,33 +213,64 @@ function initializeChat() {
     const chatInput = document.getElementById('chat-input');
 
     if (chatForm) {
-        // Auto-resize du textarea
-        chatInput.addEventListener('input', (e) => {
-            autoResizeTextarea(e.target);
-        });
-
-        chatInput.addEventListener('input', (e) => {
-            autoResizeTextarea(e.target);
-            
-            // Mettre à jour le compteur
-            const charCounter = document.getElementById('char-counter');
-            if (charCounter) {
-                const length = e.target.value.length;
-                charCounter.textContent = `${length}/${MAX_MESSAGE_LENGTH}`;
-                
-                // Changer la couleur selon la longueur
-                charCounter.classList.remove('warning', 'error');
-                if (length > MAX_MESSAGE_LENGTH) {
-                    charCounter.classList.add('error');
-                } else if (length > MAX_MESSAGE_LENGTH * 0.8) {
-                    charCounter.classList.add('warning');
-                }
-            }
-        });
-
+        // Empêcher la soumission normale du formulaire
         chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            sendChatMessage();
         });
+        
+        // Gérer les touches Entrée et Shift+Entrée
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                // Entrée sans Shift = envoyer
+                e.preventDefault();
+                sendChatMessage();
+            }
+            // Shift+Entrée = comportement normal (nouvelle ligne)
+        });
+        
+        // Auto-resize et compteur
+        chatInput.addEventListener('input', (e) => {
+            autoResizeTextarea(e.target);
+            updateCharCounter(e.target);
+        });
+    }
+}
+
+// Fonction pour envoyer le message
+function sendChatMessage() {
+    const message = chatInput.value.trim();
+    
+    // Vérifier la longueur
+    if (message.length > MAX_MESSAGE_LENGTH) {
+        alert(`Le message est trop long. Maximum ${MAX_MESSAGE_LENGTH} caractères.`);
+        return;
+    }
+    
+    if (message && chatConnected) {
+        chatWebSocket.send(JSON.stringify({
+            event: 'chatMessage',
+            data: { message }
+        }));
+        chatInput.value = '';
+        autoResizeTextarea(chatInput);
+        updateCharCounter(chatInput);
+    }
+}
+
+// Fonction pour mettre à jour le compteur
+function updateCharCounter(textarea) {
+    const charCounter = document.getElementById('char-counter');
+    if (charCounter) {
+        const length = textarea.value.length;
+        charCounter.textContent = `${length}/${MAX_MESSAGE_LENGTH}`;
+        
+        charCounter.classList.remove('warning', 'error');
+        if (length > MAX_MESSAGE_LENGTH) {
+            charCounter.classList.add('error');
+        } else if (length > MAX_MESSAGE_LENGTH * 0.8) {
+            charCounter.classList.add('warning');
+        }
     }
 }
 
