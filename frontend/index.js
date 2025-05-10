@@ -42,6 +42,33 @@ document.addEventListener('DOMContentLoaded', () => {
         loginSection.classList.add('hidden');
         userSection.classList.remove('hidden');
     }
+
+    setTimeout(() => {
+        const chatToggleBtn = document.getElementById('chat-toggle-btn');
+        if (chatToggleBtn) {
+            chatToggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const chatPanel = document.getElementById('chat-panel');
+                
+                if (chatPanel) {
+                    if (chatPanel.classList.contains('hidden')) {
+                        chatPanel.classList.remove('hidden');
+                        chatToggleBtn.textContent = 'Cacher le chat';
+                        document.querySelector('.center-panel').style.maxWidth = '700px';
+                        
+                        if (!chatWebSocket) {
+                            initializeChat();
+                        }
+                    } else {
+                        chatPanel.classList.add('hidden');
+                        chatToggleBtn.textContent = 'Afficher le chat';
+                        document.querySelector('.center-panel').style.maxWidth = '100%';
+                    }
+                }
+            });
+        }
+    }, 0);
+    
     
     // Gestionnaires d'événements pour les boutons
     document.getElementById('login-btn').addEventListener('click', () => {
@@ -92,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (chatPanel.classList.contains('hidden')) {
                 chatPanel.classList.remove('hidden');
-                chatToggleBtn.textContent = 'Fermer Chat';
+                chatToggleBtn.textContent = 'Cacher le chat';
                 if (centerPanel) centerPanel.style.maxWidth = '700px';
                 
                 // Initialiser le chat si ce n'est pas déjà fait
@@ -101,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 chatPanel.classList.add('hidden');
-                chatToggleBtn.textContent = 'Chat Général';
+                chatToggleBtn.textContent = 'Afficher le chat';
                 if (centerPanel) centerPanel.style.maxWidth = '100%';
             }
         });
@@ -125,6 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
             loadLeaderboard(mode, withExtension);
         });
     });
+
+    console.log('Chat panel:', document.getElementById('chat-panel'));
+    console.log('Chat toggle button:', document.getElementById('chat-toggle-btn'));
 });
 
 async function loadLeaderboard(mode, withExtension) {
