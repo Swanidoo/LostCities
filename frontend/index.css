@@ -208,6 +208,7 @@ body {
     gap: 1rem;
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .chat-header {
@@ -263,7 +264,8 @@ body {
     flex-direction: column;
     gap: 0.5rem;
     margin-top: auto;
-    padding-bottom: 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .chat-input {
@@ -278,6 +280,7 @@ body {
     max-height: 7.5rem;
     resize: vertical;
     overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .chat-input:focus {
@@ -295,13 +298,16 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    padding-right: 0.25rem;
+    width: 100%;
+    box-sizing: border-box;
+    padding-right: 0.5rem; /* Ajout d'un petit padding à droite pour éviter le débordement */
 }
 
 .char-counter {
     font-size: 0.75rem;
     color: #888;
     flex-shrink: 0;
+    padding-left: 0.5rem;
 }
 
 .char-counter.warning {
@@ -312,22 +318,6 @@ body {
     color: #f44336;
 }
 
-.chat-send {
-    background-color: var(--accent-color);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    padding: 0.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-left: auto;
-}
 
 .chat-send:hover {
     background-color: #45a049;
@@ -340,8 +330,8 @@ body {
 }
 
 .chat-send svg {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.1rem;  /* Légèrement réduit */
+    height: 1.1rem;
 }
 
 /* === Utilitaires === */
