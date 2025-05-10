@@ -84,8 +84,6 @@ async function loadChatMessages() {
             }
         });
         
-        if (!response.ok) throw new Error("Erreur de chargement");
-        
         const messages = await response.json();
         const chatTableBody = document.querySelector("#chatMessagesTable tbody");
         chatTableBody.innerHTML = "";
@@ -94,13 +92,14 @@ async function loadChatMessages() {
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td>${msg.id}</td>
-                <td>${msg.sender_username}</td>
-                <td>${msg.message}</td>
-                <td>${new Date(msg.timestamp).toLocaleString()}</td>
+                <td><strong>${msg.sender_username}</strong></td>
+                <td><div class="message-content">${msg.message}</div></td>
+                <td><span class="timestamp">${new Date(msg.timestamp).toLocaleString()}</span></td>
+                <td><span class="status-badge ${msg.report_count > 0 ? 'status-pending' : ''}">${msg.report_count || 0}</span></td>
                 <td>
-                    <button onclick="muteUserFromChat(${msg.sender_id}, '${msg.sender_username}')">Mute</button>
-                    <button onclick="banUserFromChat(${msg.sender_id}, '${msg.sender_username}')">Ban</button>
-                    <button onclick="deleteMessage(${msg.id})">Supprimer</button>
+                    <button onclick="muteUserFromChat(${msg.sender_id}, '${msg.sender_username}')" title="Mute">🔇 Mute</button>
+                    <button onclick="banUserFromChat(${msg.sender_id}, '${msg.sender_username}')" title="Ban">🚫 Ban</button>
+                    <button onclick="deleteMessage(${msg.id})" title="Supprimer">🗑️ Supprimer</button>
                 </td>
             `;
             chatTableBody.appendChild(row);
@@ -108,6 +107,34 @@ async function loadChatMessages() {
     } catch (error) {
         console.error("Error loading chat messages:", error);
     }
+}
+
+// Améliorer l'affichage des statistiques
+function updateDashboardUI(stats) {
+    document.getElementById('total-users').textContent = stats.total_users || 0;
+    document.getElementById('new-users').textContent = stats.new_users_24h || 0;
+    document.getElementById('active-games').textContent = stats.active_games || 0;
+    document.getElementById('banned-users').textContent = stats.banned_users || 0;
+    
+    // Animer les chiffres
+    animateValue('total-users', 0, stats.total_users || 0, 1000);
+}
+
+// Animation des valeurs
+function animateValue(id, start, end, duration) {
+    const obj = document.getElementById(id);
+    const range = end - start;
+    const startTime = new Date().getTime();
+    
+    const timer = setInterval(() => {
+        const now = new Date().getTime();
+        const timePassed = now - startTime;
+        const progress = Math.min(timePassed / duration, 1);
+        const current = Math.floor(start + range * progress);
+        obj.textContent = current;
+        
+        if (progress === 1) clearInterval(timer);
+    }, 50);
 }
 
 // Fonctions pour mute/ban depuis les messages

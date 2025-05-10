@@ -1,116 +1,217 @@
-/* Style de base pour le corps de la page */
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
+/* Reset and base styles */
+* {
     margin: 0;
     padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-}
-
-/* Style pour le conteneur du formulaire */
-form {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    width: 300px;
-}
-
-/* Style pour les étiquettes et les champs de saisie */
-label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
-}
-
-input[type="text"],
-input[type="password"] {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 20px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
     box-sizing: border-box;
 }
 
-/* Style pour le bouton de soumission */
-button[type="submit"] {
-    width: 100%;
-    padding: 10px;
-    background-color: #007BFF;
-    border: none;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 16px;
-    cursor: pointer;
+body {
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
 }
 
-button[type="submit"]:hover {
-    background-color: #0056b3;
+h1 {
+    color: #ffffff;
+    font-size: 2.5rem;
+    margin-bottom: 30px;
+    text-align: center;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
-#chatContainer {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    height: 100vh;
-    width: 100%;
-    max-width: 600px;
-    margin: auto;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    background-color: #fff;
+h2 {
+    color: #ffffff;
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #444;
 }
 
-#messages {
-    flex-grow: 1;
-    overflow-y: auto;
+/* Admin container */
+#adminContent {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Stats dashboard */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.stat-card h3 {
+    color: #aaa;
+    font-size: 0.9rem;
     margin-bottom: 10px;
+    text-transform: uppercase;
 }
 
-.message {
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 4px;
+.stat-card p {
+    color: #ffffff;
+    font-size: 2.5rem;
+    font-weight: 700;
 }
 
-.message.self {
-    background-color: #007BFF;
-    color: #fff;
-    align-self: flex-end;
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 40px;
 }
 
-.message.other {
-    background-color: #f1f1f1;
-    align-self: flex-start;
+thead {
+    background: rgba(255, 255, 255, 0.1);
 }
 
-#chatForm {
-    display: flex;
+th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #ffffff;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
 }
 
-#messageInput {
-    flex-grow: 1;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-right: 10px;
+td {
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-#chatForm button {
-    padding: 10px;
-    background-color: #007BFF;
+tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+/* Buttons */
+button {
+    padding: 8px 16px;
     border: none;
-    border-radius: 4px;
-    color: #fff;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 5px;
 }
 
-#chatForm button:hover {
-    background-color: #0056b3;
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Action buttons with specific colors */
+button:contains("Mute") {
+    background: linear-gradient(135deg, #ff9800, #ff6d00);
+    color: white;
+}
+
+button:contains("Ban") {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    color: white;
+}
+
+button:contains("Delete") {
+    background: linear-gradient(135deg, #9e9e9e, #616161);
+    color: white;
+}
+
+button:contains("Unmute") {
+    background: linear-gradient(135deg, #4caf50, #388e3c);
+    color: white;
+}
+
+button:contains("Unban") {
+    background: linear-gradient(135deg, #2196f3, #1976d2);
+    color: white;
+}
+
+/* Sections with cards */
+#dashboard-stats,
+#reports-section,
+#chat-messages-section {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 25px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Message display improvements */
+.message-content {
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Date formatting */
+.timestamp {
+    color: #aaa;
+    font-size: 0.85rem;
+}
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-pending {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+}
+
+.status-resolved {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    table {
+        font-size: 0.9rem;
+    }
+    
+    td, th {
+        padding: 10px;
+    }
+    
+    button {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
 }

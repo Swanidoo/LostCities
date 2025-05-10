@@ -15,6 +15,23 @@ if (!jwtKey) {
   Deno.exit(1);
 }
 
+async function isUserMuted(userId: string): Promise<boolean> {
+  try {
+    const result = await client.queryObject<{ is_muted: boolean }>(
+      `SELECT EXISTS(
+        SELECT 1 FROM user_mutes 
+        WHERE user_id = $1 
+        AND (muted_until IS NULL OR muted_until > NOW())
+      ) as is_muted`,
+      [userId]
+    );
+    return result.rows[0]?.is_muted || false;
+  } catch (error) {
+    console.error("Error checking mute status:", error);
+    return false;
+  }
+}
+
 // Debug function to log all connected clients
 function logConnectedClients() {
   console.log(`=== CONNECTED CLIENTS (${connectedClients.length}) ===`);
@@ -279,29 +296,37 @@ function handleChatMessage(
 ) {
   console.log(`💬 Chat message from ${username}: ${data.message}`);
   
-  // Format the message to be sent
-  const formattedMessage = JSON.stringify({ 
-    event: "chatMessage", 
-    data: { username, message: data.message } 
-  });
-  
-  console.log(`📤 Sending message to all other clients (${connectedClients.length - 1} others)`);
-  
-  // Send to all other connected clients
-  let sentCount = 0;
-  connectedClients.forEach((client) => {
-    try {
-      if (client.socket !== sender && client.socket.readyState === WebSocket.OPEN) {
-        console.log(`  📨 Sending to ${client.username}`);
-        client.socket.send(formattedMessage);
-        sentCount++;
-      }
-    } catch (error) {
-      console.error(`❌ Error sending message to ${client.username}:`, error);
+  // Vérifier si l'utilisateur est muté
+  const userId = getUserIdFromUsername(username).then(async (userId) => {
+    if (!userId) return;
+    
+    const isMuted = await isUserMuted(userId);
+    if (isMuted) {
+      // Envoyer un message d'erreur à l'utilisateur muté
+      sender.send(JSON.stringify({
+        event: "error",
+        data: { message: "Vous êtes muté et ne pouvez pas envoyer de messages." }
+      }));
+      return;
     }
+    
+    // Format the message to be sent
+    const formattedMessage = JSON.stringify({ 
+      event: "chatMessage", 
+      data: { username, message: data.message } 
+    });
+    
+    // Send to all connected clients INCLUDING the sender
+    connectedClients.forEach((client) => {
+      try {
+        if (client.socket.readyState === WebSocket.OPEN) {
+          client.socket.send(formattedMessage);
+        }
+      } catch (error) {
+        console.error(`❌ Error sending message to ${client.username}:`, error);
+      }
+    });
   });
-  
-  console.log(`✅ Message sent to ${sentCount} clients`);
 }
 
 // Handle moves played in the game
