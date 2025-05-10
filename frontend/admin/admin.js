@@ -15,7 +15,19 @@ async function loadUsers(page = 1) {
             },
         });
 
+        // Check if response is ok
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
+        
+        // Defensive check
+        if (!data.users) {
+            throw new Error("Invalid response format: missing users data");
+        }
+
         const usersTableBody = document.querySelector("#usersTable tbody");
         usersTableBody.innerHTML = "";
 
@@ -40,6 +52,7 @@ async function loadUsers(page = 1) {
         
     } catch (error) {
         console.error("Error loading users:", error);
+        alert(`Failed to load users: ${error.message}`);
     }
 }
 
@@ -92,7 +105,19 @@ async function loadChatMessages(page = 1) {
             }
         });
         
+        // Check if response is ok
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        
+        // Defensive check
+        if (!data.messages) {
+            throw new Error("Invalid response format: missing messages data");
+        }
+        
         const chatTableBody = document.querySelector("#chatMessagesTable tbody");
         chatTableBody.innerHTML = "";
         
@@ -118,8 +143,41 @@ async function loadChatMessages(page = 1) {
         
     } catch (error) {
         console.error("Error loading chat messages:", error);
+        alert(`Failed to load messages: ${error.message}`);
     }
 }
+
+async function checkAdminAccess() {
+    const token = localStorage.getItem("authToken");
+    
+    if (!token) {
+        window.location.href = '/login/login.html';
+        return false;
+    }
+    
+    try {
+        // Parse JWT token to check role
+        const tokenParts = token.split('.');
+        if (tokenParts.length !== 3) {
+            throw new Error("Invalid token format");
+        }
+        
+        const payload = JSON.parse(atob(tokenParts[1]));
+        
+        if (payload.role !== 'admin') {
+            alert("Access denied: Admin privileges required");
+            window.location.href = '/';
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error("Error checking admin access:", error);
+        window.location.href = '/login/login.html';
+        return false;
+    }
+}
+
 
 // Fonction pour mettre à jour les contrôles de pagination
 function updatePaginationControls(type, pagination) {
@@ -222,12 +280,7 @@ async function muteUserFromChat(userId, username) {
     }
 }
 
-// Charger tout au démarrage
-document.addEventListener("DOMContentLoaded", () => {
-    loadUsers();
-    loadDashboardStats();
-    loadChatMessages(); // Nouveau
-});
+
 
 // Fonction pour bannir un utilisateur
 async function banUser(userId) {
@@ -274,9 +327,31 @@ async function deleteUser(userId) {
     }
 }
 
-// Charger les utilisateurs au chargement de la page
-document.addEventListener("DOMContentLoaded", () => {
-    loadUsers();
-    loadDashboardStats();
-    loadChatMessages();
+async function debugAuth() {
+    const token = localStorage.getItem("authToken");
+    console.log("Token exists:", !!token);
+    
+    if (token) {
+        try {
+            const tokenParts = token.split('.');
+            const payload = JSON.parse(atob(tokenParts[1]));
+            console.log("Token payload:", payload);
+            console.log("User role:", payload.role);
+            console.log("Token expiration:", new Date(payload.exp * 1000));
+        } catch (error) {
+            console.error("Error parsing token:", error);
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    debugAuth();
+    // First check if user has admin access
+    const hasAccess = await checkAdminAccess();
+    
+    if (hasAccess) {
+        loadUsers();
+        loadDashboardStats();
+        loadChatMessages();
+    }
 });

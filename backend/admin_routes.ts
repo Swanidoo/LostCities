@@ -118,18 +118,13 @@ adminRouter.get("/api/admin/dashboard", requireAdmin, async (ctx) => {
     const stats = await client.queryObject(`
       SELECT 
         (SELECT COUNT(*) FROM users) as total_users,
-        (SELECT COUNT(*) FROM users WHERE 
-          CASE 
-            WHEN column_exists('users', 'created_at') THEN created_at > NOW() - INTERVAL '24 hours'
-            ELSE false
-          END
-        ) as new_users_24h,
+        (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours') as new_users_24h,
         (SELECT COUNT(*) FROM games WHERE status = 'in_progress') as active_games,
         (SELECT COUNT(*) FROM users WHERE is_banned = true) as banned_users,
         (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports
     `);
     
-    // Convertir les BigInt en nombres
+    // Convert BigInt to numbers
     const result = stats.rows[0];
     const response = {
       total_users: Number(result.total_users || 0),
