@@ -139,10 +139,14 @@ if (!token) {
     
             try {
                 const receivedData = JSON.parse(event.data);
-                console.log('Parsed message data:', receivedData); // Additional logging
-    
+                console.log('Parsed message data:', receivedData);
+        
                 // Handle different event types
-                if (receivedData.event === "chatMessage" && receivedData.data) {
+                if (receivedData.event === "error") {
+                    // Nouveau: Gérer les messages d'erreur
+                    displayMessage(receivedData.data.message, "system");
+                    console.error('Error from server:', receivedData.data.message);
+                } else if (receivedData.event === "chatMessage" && receivedData.data) {
                     const username = receivedData.data.username;
                     const message = receivedData.data.message;
                     console.log(`Displaying chat message from ${username}: ${message}`);
@@ -151,7 +155,6 @@ if (!token) {
                     console.log(`Displaying system message: ${receivedData.data.message}`);
                     displayMessage(receivedData.data.message, "system");
                 } else if (receivedData.event === "movePlayed" && receivedData.data) {
-                    // Handle game moves if needed
                     console.log(`Move played in game ${receivedData.data.gameId} by ${receivedData.data.username}: ${receivedData.data.move}`);
                 } else {
                     console.warn("⚠️ Unknown message format:", receivedData);

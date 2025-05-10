@@ -794,18 +794,21 @@ async function loadGameFromDatabase(gameId: string): Promise<LostCitiesGame> {
   return await LostCitiesGame.load(gameId);
 }
 
-async function getUserIdFromUsername(username: string): Promise<string> {
-  const result = await client.queryObject<{id: string}>(
-    "SELECT id FROM users WHERE username = $1",
-    [username]
-  );
-  
-  if (result.rows.length === 0) {
-    console.warn(`User not found: ${username}`);
-    throw new Error(`User not found: ${username}`);
+async function getUserIdFromUsername(username: string): Promise<string | null> {
+  try {
+    const result = await client.queryObject<{ id: string }>(
+      "SELECT id FROM users WHERE username = $1",
+      [username]
+    );
+    
+    if (result.rows.length > 0) {
+      return result.rows[0].id;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting user ID:", error);
+    return null;
   }
-  
-  return result.rows[0].id;
 }
 
 // Handle requests for game state

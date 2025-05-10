@@ -1,4 +1,5 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { helpers } from "https://deno.land/x/oak@v12.6.1/mod.ts"; 
 import { requireAdmin } from "./middlewares/require_admin_middleware.ts";
 import { client } from "./db_client.ts";
 
@@ -85,16 +86,22 @@ adminRouter.post("/api/admin/users/:id/ban", requireAdmin, async (ctx) => {
 
 // Dashboard stats
 adminRouter.get("/api/admin/dashboard", requireAdmin, async (ctx) => {
-  const stats = await client.queryObject(`
-    SELECT 
-      (SELECT COUNT(*) FROM users) as total_users,
-      (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours') as new_users_24h,
-      (SELECT COUNT(*) FROM games WHERE status = 'in_progress') as active_games,
-      (SELECT COUNT(*) FROM users WHERE is_banned = true) as banned_users,
-      (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports
-  `);
-  
-  ctx.response.body = stats.rows[0];
+  try {  // ← AJOUTER
+    const stats = await client.queryObject(`
+      SELECT 
+        (SELECT COUNT(*) FROM users) as total_users,
+        (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours') as new_users_24h,
+        (SELECT COUNT(*) FROM games WHERE status = 'in_progress') as active_games,
+        (SELECT COUNT(*) FROM users WHERE is_banned = true) as banned_users,
+        (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports
+    `);
+    
+    ctx.response.body = stats.rows[0];
+  } catch (err) {  // ← AJOUTER
+    console.error("Error fetching dashboard stats:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
 });
 
 // Route pour obtenir les utilisateurs détaillés
@@ -108,27 +115,23 @@ adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
     const messages = await client.queryObject(`
       SELECT 
         cm.id,
-        cm.game_id,
         cm.message,
         cm.timestamp,
-        cm.is_deleted,
         u.username as sender_username,
-        u.id as sender_id,
-        COUNT(r.id) as report_count
+        u.id as sender_id
       FROM chat_message cm
       JOIN users u ON cm.sender_id = u.id
-      LEFT JOIN reports r ON r.reported_message_id = cm.id
-      WHERE cm.timestamp > NOW() - INTERVAL '7 days'
-      GROUP BY cm.id, cm.game_id, cm.message, cm.timestamp, cm.is_deleted, u.username, u.id
-      ORDER BY report_count DESC, cm.timestamp DESC
-      LIMIT 100
+      WHERE cm.is_deleted = false OR cm.is_deleted IS NULL
+      ORDER BY cm.timestamp DESC
+      LIMIT 50
     `);
     
+    console.log("Found messages:", messages.rows.length);
     ctx.response.body = messages.rows;
   } catch (err) {
     console.error("Error fetching chat messages:", err);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { error: err.message };
   }
 });
 
@@ -156,23 +159,29 @@ adminRouter.delete("/api/admin/chat-messages/:id", requireAdmin, async (ctx) => 
 
 // Route pour obtenir les rapports
 adminRouter.get("/api/admin/reports", requireAdmin, async (ctx) => {
-  const { status = 'pending' } = helpers.getQuery(ctx);
-  
-  const reports = await client.queryObject(`
-    SELECT 
-      r.*,
-      reporter.username as reporter_username,
-      reported.username as reported_username,
-      cm.message as reported_message
-    FROM reports r
-    JOIN users reporter ON r.reporter_id = reporter.id
-    LEFT JOIN users reported ON r.reported_user_id = reported.id
-    LEFT JOIN chat_message cm ON r.reported_message_id = cm.id
-    WHERE r.status = $1
-    ORDER BY r.created_at DESC
-  `, [status]);
-  
-  ctx.response.body = reports.rows;
+  try {  // ← AJOUTER
+    const { status = 'pending' } = helpers.getQuery(ctx);
+    
+    const reports = await client.queryObject(`
+      SELECT 
+        r.*,
+        reporter.username as reporter_username,
+        reported.username as reported_username,
+        cm.message as reported_message
+      FROM reports r
+      JOIN users reporter ON r.reporter_id = reporter.id
+      LEFT JOIN users reported ON r.reported_user_id = reported.id
+      LEFT JOIN chat_message cm ON r.reported_message_id = cm.id
+      WHERE r.status = $1
+      ORDER BY r.created_at DESC
+    `, [status]);
+    
+    ctx.response.body = reports.rows;
+  } catch (err) {  // ← AJOUTER
+    console.error("Error fetching reports:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
 });
 
 // Route pour résoudre un rapport
