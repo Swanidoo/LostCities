@@ -318,6 +318,16 @@ function handleChatMessage(
 ) {
   console.log(`💬 Chat message from ${username}: ${data.message}`);
   
+  // Vérifier la longueur du message
+  const MAX_MESSAGE_LENGTH = 500;
+  if (data.message.length > MAX_MESSAGE_LENGTH) {
+    sender.send(JSON.stringify({
+      event: "error",
+      data: { message: `Message trop long. Maximum ${MAX_MESSAGE_LENGTH} caractères.` }
+    }));
+    return;
+  }
+  
   getUserIdFromUsername(username).then(async (userId) => {
     if (!userId) return;
     

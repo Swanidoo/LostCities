@@ -5,6 +5,7 @@ const API_URL = window.location.hostname === "localhost"
 
 let chatWebSocket = null;
 let chatConnected = false;
+const MAX_MESSAGE_LENGTH = 500; // Limite de 500 caractères
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginSection = document.getElementById('login-section');
@@ -255,18 +256,21 @@ function initializeChat() {
             autoResizeTextarea(e.target);
         });
 
-        chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                // Logique d'envoi du message
-                const message = chatInput.value.trim();
-                if (message && chatConnected) {
-                    chatWebSocket.send(JSON.stringify({
-                        event: 'chatMessage',
-                        data: { message }
-                    }));
-                    chatInput.value = '';
-                    autoResizeTextarea(chatInput); // Réinitialise la hauteur après l'envoi
+        chatInput.addEventListener('input', (e) => {
+            autoResizeTextarea(e.target);
+            
+            // Mettre à jour le compteur
+            const charCounter = document.getElementById('char-counter');
+            if (charCounter) {
+                const length = e.target.value.length;
+                charCounter.textContent = `${length}/${MAX_MESSAGE_LENGTH}`;
+                
+                // Changer la couleur selon la longueur
+                charCounter.classList.remove('warning', 'error');
+                if (length > MAX_MESSAGE_LENGTH) {
+                    charCounter.classList.add('error');
+                } else if (length > MAX_MESSAGE_LENGTH * 0.8) {
+                    charCounter.classList.add('warning');
                 }
             }
         });
@@ -275,6 +279,12 @@ function initializeChat() {
             e.preventDefault();
         });
     }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Fonction pour ajouter un message de chat
@@ -286,11 +296,13 @@ function addChatMessage(username, message) {
     const currentUsername = localStorage.getItem('username');
     const isOwnMessage = username === currentUsername;
     
-    // Ajouter une classe différente pour ses propres messages
     messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
     
-    // Format "pseudo : message" sur une seule ligne
-    messageElement.innerHTML = `<span class="chat-sender">${username}</span>: <span class="chat-text">${message}</span>`;
+    // Échapper le HTML pour éviter les injections
+    const safeUsername = escapeHtml(username);
+    const safeMessage = escapeHtml(message);
+    
+    messageElement.innerHTML = `<span class="chat-sender">${safeUsername}</span>: <span class="chat-text">${safeMessage}</span>`;
     
     messagesContainer.appendChild(messageElement);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
