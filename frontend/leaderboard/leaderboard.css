@@ -1,0 +1,68 @@
+.leaderboard-container {
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 800px;
+}
+
+.game-mode-tabs, .extension-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    gap: 10px;
+}
+
+.tab-button, .subtab-button {
+    padding: 10px 20px;
+    background-color: #555;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.tab-button.active, .subtab-button.active {
+    background-color: #4CAF50;
+}
+
+.tab-button:hover, .subtab-button:hover {
+    background-color: #666;
+}
+
+.tab-button.active:hover, .subtab-button.active:hover {
+    background-color: #45a049;
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.leaderboard-table th {
+    background-color: rgba(0, 0, 0, 0.5);
+    font-weight: bold;
+    color: #4CAF50;
+}
+
+.leaderboard-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.leaderboard-table tr:nth-child(1) td:first-child::before { content: "🥇 "; }
+.leaderboard-table tr:nth-child(2) td:first-child::before { content: "🥈 "; }
+.leaderboard-table tr:nth-child(3) td:first-child::before { content: "🥉 "; }
+
+.back-button-container {
+    text-align: center;
+    margin-top: 30px;
+}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost Cities - Leaderboard</title>
+    <link rel="stylesheet" href="/shared/global.css">
+    <link rel="stylesheet" href="./leaderboard.css">
+</head>
+<body>
+    <div class="header">
+        <h1>LOST CITIES</h1>
+        <p>Classement des meilleurs joueurs</p>
+    </div>
+    
+    <div class="container">
+        <div class="leaderboard-container">
+            <h2>Classement</h2>
+            
+            <!-- Onglets pour les modes de jeu -->
+            <div class="game-mode-tabs">
+                <button class="tab-button active" data-mode="classic">Mode Classique (3 manches)</button>
+                <button class="tab-button" data-mode="quick">Mode Rapide (1 manche)</button>
+            </div>
+            
+            <!-- Sous-onglets pour l'extension -->
+            <div class="extension-tabs">
+                <button class="subtab-button active" data-extension="false">Sans Extension</button>
+                <button class="subtab-button" data-extension="true">Avec Extension (cartes violettes)</button>
+            </div>
+            
+            <!-- Tableau des scores -->
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Rang</th>
+                        <th>Joueur</th>
+                        <th>Score</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-data">
+                    <!-- Les données seront insérées ici -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="back-button-container">
+            <button class="menu-button" id="back-btn">Retour au menu</button>
+        </div>
+    </div>
+
+    <script src="./leaderboard.js"></script>
+</body>
+</html>

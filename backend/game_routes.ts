@@ -831,6 +831,40 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
       gameId
     ]);
   }
+
+  if (game.gameStatus === 'finished') {
+    // Enregistrer les scores dans le leaderboard
+    const gameMode = game.totalRounds === 1 ? 'quick' : 'classic';
+    const withExtension = game.usePurpleExpedition;
+    
+    // Fetch player usernames from the users table (not players)
+    const player1Result = await client.queryObject<{ username: string }>(
+        `SELECT username FROM users WHERE id = $1`,
+        [game.player1.id]
+    );
+    const player1Name = player1Result.rows[0]?.username || "Unknown Player";
+
+    // Enregistrer le score du joueur 1
+    await client.queryObject(
+        `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
+        VALUES ($1, $2, $3, $4, $5)`,
+        [game.player1.id, player1Name, game.scores.player1.total, gameMode, withExtension]
+    );
+    
+    // Fetch player2's username
+    const player2Result = await client.queryObject<{ username: string }>(
+        `SELECT username FROM users WHERE id = $1`,
+        [game.player2.id]
+    );
+    const player2Name = player2Result.rows[0]?.username || "Unknown Player";
+
+    // Enregistrer le score du joueur 2
+    await client.queryObject(
+        `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
+        VALUES ($1, $2, $3, $4, $5)`,
+        [game.player2.id, player2Name, game.scores.player2.total, gameMode, withExtension]
+    );
+  }
   
   // We'll assume the game logic has already updated the cards in memory,
   // so now we need to sync those changes to the database

@@ -28,44 +28,61 @@ document.addEventListener('DOMContentLoaded', () => {
             loadLeaderboard(mode, withExtension);
         });
     });
+    
+    // Bouton retour
+    document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = '/';
+    });
 });
 
-function loadLeaderboard(mode, withExtension) {
+async function loadLeaderboard(mode, withExtension) {
+    // Utilisez directement le port 3000 du backend
     const API_URL = window.location.hostname === "localhost"
-        ? "http://localhost:3000"
+        ? "http://localhost:3000"  // Backend direct, pas le frontend !
         : "https://lostcitiesbackend.onrender.com";
     
-    // Construire l'URL avec les filtres
-    const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
-    
-    fetch(url, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-    })
-    .then(response => response.json())
-    .then(data => {
-        const tableBody = document.getElementById('leaderboard-data');
-        tableBody.innerHTML = '';
+    try {
+        const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
         
-        if (data.data.length === 0) {
-            const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="4">Aucune donnée disponible</td>';
-            tableBody.appendChild(row);
-            return;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        // Afficher les données
-        data.data.forEach((entry, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${entry.player}</td>
-                <td>${entry.score}</td>
-                <td>${new Date(entry.date).toLocaleDateString()}</td>
-            `;
-            tableBody.appendChild(row);
-        });
-    })
-    .catch(error => {
+        const data = await response.json();
+        displayLeaderboard(data.data);
+        
+    } catch (error) {
         console.error('Erreur lors du chargement du leaderboard:', error);
+        displayError();
+    }
+}
+
+function displayLeaderboard(entries) {
+    const tableBody = document.getElementById('leaderboard-data');
+    tableBody.innerHTML = '';
+    
+    if (entries.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="4" style="text-align: center;">Aucune donnée disponible</td>';
+        tableBody.appendChild(row);
+        return;
+    }
+    
+    entries.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${entry.player}</td>
+            <td>${entry.score}</td>
+            <td>${new Date(entry.date).toLocaleDateString('fr-FR')}</td>
+        `;
+        tableBody.appendChild(row);
     });
+}
+
+function displayError() {
+    const tableBody = document.getElementById('leaderboard-data');
+    tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #ff5252;">Erreur lors du chargement des données</td></tr>';
 }

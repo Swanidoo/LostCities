@@ -23,6 +23,10 @@ redirectRouter.get("/matchmaking", (ctx) => {
   ctx.response.redirect("/matchmaking/matchmaking.html");
 });
 
+redirectRouter.get("/leaderboard", (ctx) => {
+  ctx.response.redirect("/leaderboard/leaderboard.html");
+});
+
 // 2. Game-specific dynamic routes
 const gameRouter = new Router();
 gameRouter.get("/game/game.html", async (ctx) => {

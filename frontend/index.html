@@ -109,6 +109,7 @@
             <div class="menu">
                 <button class="menu-button" id="play-btn">Jouer</button>
                 <button class="menu-button secondary" id="stats-btn">Statistiques</button>
+                <button class="menu-button secondary" id="leaderboard-btn">Classement</button>
                 <button class="menu-button secondary" id="chat-btn">Chat</button>
                 <button class="menu-button secondary" id="logout-btn">Déconnexion</button>
             </div>
@@ -168,6 +169,10 @@
                 // Supprimer le token et rediriger vers la page d'accueil
                 localStorage.removeItem('authToken');
                 window.location.reload();
+            });
+            
+            document.getElementById('leaderboard-btn').addEventListener('click', () => {
+                window.location.href = '/leaderboard/leaderboard.html';
             });
         });
     </script>
