@@ -112,10 +112,7 @@ adminRouter.get("/api/admin/users/detailed", requireAdmin, async (ctx) => {
 // Route pour obtenir les messages de chat à modérer
 adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
   try {
-    // D'abord, vérifions quelle table contient les messages
-    console.log("Fetching chat messages...");
-    
-    // Essayons avec une requête plus simple pour voir ce qu'on a
+    // Lire les messages du chat général (game_id IS NULL)
     const messages = await client.queryObject(`
       SELECT 
         cm.id,
@@ -125,23 +122,13 @@ adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
         u.id as sender_id
       FROM chat_message cm
       JOIN users u ON cm.sender_id = u.id
+      WHERE cm.game_id IS NULL  -- Messages du chat général uniquement
+      AND (cm.is_deleted = false OR cm.is_deleted IS NULL)
       ORDER BY cm.timestamp DESC
       LIMIT 50
     `);
     
     console.log("Found messages:", messages.rows.length);
-    
-    // Si pas de messages, essayons de voir si la structure est différente
-    if (messages.rows.length === 0) {
-      console.log("No messages found in chat_message table");
-      
-      // Vérifier si les messages sont ailleurs (peut-être sans game_id)
-      const allMessages = await client.queryObject(`
-        SELECT * FROM chat_message LIMIT 5
-      `);
-      console.log("Sample messages:", allMessages.rows);
-    }
-    
     ctx.response.body = messages.rows;
   } catch (err) {
     console.error("Error fetching chat messages:", err);

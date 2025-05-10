@@ -298,9 +298,21 @@ function broadcastSystemMessage(message: string, excludeSocket?: WebSocket) {
   console.log(`✅ System message sent to ${sentCount} clients`);
 }
 
+//Fonction pour save les messages dans la bdd
+async function saveChatMessage(senderId: string, message: string, gameId?: string) {
+  try {
+    await client.queryObject(
+      `INSERT INTO chat_message (sender_id, message, game_id) VALUES ($1, $2, $3)`,
+      [senderId, message, gameId || null]
+    );
+  } catch (error) {
+    console.error("Error saving chat message:", error);
+  }
+}
+
 // Handle chat messages
 function handleChatMessage(
-  data: { message: string },
+  data: { message: string; gameId?: string },
   sender: WebSocket,
   username: string
 ) {
@@ -330,6 +342,9 @@ function handleChatMessage(
       }));
       return;
     }
+    
+    // Sauvegarder le message en base de données
+    await saveChatMessage(userId, data.message, data.gameId);
     
     // Format the message to be sent
     const formattedMessage = JSON.stringify({ 

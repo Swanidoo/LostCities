@@ -3,6 +3,9 @@ const API_URL = window.location.hostname === "localhost"
     ? "http://localhost:3000"
     : "https://lostcitiesbackend.onrender.com";
 
+let chatWebSocket = null;
+let chatConnected = false;
+
 document.addEventListener('DOMContentLoaded', () => {
     const loginSection = document.getElementById('login-section');
     const userSection = document.getElementById('user-section');
@@ -31,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Erreur lors de la lecture du token:", error);
         }
+
+        initializeChat();
         
         // Afficher la section utilisateur
         loginSection.classList.add('hidden');
@@ -61,6 +66,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('logout-btn').addEventListener('click', () => {
         localStorage.removeItem('authToken');
         window.location.reload();
+    });
+
+    // Gestionnaire pour le bouton toggle chat
+    document.getElementById('chat-toggle-btn').addEventListener('click', () => {
+        const chatPanel = document.getElementById('chat-panel');
+        const chatBtn = document.getElementById('chat-toggle-btn');
+        const centerPanel = document.querySelector('.center-panel');
+        
+        if (chatPanel.classList.contains('hidden')) {
+            chatPanel.classList.remove('hidden');
+            chatBtn.textContent = 'Fermer Chat';
+            centerPanel.style.maxWidth = '700px';
+        } else {
+            chatPanel.classList.add('hidden');
+            chatBtn.textContent = 'Chat Général';
+            centerPanel.style.maxWidth = '100%';
+        }
     });
     
     // Initialiser le leaderboard
@@ -129,4 +151,101 @@ function displayLeaderboard(entries) {
 function displayError() {
     const tableBody = document.getElementById('leaderboard-data');
     tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #ff5252;">Erreur lors du chargement</td></tr>';
+}
+
+function initializeChat() {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+    
+    // Afficher le panel de chat pour les utilisateurs connectés
+    const chatPanel = document.getElementById('chat-panel');
+    if (chatPanel) {
+        chatPanel.style.display = 'block';
+    }
+    
+    // Connexion WebSocket pour le chat
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
+    const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
+    
+    chatWebSocket = new WebSocket(wsUrl);
+    
+    chatWebSocket.addEventListener('open', () => {
+        console.log('Chat WebSocket connected');
+        chatConnected = true;
+        addSystemMessage('Connecté au chat');
+    });
+    
+    chatWebSocket.addEventListener('message', (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            
+            if (data.event === 'chatMessage' && data.data) {
+                addChatMessage(data.data.username, data.data.message);
+            } else if (data.event === 'systemMessage' && data.data) {
+                addSystemMessage(data.data.message);
+            } else if (data.event === 'error' && data.data) {
+                addSystemMessage(data.data.message);
+            }
+        } catch (error) {
+            console.error('Error parsing message:', error);
+        }
+    });
+    
+    chatWebSocket.addEventListener('close', () => {
+        console.log('Chat WebSocket disconnected');
+        chatConnected = false;
+        addSystemMessage('Déconnecté du chat');
+    });
+    
+    // Gérer l'envoi de messages
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    
+    if (chatForm) {
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const message = chatInput.value.trim();
+            if (message && chatConnected) {
+                chatWebSocket.send(JSON.stringify({
+                    event: 'chatMessage',
+                    data: { message }
+                }));
+                chatInput.value = '';
+            }
+        });
+    }
+}
+
+// Fonction pour ajouter un message de chat
+function addChatMessage(username, message) {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
+    
+    const messageElement = document.createElement('div');
+    const currentUsername = localStorage.getItem('username');
+    const isOwnMessage = username === currentUsername;
+    
+    messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
+    messageElement.innerHTML = `
+        <div class="chat-sender">${username}</div>
+        <div class="chat-text">${message}</div>
+    `;
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Fonction pour ajouter un message système
+function addSystemMessage(message) {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = 'chat-message system';
+    messageElement.textContent = message;
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }

@@ -5,176 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lost Cities: Le Duel</title>
     <link rel="stylesheet" href="/shared/global.css">
-    <style>
-        body {
-            background: linear-gradient(135deg, #333333, #222222);
-            color: white;
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .header {
-            text-align: center;
-            margin: 40px 0;
-            width: 100%;
-        }
-        
-        .header h1 {
-            font-size: 3em;
-            margin: 0;
-            color: #FFD700;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-        
-        .header p {
-            color: #DDD;
-            font-style: italic;
-            margin-top: 5px;
-        }
-        
-        .main-container {
-            display: flex;
-            gap: 40px;
-            max-width: 1200px;
-            width: 90%;
-            margin: 0 auto;
-            align-items: flex-start;
-        }
-        
-        .left-panel {
-            flex: 1;
-            min-width: 300px;
-            max-width: 400px;
-        }
-        
-        .right-panel {
-            flex: 2;
-            min-width: 500px;
-        }
-        
-        .menu-container {
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        
-        .menu {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        
-        .menu-button {
-            padding: 12px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 1em;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        
-        .menu-button:hover {
-            background-color: #45a049;
-        }
-        
-        .menu-button.secondary {
-            background-color: #555;
-        }
-        
-        .menu-button.secondary:hover {
-            background-color: #666;
-        }
-        
-        .user-info {
-            margin-top: 20px;
-            font-size: 0.9em;
-            color: #AAA;
-        }
-        
-        .leaderboard-container {
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 10px;
-            padding: 20px;
-        }
-        
-        .leaderboard-container h2 {
-            color: #FFD700;
-            margin-top: 0;
-            text-align: center;
-        }
-        
-        .leaderboard-tabs {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .tab-button {
-            padding: 8px 15px;
-            background-color: #555;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-        
-        .tab-button.active {
-            background-color: #4CAF50;
-        }
-        
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        
-        .leaderboard-table th,
-        .leaderboard-table td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .leaderboard-table th {
-            background-color: rgba(0, 0, 0, 0.3);
-            color: #4CAF50;
-            font-weight: bold;
-        }
-        
-        .leaderboard-table tr:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        .leaderboard-table tr:nth-child(1) td:first-child::before { content: "🥇 "; }
-        .leaderboard-table tr:nth-child(2) td:first-child::before { content: "🥈 "; }
-        .leaderboard-table tr:nth-child(3) td:first-child::before { content: "🥉 "; }
-        
-        .hidden {
-            display: none;
-        }
-
-        /* Responsive */
-        @media (max-width: 900px) {
-            .main-container {
-                flex-direction: column;
-                align-items: center;
-            }
-            .left-panel, .right-panel {
-                max-width: 100%;
-                width: 100%;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="index.css">
 </head>
 <body>
     <div class="header">
@@ -183,6 +14,7 @@
     </div>
     
     <div class="main-container">
+        <!-- Panel gauche avec menu -->
         <div class="left-panel">
             <div class="menu-container">
                 <!-- Section visiteur (non connecté) -->
@@ -198,7 +30,7 @@
                     <div class="menu">
                         <button class="menu-button" id="play-btn">Jouer</button>
                         <button class="menu-button secondary" id="stats-btn">Statistiques</button>
-                        <button class="menu-button secondary" id="chat-btn">Chat</button>
+                        <button class="menu-button secondary" id="chat-toggle-btn">Chat Général</button>
                         <button class="menu-button secondary" id="logout-btn">Déconnexion</button>
                         <!-- Bouton Administration -->
                         <button class="menu-button secondary" id="admin-btn" style="display: none;">Administration</button>
@@ -210,7 +42,8 @@
             </div>
         </div>
         
-        <div class="right-panel">
+        <!-- Panel central avec leaderboard -->
+        <div class="center-panel">
             <div class="leaderboard-container">
                 <h2>Classement</h2>
                 
@@ -238,7 +71,22 @@
                 </table>
             </div>
         </div>
+        
+        <!-- Panel droit avec chat général -->
+        <div class="right-panel hidden" id="chat-panel">
+            <div class="chat-container">
+                <h2 class="chat-header">Chat Général</h2>
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Messages seront ajoutés ici -->
+                </div>
+                <form class="chat-form" id="chat-form">
+                    <input type="text" class="chat-input" id="chat-input" placeholder="Tapez votre message..." required>
+                    <button type="submit" class="chat-send">Envoyer</button>
+                </form>
+            </div>
+        </div>
     </div>
-<script src="index.js"></script>
+
+    <script src="index.js"></script>
 </body>
 </html>
