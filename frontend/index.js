@@ -286,11 +286,11 @@ function addChatMessage(username, message) {
     const currentUsername = localStorage.getItem('username');
     const isOwnMessage = username === currentUsername;
     
+    // Ajouter une classe différente pour ses propres messages
     messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
-    messageElement.innerHTML = `
-        <div class="chat-sender">${username}</div>
-        <div class="chat-text">${message}</div>
-    `;
+    
+    // Format "pseudo : message" sur une seule ligne
+    messageElement.innerHTML = `<span class="chat-sender">${username}</span>: <span class="chat-text">${message}</span>`;
     
     messagesContainer.appendChild(messageElement);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;

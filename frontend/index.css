@@ -182,12 +182,39 @@ body {
 
 .chat-messages {
     flex: 1;
+    padding: 8px 12px;
     overflow-y: auto;
-    margin-bottom: 15px;
+    margin: 4px 0;
     padding: 10px;
     background-color: rgba(0, 0, 0, 0.3);
-    border-radius: 5px;
+    border-radius: 8px;
+    word-wrap: break-word;
     min-height: 0;
+    transition: background-color 0.3s ease;
+    animation: fadeIn 0.3s ease;
+}
+
+.chat-message.self {
+    background-color: rgba(33, 150, 243, 0.2); /* Bleu transparent pour vos messages */
+    border-left: 3px solid #2196F3;
+}
+
+.chat-message.other {
+    background-color: rgba(255, 255, 255, 0.1); /* Gris pour les autres messages */
+}
+
+.chat-sender {
+    font-weight: bold;
+    color: #4CAF50; /* Couleur verte pour les pseudos */
+}
+
+.chat-message.self .chat-sender {
+    color: #2196F3; /* Couleur bleue pour votre pseudo */
+}
+
+
+.chat-text {
+    color: rgb(0, 0, 0);
 }
 
 .chat-form {
@@ -204,7 +231,7 @@ body {
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
     background-color: rgba(255, 255, 255, 0.15);
-    color: white;
+    color: black;
     font-size: 16px;
     min-height: 60px !important; /* Force minimum height */
     height: auto;
@@ -230,7 +257,7 @@ body {
 }
 
 .chat-input::placeholder {
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(0, 0, 0, 0.6);
     font-size: 16px;
 }
 
@@ -302,4 +329,9 @@ body {
         padding: 8px 6px;
         font-size: 0.9em;
     }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
