@@ -1,5 +1,4 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
-import { helpers } from "https://deno.land/x/oak@v12.6.1/mod.ts"; 
 import { requireAdmin } from "./middlewares/require_admin_middleware.ts";
 import { client } from "./db_client.ts";
 
@@ -8,23 +7,25 @@ const adminRouter = new Router();
 // Route pour récupérer tous les utilisateurs avec pagination
 adminRouter.get("/api/admin/users", requireAdmin, async (ctx) => {
   try {
+    // Utiliser la même méthode partout
     const url = new URL(ctx.request.url);
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
     
     // Compter le total des utilisateurs
-    const countResult = await client.queryObject(`
+    const countResult = await client.queryObject<{total: number}>(`
       SELECT COUNT(*) as total FROM users
     `);
     
-    const totalUsers = countResult.rows[0].total;
+    const totalUsers = Number(countResult.rows[0].total); // Convertir explicitement en nombre
     
-    // Récupérer les utilisateurs avec pagination
+    // Récupérer les utilisateurs avec pagination - ATTENTION à created_at
     const users = await client.queryObject(`
-      SELECT id, username, email, role, created_at, is_banned, is_muted
+      SELECT id, username, email, role, is_banned, is_muted, 
+             COALESCE(created_at, NOW()) as created_at
       FROM users
-      ORDER BY created_at DESC
+      ORDER BY id DESC
       LIMIT $1 OFFSET $2
     `, [limit, offset]);
     
@@ -40,7 +41,7 @@ adminRouter.get("/api/admin/users", requireAdmin, async (ctx) => {
   } catch (err) {
     console.error("Error fetching users:", err);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { error: "Internal server error", details: err.message };
   }
 });
 
@@ -113,47 +114,104 @@ adminRouter.post("/api/admin/users/:id/ban", requireAdmin, async (ctx) => {
 
 // Dashboard stats
 adminRouter.get("/api/admin/dashboard", requireAdmin, async (ctx) => {
-  try {  // ← AJOUTER
+  try {
     const stats = await client.queryObject(`
       SELECT 
         (SELECT COUNT(*) FROM users) as total_users,
-        (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours') as new_users_24h,
+        (SELECT COUNT(*) FROM users WHERE 
+          CASE 
+            WHEN column_exists('users', 'created_at') THEN created_at > NOW() - INTERVAL '24 hours'
+            ELSE false
+          END
+        ) as new_users_24h,
         (SELECT COUNT(*) FROM games WHERE status = 'in_progress') as active_games,
         (SELECT COUNT(*) FROM users WHERE is_banned = true) as banned_users,
         (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports
     `);
     
-    ctx.response.body = stats.rows[0];
-  } catch (err) {  // ← AJOUTER
+    // Convertir les BigInt en nombres
+    const result = stats.rows[0];
+    const response = {
+      total_users: Number(result.total_users || 0),
+      new_users_24h: Number(result.new_users_24h || 0),
+      active_games: Number(result.active_games || 0),
+      banned_users: Number(result.banned_users || 0),
+      pending_reports: Number(result.pending_reports || 0)
+    };
+    
+    ctx.response.body = response;
+  } catch (err) {
     console.error("Error fetching dashboard stats:", err);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { error: "Internal server error", details: err.message };
   }
 });
 
 // Route pour obtenir les utilisateurs détaillés
 adminRouter.get("/api/admin/users/detailed", requireAdmin, async (ctx) => {
-  // Code que j'ai fourni plus haut
-});
-
-// Route pour obtenir les messages de chat à modérer
-adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
   try {
-    // Récupérer les paramètres de pagination
     const url = new URL(ctx.request.url);
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
     
-    // Compter le total des messages récents
-    const countResult = await client.queryObject(`
+    // Récupérer des informations détaillées sur les utilisateurs
+    const users = await client.queryObject(`
+      SELECT 
+        u.id,
+        u.username,
+        u.email,
+        u.role,
+        u.is_banned,
+        u.is_muted,
+        u.created_at,
+        u.last_login,
+        (SELECT COUNT(*) FROM games WHERE player1_id = u.id OR player2_id = u.id) as games_played,
+        (SELECT COUNT(*) FROM chat_message WHERE sender_id = u.id) as messages_sent,
+        (SELECT COUNT(*) FROM reports WHERE reported_user_id = u.id) as reports_received
+      FROM users u
+      ORDER BY u.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+    
+    // Compter le total pour la pagination
+    const countResult = await client.queryObject<{total: number}>(`
+      SELECT COUNT(*) as total FROM users
+    `);
+    
+    ctx.response.body = {
+      users: users.rows,
+      pagination: {
+        page,
+        limit,
+        total: Number(countResult.rows[0].total),
+        totalPages: Math.ceil(Number(countResult.rows[0].total) / limit)
+      }
+    };
+  } catch (err) {
+    console.error("Error fetching detailed users:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error", details: err.message };
+  }
+});
+
+// Route pour obtenir les messages de chat à modérer
+adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
+  try {
+    const url = new URL(ctx.request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const offset = (page - 1) * limit;
+    
+    // Vérifier d'abord si la table existe et compter
+    const countResult = await client.queryObject<{total: number}>(`
       SELECT COUNT(*) as total
       FROM chat_message cm
       WHERE cm.timestamp > NOW() - INTERVAL '1 hour'
-      AND (cm.is_deleted = false OR cm.is_deleted IS NULL)
+      AND COALESCE(cm.is_deleted, false) = false
     `);
     
-    const totalMessages = countResult.rows[0].total;
+    const totalMessages = Number(countResult.rows[0].total);
     
     // Récupérer les messages avec pagination
     const messages = await client.queryObject(`
@@ -163,11 +221,11 @@ adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
         cm.timestamp,
         u.username as sender_username,
         u.id as sender_id,
-        (SELECT COUNT(*) FROM reports WHERE reported_message_id = cm.id) as report_count
+        0 as report_count  -- Temporairement si la table reports n'existe pas
       FROM chat_message cm
       JOIN users u ON cm.sender_id = u.id
       WHERE cm.timestamp > NOW() - INTERVAL '1 hour'
-      AND (cm.is_deleted = false OR cm.is_deleted IS NULL)
+      AND COALESCE(cm.is_deleted, false) = false
       ORDER BY cm.timestamp DESC
       LIMIT $1 OFFSET $2
     `, [limit, offset]);
@@ -184,7 +242,7 @@ adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
   } catch (err) {
     console.error("Error fetching chat messages:", err);
     ctx.response.status = 500;
-    ctx.response.body = { error: err.message };
+    ctx.response.body = { error: "Internal server error", details: err.message };
   }
 });
 
