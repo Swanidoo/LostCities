@@ -48,7 +48,7 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
             }
 
             alert("Login successful!");
-            window.location.href = '/chat/chat.html'; // Redirect to chat page
+            window.location.href = '/'; // Redirect to home page
         } else {
             alert(data.error || "Invalid credentials");
         }

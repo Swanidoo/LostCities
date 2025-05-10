@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Gestionnaire pour le bouton toggle chat
-    document.getElementById('chat-toggle-btn').addEventListener('click', () => {
+    document.getElementById('chat-toggle-btn')?.addEventListener('click', () => {
         const chatPanel = document.getElementById('chat-panel');
         const chatBtn = document.getElementById('chat-toggle-btn');
         const centerPanel = document.querySelector('.center-panel');
@@ -175,12 +175,6 @@ function displayError() {
 function initializeChat() {
     const token = localStorage.getItem('authToken');
     if (!token) return;
-    
-    // Afficher le panel de chat pour les utilisateurs connectés
-    const chatPanel = document.getElementById('chat-panel');
-    if (chatPanel) {
-        chatPanel.style.display = 'block';
-    }
     
     // Connexion WebSocket pour le chat
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

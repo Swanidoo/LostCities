@@ -42,22 +42,22 @@ body {
     padding: 0 20px;
 }
 
-.left-panel {
-    flex: 1;
-    min-width: 280px;
-    max-width: 350px;
-}
-
 .center-panel {
     flex: 2;
     min-width: 500px;
-    max-width: 700px;
+    max-width: 100%; /* Par défaut, prend toute la place */
+    transition: max-width 0.3s ease;
 }
 
 .right-panel {
     flex: 1;
     min-width: 320px;
     max-width: 400px;
+    transition: all 0.3s ease;
+}
+
+.right-panel.hidden {
+    display: none;
 }
 
 /* === Menu === */
@@ -184,52 +184,64 @@ body {
     min-height: 0; /* Important pour le scroll */
 }
 
+/* Formulaire de chat */
 .chat-form {
     display: flex;
     gap: 10px;
     margin-top: 10px;
-    align-items: center; /* Aligner verticalement */
+    align-items: center;
 }
 
-/* MODIFICATIONS ICI - Amélioration du champ de saisie */
 .chat-input {
     flex: 1;
-    padding: 12px 15px;  /* Plus de padding */
+    padding: 15px;
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
     background-color: rgba(255, 255, 255, 0.15);
     color: white;
-    font-size: 16px; /* Police plus grande */
-    min-height: 45px; /* Hauteur minimale */
+    font-size: 16px;
+    min-height: 50px;
+    line-height: 1.4;
     transition: all 0.3s ease;
+    resize: none; /* Empêcher le redimensionnement */
 }
 
 .chat-input:focus {
     outline: none;
     border-color: #4CAF50;
-    background-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+    background-color: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
 }
 
 .chat-input::placeholder {
     color: rgba(255, 255, 255, 0.6);
+    font-size: 16px;
 }
 
 .chat-send {
-    padding: 12px 25px;
+    padding: 15px 25px;
     background-color: #4CAF50;
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: all 0.3s ease;
     font-size: 16px;
-    min-height: 45px; /* Même hauteur que l'input */
+    min-height: 50px;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .chat-send:hover {
     background-color: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.chat-send:active {
+    transform: translateY(0);
 }
 
 /* === Utilitaires === */
