@@ -79,13 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = '/login/register.html';
     });
     
-    document.getElementById('stats-btn').addEventListener('click', () => {
-        window.location.href = '/stats.html';
-    });
-    
     document.getElementById('logout-btn').addEventListener('click', () => {
         localStorage.removeItem('authToken');
         window.location.reload();
+    });
+
+    document.getElementById('play-btn').addEventListener('click', () => {
+        window.location.href = '/matchmaking/matchmaking.html';
     });
 
     // Gestionnaire pour le bouton toggle chat
