@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = '/stats.html';
     });
     
-    document.getElementById('chat-btn').addEventListener('click', () => {
+    document.getElementById('chat-toggle-btn').addEventListener('click', () => {
         window.location.href = '/chat/chat.html';
     });
     
@@ -183,8 +183,6 @@ function initializeChat() {
             if (data.event === 'chatMessage' && data.data) {
                 addChatMessage(data.data.username, data.data.message);
             } else if (data.event === 'systemMessage' && data.data) {
-                addSystemMessage(data.data.message);
-            } else if (data.event === 'error' && data.data) {
                 addSystemMessage(data.data.message);
             }
         } catch (error) {
