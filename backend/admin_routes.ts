@@ -30,4 +30,71 @@ adminRouter.delete("/api/admin/users/:id", requireAdmin, async (ctx) => {
   }
 });
 
+// Muter un utilisateur
+adminRouter.post("/api/admin/users/:id/mute", requireAdmin, async (ctx) => {
+  const userId = ctx.params.id;
+  const { duration, reason } = await ctx.request.body({ type: "json" }).value;
+  const adminId = ctx.state.user.id;
+  
+  // Calculer muted_until
+  const mutedUntil = duration ? new Date(Date.now() + duration * 1000) : null;
+  
+  await client.queryObject(
+    `INSERT INTO user_mutes (user_id, muted_until, mute_reason, muted_by)
+     VALUES ($1, $2, $3, $4)`,
+    [userId, mutedUntil, reason, adminId]
+  );
+  
+  // Logger l'action
+  await client.queryObject(
+    `INSERT INTO admin_actions (admin_id, action_type, target_user_id, reason)
+     VALUES ($1, 'mute', $2, $3)`,
+    [adminId, userId, reason]
+  );
+  
+  ctx.response.body = { message: "User muted successfully" };
+});
+
+// Bannir un utilisateur (soft delete)
+adminRouter.post("/api/admin/users/:id/ban", requireAdmin, async (ctx) => {
+  const userId = ctx.params.id;
+  const { duration, reason } = await ctx.request.body({ type: "json" }).value;
+  const adminId = ctx.state.user.id;
+  
+  const bannedUntil = duration ? new Date(Date.now() + duration * 1000) : null;
+  
+  await client.queryObject(
+    `UPDATE users 
+     SET is_banned = true, 
+         banned_at = CURRENT_TIMESTAMP, 
+         banned_until = $1,
+         ban_reason = $2
+     WHERE id = $3`,
+    [bannedUntil, reason, userId]
+  );
+  
+  // Logger l'action
+  await client.queryObject(
+    `INSERT INTO admin_actions (admin_id, action_type, target_user_id, reason)
+     VALUES ($1, 'ban', $2, $3)`,
+    [adminId, userId, reason]
+  );
+  
+  ctx.response.body = { message: "User banned successfully" };
+});
+
+// Dashboard stats
+adminRouter.get("/api/admin/dashboard", requireAdmin, async (ctx) => {
+  const stats = await client.queryObject(`
+    SELECT 
+      (SELECT COUNT(*) FROM users) as total_users,
+      (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours') as new_users_24h,
+      (SELECT COUNT(*) FROM games WHERE status = 'in_progress') as active_games,
+      (SELECT COUNT(*) FROM users WHERE is_banned = true) as banned_users,
+      (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports
+  `);
+  
+  ctx.response.body = stats.rows[0];
+});
+
 export default adminRouter;

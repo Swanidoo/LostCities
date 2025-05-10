@@ -9,7 +9,14 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url TEXT,
     bio TEXT,
     role TEXT DEFAULT 'user',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- New columns for moderation
+    is_banned BOOLEAN DEFAULT false,
+    banned_at TIMESTAMP,
+    banned_until TIMESTAMP,
+    ban_reason TEXT,
+    is_muted BOOLEAN DEFAULT false,
+    last_login TIMESTAMP
 );
 
 -- Create games table if it doesn't exist
@@ -28,6 +35,43 @@ CREATE TABLE IF NOT EXISTS games (
     ended_at TIMESTAMP,
     settings_id INTEGER,
     game_mode VARCHAR(10) DEFAULT 'classic'
+);
+
+-- New table for user mutes
+CREATE TABLE IF NOT EXISTS user_mutes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    muted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    muted_until TIMESTAMP,
+    mute_reason TEXT,
+    muted_by INTEGER NOT NULL
+);
+
+-- New table for admin actions logging
+CREATE TABLE IF NOT EXISTS admin_actions (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER NOT NULL,
+    action_type TEXT NOT NULL CHECK (action_type IN ('ban', 'unban', 'mute', 'unmute', 'delete_message', 'warn', 'change_role')),
+    target_user_id INTEGER,
+    target_message_id INTEGER,
+    reason TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- New table for user reports
+CREATE TABLE IF NOT EXISTS reports (
+    id SERIAL PRIMARY KEY,
+    reporter_id INTEGER NOT NULL,
+    reported_user_id INTEGER,
+    reported_message_id INTEGER,
+    report_type TEXT NOT NULL CHECK (report_type IN ('chat_abuse', 'cheating', 'inappropriate_name', 'harassment', 'spam', 'other')),
+    description TEXT,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved', 'dismissed')),
+    resolved_by INTEGER,
+    resolved_at TIMESTAMP,
+    resolution_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Board table for game configuration and state
@@ -49,7 +93,7 @@ CREATE TABLE IF NOT EXISTS board (
 
 -- Card table - reference for all cards in the game
 CREATE TABLE IF NOT EXISTS card (
-    id VARCHAR(20) PRIMARY KEY,  -- e.g. "red_5", "yellow_wager_2"
+    id VARCHAR(20) PRIMARY KEY,
     color TEXT NOT NULL CHECK (color IN ('red', 'green', 'white', 'blue', 'yellow', 'purple')),
     type TEXT NOT NULL CHECK (type IN ('expedition', 'wager')),
     value INTEGER,
@@ -103,13 +147,17 @@ CREATE TABLE IF NOT EXISTS move (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Chat messages table (if it exists)
+-- Chat messages table with soft delete capability
 CREATE TABLE IF NOT EXISTS chat_message (
     id SERIAL PRIMARY KEY,
     game_id BIGINT,
     sender_id INTEGER NOT NULL,
     message TEXT NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- New columns for moderation
+    is_deleted BOOLEAN DEFAULT false,
+    deleted_at TIMESTAMP,
+    deleted_by INTEGER
 );
 
 -- Leaderboard table for tracking high scores
@@ -122,15 +170,13 @@ CREATE TABLE IF NOT EXISTS leaderboard (
     month INTEGER,
     year INTEGER,
     game_mode VARCHAR(10) DEFAULT 'classic',
-    with_extension BOOLEAN DEFAULT false,
-    FOREIGN KEY (player_id) REFERENCES users(id) ON DELETE CASCADE
+    with_extension BOOLEAN DEFAULT false
 );
 
--- Now add the foreign key constraints (without IF NOT EXISTS which isn't supported in older PostgreSQL)
--- We'll check for constraint existence before adding
+-- Now add the foreign key constraints
 DO $$
 BEGIN
-    -- Add constraints for games table
+    -- Existing constraints
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_games_player1') THEN
         ALTER TABLE games ADD CONSTRAINT fk_games_player1 FOREIGN KEY (player1_id) REFERENCES users(id) ON DELETE CASCADE;
     END IF;
@@ -147,12 +193,12 @@ BEGIN
         ALTER TABLE games ADD CONSTRAINT fk_games_current_turn_player FOREIGN KEY (current_turn_player_id) REFERENCES users(id);
     END IF;
     
-    -- Add constraints for board table
+    -- Board constraints
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_board_game') THEN
         ALTER TABLE board ADD CONSTRAINT fk_board_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
     END IF;
     
-    -- Add constraints for expedition table
+    -- Expedition constraints
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_expedition_board') THEN
         ALTER TABLE expedition ADD CONSTRAINT fk_expedition_board FOREIGN KEY (board_id) REFERENCES board(id) ON DELETE CASCADE;
     END IF;
@@ -165,7 +211,7 @@ BEGIN
         ALTER TABLE expedition ADD CONSTRAINT uq_expedition_board_player_color UNIQUE (board_id, player_id, color);
     END IF;
     
-    -- Add constraints for discard_pile table
+    -- Discard pile constraints
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_discard_pile_board') THEN
         ALTER TABLE discard_pile ADD CONSTRAINT fk_discard_pile_board FOREIGN KEY (board_id) REFERENCES board(id) ON DELETE CASCADE;
     END IF;
@@ -178,7 +224,7 @@ BEGIN
         ALTER TABLE discard_pile ADD CONSTRAINT uq_discard_pile_board_color UNIQUE (board_id, color);
     END IF;
     
-    -- Add constraints for game_card table
+    -- Game card constraints
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_game_card_game') THEN
         ALTER TABLE game_card ADD CONSTRAINT fk_game_card_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
     END IF;
@@ -199,7 +245,7 @@ BEGIN
         ALTER TABLE game_card ADD CONSTRAINT uq_game_card_game_card UNIQUE (game_id, card_id);
     END IF;
     
-    -- Add constraints for move table
+    -- Move constraints
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_move_game') THEN
         ALTER TABLE move ADD CONSTRAINT fk_move_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
     END IF;
@@ -210,6 +256,61 @@ BEGIN
     
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_move_card') THEN
         ALTER TABLE move ADD CONSTRAINT fk_move_card FOREIGN KEY (card_id) REFERENCES card(id);
+    END IF;
+    
+    -- Chat message constraints
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_chat_message_sender') THEN
+        ALTER TABLE chat_message ADD CONSTRAINT fk_chat_message_sender FOREIGN KEY (sender_id) REFERENCES users(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_chat_message_game') THEN
+        ALTER TABLE chat_message ADD CONSTRAINT fk_chat_message_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_chat_message_deleted_by') THEN
+        ALTER TABLE chat_message ADD CONSTRAINT fk_chat_message_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id);
+    END IF;
+    
+    -- Leaderboard constraints
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_leaderboard_player') THEN
+        ALTER TABLE leaderboard ADD CONSTRAINT fk_leaderboard_player FOREIGN KEY (player_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+    
+    -- New constraints for moderation tables
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_user_mutes_user') THEN
+        ALTER TABLE user_mutes ADD CONSTRAINT fk_user_mutes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_user_mutes_muted_by') THEN
+        ALTER TABLE user_mutes ADD CONSTRAINT fk_user_mutes_muted_by FOREIGN KEY (muted_by) REFERENCES users(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_admin_actions_admin') THEN
+        ALTER TABLE admin_actions ADD CONSTRAINT fk_admin_actions_admin FOREIGN KEY (admin_id) REFERENCES users(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_admin_actions_target_user') THEN
+        ALTER TABLE admin_actions ADD CONSTRAINT fk_admin_actions_target_user FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_admin_actions_target_message') THEN
+        ALTER TABLE admin_actions ADD CONSTRAINT fk_admin_actions_target_message FOREIGN KEY (target_message_id) REFERENCES chat_message(id) ON DELETE SET NULL;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reports_reporter') THEN
+        ALTER TABLE reports ADD CONSTRAINT fk_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reports_reported_user') THEN
+        ALTER TABLE reports ADD CONSTRAINT fk_reports_reported_user FOREIGN KEY (reported_user_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reports_reported_message') THEN
+        ALTER TABLE reports ADD CONSTRAINT fk_reports_reported_message FOREIGN KEY (reported_message_id) REFERENCES chat_message(id) ON DELETE SET NULL;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reports_resolved_by') THEN
+        ALTER TABLE reports ADD CONSTRAINT fk_reports_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id);
     END IF;
 END $$;
 
@@ -316,6 +417,20 @@ CREATE INDEX IF NOT EXISTS idx_leaderboard_game_mode ON leaderboard(game_mode);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_with_extension ON leaderboard(with_extension);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_date ON leaderboard(date DESC);
 
+-- New indexes for moderation features
+CREATE INDEX IF NOT EXISTS idx_users_banned ON users(is_banned);
+CREATE INDEX IF NOT EXISTS idx_users_muted ON users(is_muted);
+CREATE INDEX IF NOT EXISTS idx_user_mutes_user_id ON user_mutes(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_mutes_muted_until ON user_mutes(muted_until);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_admin_id ON admin_actions(admin_id);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_target_user ON admin_actions(target_user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_created_at ON admin_actions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id);
+CREATE INDEX IF NOT EXISTS idx_reports_reported_user ON reports(reported_user_id);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_message_is_deleted ON chat_message(is_deleted);
+
 -- Create a trigger to automatically set month and year fields
 CREATE OR REPLACE FUNCTION set_leaderboard_date() 
 RETURNS TRIGGER AS $$
@@ -331,3 +446,61 @@ CREATE TRIGGER trigger_set_leaderboard_date
 BEFORE INSERT ON leaderboard
 FOR EACH ROW
 EXECUTE FUNCTION set_leaderboard_date();
+
+-- Create a function to check if a user is currently muted
+CREATE OR REPLACE FUNCTION is_user_muted(user_id_param INTEGER) 
+RETURNS BOOLEAN AS $$
+DECLARE
+    muted_until_date TIMESTAMP;
+BEGIN
+    SELECT muted_until INTO muted_until_date
+    FROM user_mutes
+    WHERE user_id = user_id_param
+    AND (muted_until IS NULL OR muted_until > NOW())
+    ORDER BY muted_at DESC
+    LIMIT 1;
+    
+    RETURN muted_until_date IS NOT NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a view for active mutes
+CREATE OR REPLACE VIEW active_mutes AS
+SELECT 
+    um.id,
+    um.user_id,
+    u.username,
+    um.muted_at,
+    um.muted_until,
+    um.mute_reason,
+    um.muted_by,
+    admin.username as muted_by_username
+FROM user_mutes um
+JOIN users u ON um.user_id = u.id
+JOIN users admin ON um.muted_by = admin.id
+WHERE um.muted_until IS NULL OR um.muted_until > NOW();
+
+-- Create a view for active bans
+CREATE OR REPLACE VIEW active_bans AS
+SELECT 
+    id,
+    username,
+    email,
+    banned_at,
+    banned_until,
+    ban_reason
+FROM users
+WHERE is_banned = true 
+AND (banned_until IS NULL OR banned_until > NOW());
+
+-- Create a comprehensive admin dashboard view
+CREATE OR REPLACE VIEW admin_dashboard_stats AS
+SELECT 
+    (SELECT COUNT(*) FROM users) as total_users,
+    (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours') as new_users_24h,
+    (SELECT COUNT(*) FROM users WHERE last_login > NOW() - INTERVAL '24 hours') as active_users_24h,
+    (SELECT COUNT(*) FROM games WHERE status = 'in_progress') as active_games,
+    (SELECT COUNT(*) FROM users WHERE is_banned = true) as banned_users,
+    (SELECT COUNT(*) FROM active_mutes) as muted_users,
+    (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports,
+    (SELECT COUNT(*) FROM chat_message WHERE timestamp > NOW() - INTERVAL '24 hours' AND is_deleted = false) as messages_24h;
