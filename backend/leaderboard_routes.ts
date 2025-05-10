@@ -1,21 +1,26 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { helpers } from "https://deno.land/x/oak@v12.6.1/mod.ts";  // Ajoutez cette importation
 import { client } from "./db_client.ts";
 
 const leaderboardRouter = new Router();
 
 // GET /api/leaderboard - Récupérer le leaderboard (avec filtres optionnels)
 leaderboardRouter.get("/api/leaderboard", async (ctx) => {
-  const { month, year, page, limit, game_mode, with_extension } = ctx.request.url.searchParams;
+  // Utilisez helpers.getQuery pour récupérer les paramètres
+  const params = helpers.getQuery(ctx);
+  const { month, year, page, limit, game_mode, with_extension } = params;
+
+  console.log(`Leaderboard request: game_mode=${game_mode}, with_extension=${with_extension}`); // Debug
 
   let query = "SELECT * FROM leaderboard";
-  const params: (string | number | boolean)[] = [];
+  const queryParams: (string | number | boolean)[] = [];
   let paramIndex = 1;
   let whereClauseAdded = false;
 
   // Ajout des filtres
   if (month && year) {
     query += " WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2";
-    params.push(Number(month), Number(year));
+    queryParams.push(Number(month), Number(year));
     paramIndex += 2;
     whereClauseAdded = true;
   }
@@ -23,27 +28,37 @@ leaderboardRouter.get("/api/leaderboard", async (ctx) => {
   if (game_mode) {
     query += whereClauseAdded ? " AND" : " WHERE";
     query += ` game_mode = $${paramIndex}`;
-    params.push(game_mode);
+    queryParams.push(game_mode);
     paramIndex++;
     whereClauseAdded = true;
   }
 
-  if (with_extension !== undefined) {
+  if (with_extension) {
     query += whereClauseAdded ? " AND" : " WHERE";
     query += ` with_extension = $${paramIndex}`;
-    params.push(with_extension === 'true');
+    queryParams.push(with_extension === 'true');
     paramIndex++;
+    whereClauseAdded = true;
   }
+
+  // Tri par score décroissant avant la pagination
+  query += " ORDER BY score DESC";
 
   // Pagination
   const pageNumber = Number(page) || 1;
   const pageSize = Number(limit) || 10;
   const offset = (pageNumber - 1) * pageSize;
 
-  query += " ORDER BY score DESC LIMIT $" + paramIndex + " OFFSET $" + (paramIndex + 1);
-  params.push(pageSize, offset);
+  query += " LIMIT $" + paramIndex + " OFFSET $" + (paramIndex + 1);
+  queryParams.push(pageSize, offset);
 
-  const leaderboard = await client.queryObject(query, params);
+  console.log("SQL Query:", query); // Debug
+  console.log("Parameters:", queryParams); // Debug
+
+  const leaderboard = await client.queryObject(query, queryParams);
+  
+  console.log(`Found ${leaderboard.rows.length} entries`); // Debug
+
   ctx.response.body = {
     data: leaderboard.rows,
     pagination: {

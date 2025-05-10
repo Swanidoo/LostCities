@@ -2,29 +2,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // Chargement initial
     loadLeaderboard('classic', false);
     
-    // Gestionnaires d'onglets
-    document.querySelectorAll('.tab-button').forEach(button => {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
         button.addEventListener('click', () => {
-            // Mettre à jour l'onglet actif
-            document.querySelector('.tab-button.active').classList.remove('active');
-            button.classList.add('active');
+            // Distinguez clairement les types de boutons
+            const isGameMode = button.dataset.mode !== undefined;
+            const isExtension = button.dataset.extension !== undefined;
             
-            // Charger les données
-            const mode = button.dataset.mode;
-            const withExtension = document.querySelector('.subtab-button.active').dataset.extension === 'true';
-            loadLeaderboard(mode, withExtension);
-        });
-    });
-    
-    document.querySelectorAll('.subtab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            // Mettre à jour le sous-onglet actif
-            document.querySelector('.subtab-button.active').classList.remove('active');
-            button.classList.add('active');
+            if (isGameMode) {
+                // Mettre à jour uniquement les boutons de mode
+                document.querySelectorAll('.tab-button[data-mode]').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                button.classList.add('active');
+            } else if (isExtension) {
+                // Mettre à jour uniquement les boutons d'extension
+                document.querySelectorAll('.tab-button[data-extension]').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                button.classList.add('active');
+            }
             
-            // Charger les données
-            const mode = document.querySelector('.tab-button.active').dataset.mode;
-            const withExtension = button.dataset.extension === 'true';
+            // Récupérer les valeurs actuelles correctement
+            const activeMode = document.querySelector('.tab-button[data-mode].active');
+            const activeExtension = document.querySelector('.tab-button[data-extension].active');
+            
+            const mode = activeMode ? activeMode.dataset.mode : 'classic';
+            const withExtension = activeExtension ? activeExtension.dataset.extension === 'true' : false;
+            
+            console.log(`Selected: mode=${mode}, withExtension=${withExtension}`); // Pour débugger
+            
             loadLeaderboard(mode, withExtension);
         });
     });
@@ -36,14 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadLeaderboard(mode, withExtension) {
-    const API_URL = window.location.hostname === "localhost"
-        ? "http://localhost:3000"
-        : "https://lostcitiesbackend.onrender.com";
-    
     try {
-        const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
+        console.log(`Loading leaderboard: mode=${mode}, withExtension=${withExtension}`); // Pour débugger
         
-        // Utilisez la variable 'url' ici, pas une URL relative !
+        const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
+        console.log(`Fetching: ${url}`); // Pour débugger
+        
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -51,6 +56,7 @@ async function loadLeaderboard(mode, withExtension) {
         }
         
         const data = await response.json();
+        console.log(`Received ${data.data.length} entries`); // Pour débugger
         displayLeaderboard(data.data);
         
     } catch (error) {

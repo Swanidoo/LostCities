@@ -7,7 +7,7 @@ ENV POSTGRES_PASSWORD=adminpassword
 ENV POSTGRES_DB=lostcities
 
 # Copier les fichiers SQL d'initialisation (si nécessaire)
-COPY init.sql /docker-entrypoint-initdb.d/
+COPY 01_init.sql /docker-entrypoint-initdb.d/
 
 # Exposer le port par défaut de PostgreSQL
 EXPOSE 5432
