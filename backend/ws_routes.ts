@@ -15,20 +15,30 @@ if (!jwtKey) {
   Deno.exit(1);
 }
 
-async function isUserMuted(userId: string): Promise<boolean> {
+async function getUserMuteInfo(userId: string): Promise<{ isMuted: boolean; reason?: string; until?: Date }> {
   try {
-    const result = await client.queryObject<{ is_muted: boolean }>(
-      `SELECT EXISTS(
-        SELECT 1 FROM user_mutes 
-        WHERE user_id = $1 
-        AND (muted_until IS NULL OR muted_until > NOW())
-      ) as is_muted`,
+    const result = await client.queryObject<{ muted_until: Date; mute_reason: string }>(
+      `SELECT muted_until, mute_reason
+       FROM user_mutes 
+       WHERE user_id = $1 
+       AND (muted_until IS NULL OR muted_until > NOW())
+       ORDER BY muted_at DESC
+       LIMIT 1`,
       [userId]
     );
-    return result.rows[0]?.is_muted || false;
+    
+    if (result.rows.length > 0) {
+      return {
+        isMuted: true,
+        reason: result.rows[0].mute_reason,
+        until: result.rows[0].muted_until
+      };
+    }
+    
+    return { isMuted: false };
   } catch (error) {
     console.error("Error checking mute status:", error);
-    return false;
+    return { isMuted: false };
   }
 }
 
@@ -296,16 +306,27 @@ function handleChatMessage(
 ) {
   console.log(`💬 Chat message from ${username}: ${data.message}`);
   
-  // Vérifier si l'utilisateur est muté
-  const userId = getUserIdFromUsername(username).then(async (userId) => {
+  getUserIdFromUsername(username).then(async (userId) => {
     if (!userId) return;
     
-    const isMuted = await isUserMuted(userId);
-    if (isMuted) {
-      // Envoyer un message d'erreur à l'utilisateur muté
+    const muteInfo = await getUserMuteInfo(userId);
+    if (muteInfo.isMuted) {
+      let errorMessage = "Vous êtes muté et ne pouvez pas envoyer de messages.";
+      
+      if (muteInfo.reason) {
+        errorMessage += ` Raison: ${muteInfo.reason}`;
+      }
+      
+      if (muteInfo.until) {
+        const untilDate = new Date(muteInfo.until);
+        errorMessage += ` Jusqu'à: ${untilDate.toLocaleString()}`;
+      } else {
+        errorMessage += " (Permanent)";
+      }
+      
       sender.send(JSON.stringify({
         event: "error",
-        data: { message: "Vous êtes muté et ne pouvez pas envoyer de messages." }
+        data: { message: errorMessage }
       }));
       return;
     }

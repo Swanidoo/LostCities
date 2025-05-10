@@ -112,6 +112,10 @@ adminRouter.get("/api/admin/users/detailed", requireAdmin, async (ctx) => {
 // Route pour obtenir les messages de chat à modérer
 adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
   try {
+    // D'abord, vérifions quelle table contient les messages
+    console.log("Fetching chat messages...");
+    
+    // Essayons avec une requête plus simple pour voir ce qu'on a
     const messages = await client.queryObject(`
       SELECT 
         cm.id,
@@ -121,12 +125,23 @@ adminRouter.get("/api/admin/chat-messages", requireAdmin, async (ctx) => {
         u.id as sender_id
       FROM chat_message cm
       JOIN users u ON cm.sender_id = u.id
-      WHERE cm.is_deleted = false OR cm.is_deleted IS NULL
       ORDER BY cm.timestamp DESC
       LIMIT 50
     `);
     
     console.log("Found messages:", messages.rows.length);
+    
+    // Si pas de messages, essayons de voir si la structure est différente
+    if (messages.rows.length === 0) {
+      console.log("No messages found in chat_message table");
+      
+      // Vérifier si les messages sont ailleurs (peut-être sans game_id)
+      const allMessages = await client.queryObject(`
+        SELECT * FROM chat_message LIMIT 5
+      `);
+      console.log("Sample messages:", allMessages.rows);
+    }
+    
     ctx.response.body = messages.rows;
   } catch (err) {
     console.error("Error fetching chat messages:", err);
@@ -159,8 +174,10 @@ adminRouter.delete("/api/admin/chat-messages/:id", requireAdmin, async (ctx) => 
 
 // Route pour obtenir les rapports
 adminRouter.get("/api/admin/reports", requireAdmin, async (ctx) => {
-  try {  // ← AJOUTER
-    const { status = 'pending' } = helpers.getQuery(ctx);
+  try {
+    // Utiliser URLSearchParams au lieu de helpers.getQuery si helpers cause des problèmes
+    const url = new URL(ctx.request.url);
+    const status = url.searchParams.get('status') || 'pending';
     
     const reports = await client.queryObject(`
       SELECT 
@@ -177,10 +194,10 @@ adminRouter.get("/api/admin/reports", requireAdmin, async (ctx) => {
     `, [status]);
     
     ctx.response.body = reports.rows;
-  } catch (err) {  // ← AJOUTER
+  } catch (err) {
     console.error("Error fetching reports:", err);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { error: err.message };
   }
 });
 
