@@ -763,15 +763,15 @@ async function checkBanStatus() {
     if (!token) return false;
     
     try {
-        const response = await fetch(`${API_URL}/profile`, {
+        const response = await fetch(`${API_URL}/ban-status`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
         });
         
-        if (response.status === 403) {
+        if (response.ok) {
             const data = await response.json();
-            if (data.banInfo) {
+            if (data.banned) {
                 return data.banInfo;
             }
         }

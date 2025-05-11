@@ -595,7 +595,7 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
   }
 }
 
-function handleMatchmaking(socket, username, userId) {
+async function handleMatchmaking(socket, username, userId) {
   try {
     const banResult = await client.queryObject(
       `SELECT is_banned, banned_until, ban_reason FROM users WHERE id = $1`,
@@ -623,7 +623,7 @@ function handleMatchmaking(socket, username, userId) {
   } catch (error) {
     console.error("Error checking ban status:", error);
   }
-  
+
   console.log(`🎮 User ${username} (${userId}) is looking for a match`);
   
   // Remove any existing entry for this player (in case they're already searching)

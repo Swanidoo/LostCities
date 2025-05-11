@@ -75,8 +75,6 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
     const { opponentId, usePurpleExpedition } = await ctx.request.body({ type: "json" }).value;
     const userId = ctx.state.user.id;
     const gameId = Date.now(); // Use timestamp for ID
-
-    const userId = ctx.state.user.id;
     const banResult = await client.queryObject(
       `SELECT is_banned, banned_until, ban_reason FROM users WHERE id = $1`,
       [userId]

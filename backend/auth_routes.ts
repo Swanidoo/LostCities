@@ -115,4 +115,37 @@ authRouter.get("/profile", authMiddleware, (ctx) => {
   };
 });
 
+// Route pour vérifier le statut de ban
+authRouter.get("/ban-status", authMiddleware, async (ctx) => {
+  try {
+    const userId = ctx.state.user.id;
+    
+    const banResult = await client.queryObject(
+      `SELECT is_banned, banned_until, ban_reason FROM users WHERE id = $1`,
+      [userId]
+    );
+    
+    if (banResult.rows.length > 0) {
+      const user = banResult.rows[0];
+      
+      if (user.is_banned && (!user.banned_until || new Date(user.banned_until) > new Date())) {
+        ctx.response.body = {
+          banned: true,
+          banInfo: {
+            reason: user.ban_reason,
+            until: user.banned_until
+          }
+        };
+        return;
+      }
+    }
+    
+    ctx.response.body = { banned: false };
+  } catch (err) {
+    console.error("Error checking ban status:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+});
+
 export default authRouter;
