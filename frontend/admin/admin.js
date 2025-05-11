@@ -33,23 +33,27 @@ async function loadUsers(page = 1) {
         window.allUsers = data.users;
 
         data.users.forEach(user => {
+            // Vérifier si le ban a expiré côté client aussi
+            const isBanned = user.is_banned && 
+              (!user.banned_until || new Date(user.banned_until) > new Date());
+            
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td>${user.id}</td>
-                <td>${user.username}</td>
-                <td>${user.email}</td>
-                <td>${user.role}</td>
-                <td>
-                    <button onclick="viewProfile(${user.id})">Voir le profil</button>
-                    <button onclick="muteUser(${user.id})">Mute</button>
-                    ${user.is_banned ? 
-                        `<button onclick="unbanUser(${user.id})">Unban</button>` : 
-                        `<button onclick="banUser(${user.id})">Ban</button>`
-                    }
-                </td>
+              <td>${user.id}</td>
+              <td>${user.username}</td>
+              <td>${user.email}</td>
+              <td>${user.role}</td>
+              <td>
+                <button onclick="viewProfile(${user.id})">Voir le profil</button>
+                <button onclick="muteUser(${user.id})">Mute</button>
+                ${isBanned ? 
+                  `<button onclick="unbanUser(${user.id})">Unban</button>` : 
+                  `<button onclick="banUser(${user.id})">Ban</button>`
+                }
+              </td>
             `;
             usersTableBody.appendChild(row);
-        });
+          });
         
         updatePaginationControls('users', data.pagination);
         

@@ -89,6 +89,39 @@ app.use(settingsRouter.allowedMethods());
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
 
+// Fonction pour nettoyer les bans et mutes expirés
+async function cleanupExpiredBansAndMutes() {
+  try {
+    // Nettoyer les bans expirés
+    const banResult = await client.queryObject(`
+      UPDATE users 
+      SET is_banned = false 
+      WHERE is_banned = true 
+        AND banned_until IS NOT NULL 
+        AND banned_until <= NOW()
+      RETURNING id, username
+    `);
+    
+    if (banResult.rows.length > 0) {
+      console.log(`✅ Cleaned up ${banResult.rows.length} expired bans`);
+      banResult.rows.forEach(user => {
+        console.log(`  - Unbanned user ${user.username} (ID: ${user.id})`);
+      });
+    }
+    
+    // Note: On ne nettoie PAS les mutes ici car ils ont leur propre logique
+    
+  } catch (error) {
+    console.error("❌ Error cleaning up expired bans:", error);
+  }
+}
+
+// Nettoyer les bans expirés toutes les 5 minutes
+setInterval(cleanupExpiredBansAndMutes, 5 * 60 * 1000);
+
+// Nettoyer au démarrage également
+cleanupExpiredBansAndMutes();
+
 
 // 🚀 Lancer le serveur
 const port = parseInt(Deno.env.get("PORT") || "3000");

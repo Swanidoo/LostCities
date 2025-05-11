@@ -13,6 +13,15 @@ adminRouter.get("/api/admin/users", requireAdmin, async (ctx) => {
     const limit = parseInt(url.searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
     
+    // D'abord, mettre à jour les bans expirés dans la base
+    await client.queryObject(`
+      UPDATE users 
+      SET is_banned = false 
+      WHERE is_banned = true 
+        AND banned_until IS NOT NULL 
+        AND banned_until <= NOW()
+    `);
+    
     // Compter le total des utilisateurs
     const countResult = await client.queryObject<{total: number}>(`
       SELECT COUNT(*) as total FROM users
@@ -20,10 +29,24 @@ adminRouter.get("/api/admin/users", requireAdmin, async (ctx) => {
     
     const totalUsers = Number(countResult.rows[0].total); // Convertir explicitement en nombre
     
-    // Récupérer les utilisateurs avec pagination - ATTENTION à created_at
+    // Récupérer les utilisateurs avec pagination - avec vérification dynamique des bans
     const users = await client.queryObject(`
-      SELECT id, username, email, role, is_banned, is_muted, 
-             COALESCE(created_at, NOW()) as created_at
+      SELECT 
+        id, 
+        username, 
+        email, 
+        role, 
+        -- Vérifier si le ban est toujours actif
+        CASE 
+          WHEN is_banned = true AND banned_until IS NOT NULL AND banned_until <= NOW() 
+          THEN false 
+          ELSE is_banned 
+        END as is_banned,
+        is_muted, 
+        COALESCE(created_at, NOW()) as created_at,
+        banned_until,
+        ban_reason,
+        last_login
       FROM users
       ORDER BY id DESC
       LIMIT $1 OFFSET $2
@@ -84,7 +107,7 @@ adminRouter.post("/api/admin/users/:id/mute", requireAdmin, async (ctx) => {
   ctx.response.body = { message: "User muted successfully" };
 });
 
-// Bannir un utilisateur (soft delete)
+// Bannir un utilisateur
 adminRouter.post("/api/admin/users/:id/ban", requireAdmin, async (ctx) => {
   const userId = ctx.params.id;
   const { duration, reason } = await ctx.request.body({ type: "json" }).value;
@@ -92,6 +115,7 @@ adminRouter.post("/api/admin/users/:id/ban", requireAdmin, async (ctx) => {
   
   const bannedUntil = duration ? new Date(Date.now() + duration * 1000) : null;
   
+  // Mettre à jour le statut de ban
   await client.queryObject(
     `UPDATE users 
      SET is_banned = true, 
@@ -102,21 +126,71 @@ adminRouter.post("/api/admin/users/:id/ban", requireAdmin, async (ctx) => {
     [bannedUntil, reason, userId]
   );
   
-  // Logger l'action
+  // Gérer le mute automatique
+  // D'abord, vérifier s'il y a un mute existant
+  const existingMuteResult = await client.queryObject<{ muted_until: Date | null }>(
+    `SELECT muted_until 
+     FROM user_mutes 
+     WHERE user_id = $1 
+     AND (muted_until IS NULL OR muted_until > NOW())
+     ORDER BY muted_until DESC NULLS FIRST
+     LIMIT 1`,
+    [userId]
+  );
+  
+  let shouldCreateMute = true;
+  
+  if (existingMuteResult.rows.length > 0) {
+    const existingMuteUntil = existingMuteResult.rows[0].muted_until;
+    
+    // Si il y a un mute permanent (NULL) ou qui expire après le ban, on ne fait rien
+    if (existingMuteUntil === null || 
+        (bannedUntil && existingMuteUntil && existingMuteUntil > bannedUntil)) {
+      shouldCreateMute = false;
+      console.log(`User ${userId} already muted until ${existingMuteUntil || 'permanently'}, keeping existing mute`);
+    }
+  }
+  
+  // Créer un nouveau mute si nécessaire
+  if (shouldCreateMute) {
+    await client.queryObject(
+      `INSERT INTO user_mutes (user_id, muted_until, mute_reason, muted_by)
+       VALUES ($1, $2, $3, $4)`,
+      [userId, bannedUntil, `Mute automatique suite au ban: ${reason}`, adminId]
+    );
+    
+    console.log(`Created automatic mute for user ${userId} until ${bannedUntil}`);
+  }
+  
+  // Logger l'action de ban
   await client.queryObject(
     `INSERT INTO admin_actions (admin_id, action_type, target_user_id, reason)
      VALUES ($1, 'ban', $2, $3)`,
     [adminId, userId, reason]
   );
   
-  ctx.response.body = { message: "User banned successfully" };
+  // Logger l'action de mute si créée
+  if (shouldCreateMute) {
+    await client.queryObject(
+      `INSERT INTO admin_actions (admin_id, action_type, target_user_id, reason)
+       VALUES ($1, 'mute', $2, $3)`,
+      [adminId, userId, `Mute automatique suite au ban: ${reason}`]
+    );
+  }
+  
+  ctx.response.body = { 
+    message: "User banned successfully",
+    muteCreated: shouldCreateMute
+  };
 });
+
 
 // Débannir un utilisateur
 adminRouter.post("/api/admin/users/:id/unban", requireAdmin, async (ctx) => {
   const userId = ctx.params.id;
   const adminId = ctx.state.user.id;
   
+  // SEULEMENT lever le ban, ne pas toucher aux mutes
   await client.queryObject(
     `UPDATE users 
      SET is_banned = false, 
@@ -187,6 +261,17 @@ adminRouter.get("/api/admin/users/detailed", requireAdmin, async (ctx) => {
         u.is_muted,
         u.created_at,
         u.last_login,
+        u.banned_until,
+        u.ban_reason,
+        -- Ajouter les infos de mute
+        (SELECT muted_until FROM user_mutes 
+         WHERE user_id = u.id 
+         AND (muted_until IS NULL OR muted_until > NOW())
+         ORDER BY muted_at DESC LIMIT 1) as muted_until,
+        (SELECT mute_reason FROM user_mutes 
+         WHERE user_id = u.id 
+         AND (muted_until IS NULL OR muted_until > NOW())
+         ORDER BY muted_at DESC LIMIT 1) as mute_reason,
         (SELECT COUNT(*) FROM games WHERE player1_id = u.id OR player2_id = u.id) as games_played,
         (SELECT COUNT(*) FROM chat_message WHERE sender_id = u.id) as messages_sent,
         (SELECT COUNT(*) FROM reports WHERE reported_user_id = u.id) as reports_received
