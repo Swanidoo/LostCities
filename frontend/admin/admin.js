@@ -145,29 +145,32 @@ async function deleteMessage(messageId) {
     
     console.log('Attempting to delete message with ID:', messageId, 'Type:', typeof messageId);
     
-    // Trouver la ligne du message
-    const messageRow = document.querySelector(`#chatMessagesTable tbody tr[data-message-id="${messageId}"]`);
-    const rows = document.querySelectorAll('#chatMessagesTable tbody tr');
-    console.log('Found', rows.length, 'rows in table');
+    // Trouver la ligne du message - déclaration avec let au lieu de const
+    let messageRow = document.querySelector(`#chatMessagesTable tbody tr[data-message-id="${messageId}"]`);
     
-    rows.forEach(row => {
-        const idCell = row.querySelector('td:first-child');
-        if (idCell) {
-            const cellText = idCell.textContent.trim();
-            console.log('Checking row with ID:', cellText, 'Type:', typeof cellText);
-            
-            // Comparer en convertissant les deux en string
-            if (cellText === String(messageId)) {
-                console.log('Found matching row!');
-                messageRow = row;
+    // Si pas trouvé avec data-attribute, chercher par contenu de la première cellule
+    if (!messageRow) {
+        const rows = document.querySelectorAll('#chatMessagesTable tbody tr');
+        console.log('Found', rows.length, 'rows in table');
+        
+        for (const row of rows) {
+            const idCell = row.querySelector('td:first-child');
+            if (idCell) {
+                const cellText = idCell.textContent.trim();
+                console.log('Checking row with ID:', cellText, 'Type:', typeof cellText);
+                
+                // Comparer en convertissant les deux en string
+                if (cellText === String(messageId)) {
+                    console.log('Found matching row!');
+                    messageRow = row;
+                    break; // Sortir de la boucle une fois trouvé
+                }
             }
         }
-    });
+    }
     
     if (!messageRow) {
-        console.error('Could not find row for message ID:', messageId);
-        // Alternative: essayer avec un sélecteur d'attribut si vous avez un data-id
-        messageRow = document.querySelector(`#chatMessagesTable tbody tr[data-message-id="${messageId}"]`);
+        console.error('Message row not found for ID:', messageId);
     }
     
     if (messageRow) {
@@ -176,8 +179,6 @@ async function deleteMessage(messageId) {
         messageRow.style.transition = 'opacity 0.5s, transform 0.5s';
         messageRow.style.opacity = '0.5';
         messageRow.style.transform = 'scale(0.95)';
-    } else {
-        console.error('Message row not found!');
     }
     
     try {

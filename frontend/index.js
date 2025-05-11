@@ -340,12 +340,13 @@ function initializeChat() {
             } else if (data.event === 'systemMessage' && data.data) {
                 addSystemMessage(data.data.message);
             } else if (data.event === 'error' && data.data) {
-                // Gérer les erreurs, notamment les erreurs de mute
                 if (data.data.type === 'mute_error') {
                     showMuteError(data.data.message);
                 } else {
                     addSystemMessage(`Erreur: ${data.data.message}`);
                 }
+            } else if (data.event === 'messageDeleted' && data.data) {
+                removeMessageFromChat(data.data.messageId);
             }
         } catch (error) {
             console.error('Error parsing message:', error);
@@ -398,6 +399,23 @@ function initializeChat() {
 function autoResizeTextarea(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+}
+
+function removeMessageFromChat(messageId) {
+    // On doit ajouter un identifiant aux messages lors de leur création
+    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageElement) {
+        // Animation de suppression
+        messageElement.style.transition = 'opacity 0.3s, transform 0.3s';
+        messageElement.style.opacity = '0';
+        messageElement.style.transform = 'scale(0.8)';
+        
+        setTimeout(() => {
+            messageElement.remove();
+            // Optionnel : ajouter un message système
+            addSystemMessage('Un message a été supprimé par un administrateur');
+        }, 300);
+    }
 }
 
 function checkMuteStatus() {
@@ -492,11 +510,15 @@ function escapeHtml(text) {
 }
 
 // Fonction pour ajouter un message de chat
-function addChatMessage(username, message) {
+function addChatMessage(username, message, messageId = null) {
     const messagesContainer = document.getElementById('chat-messages');
     if (!messagesContainer) return;
     
     const messageElement = document.createElement('div');
+    // Ajouter l'ID du message comme attribut de données
+    if (messageId) {
+        messageElement.dataset.messageId = messageId;
+    }
     const currentUsername = localStorage.getItem('username');
     const token = localStorage.getItem('authToken');
     let isOwnMessage = false;

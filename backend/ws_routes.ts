@@ -366,14 +366,16 @@ function broadcastSystemMessage(message: string, excludeSocket?: WebSocket) {
 }
 
 //Fonction pour save les messages dans la bdd
-async function saveChatMessage(senderId: string, message: string, gameId?: string) {
+async function saveChatMessage(senderId: string, message: string, gameId?: string): Promise<string> {
   try {
-    await client.queryObject(
-      `INSERT INTO chat_message (sender_id, message, game_id) VALUES ($1, $2, $3)`,
+    const result = await client.queryObject<{id: string}>(
+      `INSERT INTO chat_message (sender_id, message, game_id) VALUES ($1, $2, $3) RETURNING id`,
       [senderId, message, gameId || null]
     );
+    return result.rows[0].id;
   } catch (error) {
     console.error("Error saving chat message:", error);
+    return null;
   }
 }
 
@@ -459,13 +461,18 @@ function handleChatMessage(
     }
     
     // Sauvegarder le message en base de données
-    await saveChatMessage(userId, data.message, data.gameId);
+    const messageId = await saveChatMessage(userId, data.message, data.gameId);
+
     
     // Format the message to be sent
     const formattedMessage = JSON.stringify({ 
       event: "chatMessage", 
-      data: { username, message: data.message } 
-    });
+      data: { 
+          username, 
+          message: data.message,
+          messageId // Inclure l'ID
+      } 
+  });
     
     // Send to all connected clients INCLUDING the sender
     connectedClients.forEach((client) => {
@@ -640,6 +647,23 @@ async function handleMatchmaking(socket, username, userId) {
   
   // Try to find a match
   tryFindMatch();
+}
+
+export function broadcastMessageDeletion(messageId: string) {
+  const deletionMessage = JSON.stringify({
+    event: "messageDeleted",
+    data: { messageId }
+  });
+  
+  connectedClients.forEach((client) => {
+    try {
+      if (client.socket.readyState === WebSocket.OPEN) {
+        client.socket.send(deletionMessage);
+      }
+    } catch (error) {
+      console.error(`Error sending deletion notification to ${client.username}:`, error);
+    }
+  });
 }
 
 // Handle play card action

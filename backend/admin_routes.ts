@@ -1,6 +1,7 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { requireAdmin } from "./middlewares/require_admin_middleware.ts";
 import { client } from "./db_client.ts";
+import { broadcastMessageDeletion } from "./ws_routes.ts";
 
 const adminRouter = new Router();
 
@@ -74,17 +75,28 @@ adminRouter.get("/api/admin/users", requireAdmin, async (ctx) => {
 });
 
 // Route pour supprimer un utilisateur
-adminRouter.delete("/api/admin/users/:id", requireAdmin, async (ctx) => {
-  try {
-    const id = ctx.params.id;
-    await client.queryObject("DELETE FROM users WHERE id = $1", [id]);
-    ctx.response.status = 200;
-    ctx.response.body = { message: "User deleted successfully" };
-  } catch (err) {
-    console.error("Error deleting user:", err);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
-  }
+adminRouter.delete("/api/admin/chat-messages/:id", requireAdmin, async (ctx) => {
+  const messageId = ctx.params.id;
+  const adminId = ctx.state.user.id;
+  
+  await client.queryObject(
+    `UPDATE chat_message 
+     SET is_deleted = true, deleted_at = NOW(), deleted_by = $1
+     WHERE id = $2`,
+    [adminId, messageId]
+  );
+  
+  // Logger l'action
+  await client.queryObject(
+    `INSERT INTO admin_actions (admin_id, action_type, target_message_id, reason)
+     VALUES ($1, 'delete_message', $2, 'Message supprimé par admin')`,
+    [adminId, messageId]
+  );
+  
+  // Notifier tous les clients via WebSocket
+  broadcastMessageDeletion(messageId);
+  
+  ctx.response.body = { message: "Message deleted successfully" };
 });
 
 // Muter un utilisateur
