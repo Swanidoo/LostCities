@@ -79,6 +79,45 @@ profileRouter.put("/api/profile", authMiddleware, async (ctx) => {
   }
 });
 
+profileRouter.get("/api/profile/:id/messages", authMiddleware, async (ctx) => {
+    try {
+      const userId = ctx.params.id;
+      
+      // Vérifier si l'utilisateur est admin
+      if (ctx.state.user.role !== 'admin') {
+        ctx.response.status = 403;
+        ctx.response.body = { error: "Admin access required" };
+        return;
+      }
+      
+      // Récupérer les messages du dernier mois
+      const messages = await client.queryObject(
+        `SELECT 
+          cm.id,
+          cm.message,
+          cm.timestamp,
+          CASE 
+            WHEN cm.game_id IS NULL THEN 'General Chat'
+            ELSE CONCAT('Game #', cm.game_id)
+          END as context,
+          cm.is_deleted
+        FROM chat_message cm
+        WHERE cm.sender_id = $1
+        AND cm.timestamp > NOW() - INTERVAL '1 month'
+        ORDER BY cm.timestamp DESC
+        LIMIT 100`,
+        [userId]
+      );
+      
+      ctx.response.body = messages.rows;
+      
+    } catch (err) {
+      console.error("Error fetching user messages:", err);
+      ctx.response.status = 500;
+      ctx.response.body = { error: "Internal server error" };
+    }
+});
+
 // POST /api/report - Créer un rapport
 profileRouter.post("/api/report", authMiddleware, async (ctx) => {
   try {

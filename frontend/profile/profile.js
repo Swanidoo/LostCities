@@ -16,13 +16,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     currentUserId = userId;
     
-    // Vérifier si c'est notre propre profil
+    // Vérifier si l'utilisateur connecté est admin
     const token = localStorage.getItem('authToken');
+    let isAdmin = false;
+    
     if (token) {
         try {
             const tokenParts = token.split('.');
             const payload = JSON.parse(atob(tokenParts[1]));
             isOwnProfile = payload.id === parseInt(userId);
+            isAdmin = payload.role === 'admin';
         } catch (error) {
             console.error('Error parsing token:', error);
         }
@@ -35,6 +38,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Charger le profil
     await loadProfile();
+    
+    // Si admin, charger et afficher les messages
+    if (isAdmin) {
+        document.getElementById('admin-section').style.display = 'block';
+        await loadUserMessages(userId);
+    }
     
     // Configurer les gestionnaires d'événements
     setupEventListeners();
@@ -72,6 +81,51 @@ async function loadProfile() {
         console.error('Error loading profile:', error);
         alert('Erreur lors du chargement du profil');
     }
+}
+
+
+async function loadUserMessages(userId) {
+    try {
+        const response = await fetch(`${API_URL}/api/profile/${userId}/messages`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load messages');
+        }
+        
+        const messages = await response.json();
+        displayMessages(messages);
+        
+    } catch (error) {
+        console.error('Error loading user messages:', error);
+    }
+}
+
+function displayMessages(messages) {
+    const tbody = document.getElementById('user-messages');
+    tbody.innerHTML = '';
+    
+    if (messages.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4">Aucun message récent</td></tr>';
+        return;
+    }
+    
+    messages.forEach(msg => {
+        const row = document.createElement('tr');
+        const date = new Date(msg.timestamp).toLocaleString('fr-FR');
+        const statusClass = msg.is_deleted ? 'message-deleted' : '';
+        
+        row.innerHTML = `
+            <td>${date}</td>
+            <td>${msg.context}</td>
+            <td class="${statusClass}">${msg.message}</td>
+            <td>${msg.is_deleted ? 'Supprimé' : 'Actif'}</td>
+        `;
+        tbody.appendChild(row);
+    });
 }
 
 function setupEventListeners() {

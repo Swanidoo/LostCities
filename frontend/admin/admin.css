@@ -227,6 +227,48 @@ button:contains("Unban") {
     font-weight: 600;
 }
 
+/* Barre de recherche */
+.search-container {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-container input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 0.9rem;
+}
+
+.search-container input::placeholder {
+    color: #aaa;
+}
+
+.search-container button {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #666, #444);
+    color: white;
+}
+
+/* Style pour l'email dans les rapports */
+.report-email {
+    font-size: 0.8rem;
+    color: #aaa;
+    display: block;
+}
+
+td small {
+    display: block;
+    color: #aaa;
+    font-size: 0.8rem;
+    margin-top: 2px;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .stats-grid {

@@ -7,7 +7,7 @@ let currentUsersPage = 1;
 let currentMessagesPage = 1;
 
 // Fonction pour charger les utilisateurs avec pagination
-async function loadUsers(page = 1) {
+sync function loadUsers(page = 1) {
     try {
         const response = await fetch(`${API_URL}/api/admin/users?page=${page}&limit=50`, {
             headers: {
@@ -15,7 +15,6 @@ async function loadUsers(page = 1) {
             },
         });
 
-        // Check if response is ok
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -23,13 +22,15 @@ async function loadUsers(page = 1) {
 
         const data = await response.json();
         
-        // Defensive check
         if (!data.users) {
             throw new Error("Invalid response format: missing users data");
         }
 
         const usersTableBody = document.querySelector("#usersTable tbody");
         usersTableBody.innerHTML = "";
+
+        // Stocker les utilisateurs pour la recherche
+        window.allUsers = data.users;
 
         data.users.forEach(user => {
             const row = document.createElement("tr");
@@ -39,6 +40,7 @@ async function loadUsers(page = 1) {
                 <td>${user.email}</td>
                 <td>${user.role}</td>
                 <td>
+                    <button onclick="viewProfile(${user.id})">Voir le profil</button>
                     <button onclick="muteUser(${user.id})">Mute</button>
                     <button onclick="banUser(${user.id})">Ban</button>
                     <button onclick="deleteUser(${user.id})">Delete</button>
@@ -47,13 +49,46 @@ async function loadUsers(page = 1) {
             usersTableBody.appendChild(row);
         });
         
-        // Ajouter les contrôles de pagination
         updatePaginationControls('users', data.pagination);
         
     } catch (error) {
         console.error("Error loading users:", error);
         alert(`Failed to load users: ${error.message}`);
     }
+}
+
+function viewProfile(userId) {
+    window.open(`/profile/profile.html?id=${userId}`, '_blank');
+}
+
+function searchUsers(query) {
+    if (!window.allUsers) return;
+    
+    const searchTerm = query.toLowerCase();
+    const filteredUsers = window.allUsers.filter(user => 
+        user.username.toLowerCase().includes(searchTerm) ||
+        user.email.toLowerCase().includes(searchTerm)
+    );
+    
+    const usersTableBody = document.querySelector("#usersTable tbody");
+    usersTableBody.innerHTML = "";
+
+    filteredUsers.forEach(user => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${user.id}</td>
+            <td>${user.username}</td>
+            <td>${user.email}</td>
+            <td>${user.role}</td>
+            <td>
+                <button onclick="viewProfile(${user.id})">Voir le profil</button>
+                <button onclick="muteUser(${user.id})">Mute</button>
+                <button onclick="banUser(${user.id})">Ban</button>
+                <button onclick="deleteUser(${user.id})">Delete</button>
+            </td>
+        `;
+        usersTableBody.appendChild(row);
+    });
 }
 
 // Fonction pour charger les statistiques du dashboard
@@ -366,8 +401,12 @@ async function loadReports() {
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td>${report.id}</td>
-                <td>${report.reporter_username || 'Inconnu'}</td>
-                <td>${report.reported_username || 'Inconnu'}</td>
+                <td>${report.reporter_username || 'Inconnu'}<br>
+                    <small style="color: #aaa;">${report.reporter_email || ''}</small>
+                </td>
+                <td>${report.reported_username || 'Inconnu'}<br>
+                    <small style="color: #aaa;">${report.reported_email || ''}</small>
+                </td>
                 <td>${report.report_type}</td>
                 <td>${report.description}</td>
                 <td><span class="status-badge status-${report.status}">${report.status}</span></td>
@@ -416,5 +455,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         loadDashboardStats();
         loadChatMessages();
         loadReports();
+        
+        const searchInput = document.getElementById('user-search');
+        const clearButton = document.getElementById('clear-search');
+        
+        searchInput.addEventListener('input', (e) => {
+            searchUsers(e.target.value);
+        });
+        
+        clearButton.addEventListener('click', () => {
+            searchInput.value = '';
+            loadUsers();
+        });
     }
 });

@@ -590,7 +590,7 @@ function closeUserMenu() {
 async function viewProfile(username) {
     closeUserMenu();
     
-    // Récupérer l'ID de l'utilisateur
+    // Navigation normale depuis le chat
     try {
         const response = await fetch(`${API_URL}/api/users`);
         const users = await response.json();

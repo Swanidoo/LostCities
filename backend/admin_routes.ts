@@ -266,7 +266,6 @@ adminRouter.delete("/api/admin/chat-messages/:id", requireAdmin, async (ctx) => 
 // Route pour obtenir les rapports
 adminRouter.get("/api/admin/reports", requireAdmin, async (ctx) => {
   try {
-    // Utiliser URLSearchParams au lieu de helpers.getQuery si helpers cause des problèmes
     const url = new URL(ctx.request.url);
     const status = url.searchParams.get('status') || 'pending';
     
@@ -274,7 +273,9 @@ adminRouter.get("/api/admin/reports", requireAdmin, async (ctx) => {
       SELECT 
         r.*,
         reporter.username as reporter_username,
+        reporter.email as reporter_email,
         reported.username as reported_username,
+        reported.email as reported_email,
         cm.message as reported_message
       FROM reports r
       JOIN users reporter ON r.reporter_id = reporter.id

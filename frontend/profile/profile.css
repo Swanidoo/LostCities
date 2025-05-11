@@ -175,3 +175,42 @@
     background: #666;
     color: white;
 }
+
+/* Section admin */
+#admin-section {
+    margin-top: 30px;
+}
+
+.messages-container {
+    max-height: 400px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.messages-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.messages-table th,
+.messages-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.messages-table th {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.messages-table td {
+    color: #ddd;
+}
+
+.message-deleted {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
