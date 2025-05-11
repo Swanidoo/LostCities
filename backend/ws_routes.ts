@@ -133,9 +133,24 @@ wsRouter.get("/ws", async (ctx) => {
         connectedClients.splice(existingIndex, 1);
       }
       
-      // Add the new client to the connected clients array
-      connectedClients.push({ socket, username });
-      console.log(`👥 Current connected clients: ${connectedClients.length}`);
+      socket.onopen = function() {
+        // Ajouter le client à la liste après que la connexion est ouverte
+        connectedClients.push({ socket, username });
+        console.log(`👥 Current connected clients: ${connectedClients.length}`);
+        
+        // Envoyer le message de bienvenue
+        try {
+          socket.send(JSON.stringify({
+            event: "systemMessage",
+            data: { message: `Welcome to the chat, ${username}!` }
+          }));
+        } catch (error) {
+          console.error(`❌ Error sending welcome message to ${username}:`, error);
+        }
+        
+        // Notifier les autres utilisateurs
+        broadcastSystemMessage(`${username} has joined the chat.`, socket);
+      };
       logConnectedClients();
       
       // Send a welcome message to the client
@@ -380,7 +395,16 @@ function handleChatMessage(
     return;
   }
   
+  // Récupérer l'ID de l'utilisateur et vérifier s'il est muté
   getUserIdFromUsername(username).then(async (userId) => {
+    if (!userId) {
+      console.error("User ID not found for username:", username);
+      return;
+    }
+    
+    // AJOUT : Récupérer les informations de mute
+    const muteInfo = await getUserMuteInfo(userId);
+    
     if (muteInfo.isMuted) {
       let errorMessage = "Vous êtes muté et ne pouvez pas envoyer de messages.";
       

@@ -289,12 +289,6 @@ function initializeChat() {
         addSystemMessage('Déconnecté du chat');
     });
 
-    // Fonction pour auto-resize le textarea
-    function autoResizeTextarea(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-    }
-
     checkMuteStatus();
 
     // Gérer l'envoi de messages
@@ -330,6 +324,11 @@ function initializeChat() {
             updateCharCounter(e.target);
         });
     }
+}
+
+function autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
 }
 
 function checkMuteStatus() {
