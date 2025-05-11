@@ -6,6 +6,29 @@ const API_URL = window.location.hostname === "localhost"
 let currentUsersPage = 1;
 let currentMessagesPage = 1;
 
+
+// Fonction de notification commune pour toutes les actions d'administration
+function showNotification(message, success = true) {
+    const notification = document.createElement('div');
+    notification.className = 'admin-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${success ? '#4caf50' : '#f44336'};
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        animation: fadeInOut 2s ease-in-out;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 2500);
+}
+
+
 // Fonction pour charger les utilisateurs avec pagination
 async function loadUsers(page = 1) {
     try {
@@ -62,7 +85,7 @@ async function loadUsers(page = 1) {
         
     } catch (error) {
         console.error("Error loading users:", error);
-        alert(`Failed to load users: ${error.message}`);
+        showNotification(`Erreur lors du chargement des utilisateurs: ${error.message}`, false);
     }
 }
 
@@ -77,11 +100,12 @@ async function unbanUser(userId) {
         });
         
         if (response.ok) {
-            alert("Utilisateur débanni avec succès!");
+            showNotification("Utilisateur débanni avec succès!");
             loadUsers();
         }
     } catch (error) {
         console.error("Error unbanning user:", error);
+        showNotification("Erreur lors du débannissement", false);
     }
 }
 
@@ -96,11 +120,12 @@ async function unmuteUser(userId) {
         });
         
         if (response.ok) {
-            alert("Utilisateur dé-muté avec succès!");
+            showNotification("Utilisateur démuté avec succès!");
             loadUsers(currentUsersPage);
         }
     } catch (error) {
         console.error("Error unmuting user:", error);
+        showNotification("Erreur lors du démute", false);
     }
 }
 
@@ -204,36 +229,15 @@ async function deleteMessage(messageId) {
                 }, 500);
             }
             
-            // Notification discrète
-            const notification = document.createElement('div');
-            notification.className = 'delete-notification';
-            notification.textContent = 'Message supprimé';
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #4caf50;
-                color: white;
-                padding: 10px 20px;
-                border-radius: 5px;
-                animation: fadeInOut 2s ease-in-out;
-                z-index: 1000;
-            `;
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 2000);
+            showNotification('Message supprimé');
             
         } else {
             console.error('Server returned error:', response.status);
-            alert("Erreur lors de la suppression du message");
-            // Restaurer l'apparence si erreur
-            if (messageRow) {
-                messageRow.style.opacity = '1';
-                messageRow.style.transform = 'scale(1)';
-            }
+            showNotification('Erreur lors de la suppression du message', false);
         }
     } catch (error) {
         console.error("Error deleting message:", error);
-        alert("Erreur lors de la suppression du message");
+        showNotification("Erreur lors de la suppression du message", false);
         // Restaurer l'apparence si erreur
         if (messageRow) {
             messageRow.style.opacity = '1';
@@ -286,7 +290,7 @@ async function muteUser(userId, username = null) {
         });
         
         if (response.ok) {
-            alert(username ? `${username} a été muté avec succès!` : "Utilisateur muté avec succès!");
+            showNotification(username ? `${username} a été muté avec succès!` : "Utilisateur muté avec succès!");
             // Recharger la liste appropriée
             if (username) {
                 loadChatMessages();
@@ -296,7 +300,7 @@ async function muteUser(userId, username = null) {
         }
     } catch (error) {
         console.error("Error muting user:", error);
-        alert("Erreur lors du mute");
+        showNotification("Erreur lors du mute", false);
     }
 }
 
@@ -341,7 +345,6 @@ async function loadChatMessages(page = 1) {
                 <td><span class="status-badge ${msg.report_count > 0 ? 'status-pending' : ''}">${msg.report_count || 0}</span></td>
                 <td>
                     <button onclick="muteUserFromChat(${msg.sender_id}, '${msg.sender_username}')" title="Mute">🔇 Mute</button>
-                    <button onclick="banUserFromChat(${msg.sender_id}, '${msg.sender_username}')" title="Ban">🚫 Ban</button>
                     <button onclick="deleteMessage(${msg.id})" title="Supprimer">🗑️ Supprimer</button>
                 </td>
             `;
@@ -353,7 +356,7 @@ async function loadChatMessages(page = 1) {
         
     } catch (error) {
         console.error("Error loading chat messages:", error);
-        alert(`Failed to load messages: ${error.message}`);
+        showNotification(`Erreur lors du chargement des messages: ${error.message}`, false);
     }
 }
 
@@ -465,8 +468,13 @@ function animateValue(id, start, end, duration) {
 
 // Fonction pour bannir un utilisateur
 async function banUser(userId) {
-    const duration = prompt("Durée du ban en secondes (laisser vide pour permanent):");
+    // First ask for reason (nouveau ordre)
     const reason = prompt("Raison du ban:");
+    if (reason === null) return;
+    
+    // Then ask for duration
+    const duration = prompt("Durée en secondes (laisser vide pour permanent):");
+    if (duration === null) return;
     
     try {
         const response = await fetch(`${API_URL}/api/admin/users/${userId}/ban`, {
@@ -479,11 +487,12 @@ async function banUser(userId) {
         });
         
         if (response.ok) {
-            alert("Utilisateur banni avec succès!");
+            showNotification("Utilisateur banni avec succès!");
             loadUsers();
         }
     } catch (error) {
         console.error("Error banning user:", error);
+        showNotification("Erreur lors du bannissement", false);
     }
 }
 
@@ -501,10 +510,11 @@ async function deleteUser(userId) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        alert("User deleted successfully!");
+        showNotification("Utilisateur supprimé avec succès!");
         loadUsers(); // Recharge la liste des utilisateurs
     } catch (error) {
         console.error("Error deleting user:", error);
+        showNotification("Erreur lors de la suppression de l'utilisateur", false);
     }
 }
 
@@ -566,6 +576,7 @@ async function loadReports() {
         
     } catch (error) {
         console.error("Error loading reports:", error);
+        showNotification("Erreur lors du chargement des rapports", false);
     }
 }
 
@@ -584,7 +595,7 @@ async function resolveReport(reportId, resolution) {
         });
         
         if (response.ok) {
-            alert("Rapport traité avec succès!");
+            showNotification(`Rapport tarité avec succès!`);
             loadReports();
         }
     } catch (error) {

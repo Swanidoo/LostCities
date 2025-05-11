@@ -636,7 +636,7 @@ async function muteUserDirectly(username) {
     closeUserMenu();
     
     // D'abord la raison
-    const reason = prompt("Raison du mute:");
+    const reason = prompt(username ? `Raison du mute pour ${username}:` : "Raison du mute:");
     if (reason === null) return;
     
     // Ensuite la durée
