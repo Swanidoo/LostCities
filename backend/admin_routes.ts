@@ -112,6 +112,32 @@ adminRouter.post("/api/admin/users/:id/ban", requireAdmin, async (ctx) => {
   ctx.response.body = { message: "User banned successfully" };
 });
 
+// Débannir un utilisateur
+adminRouter.post("/api/admin/users/:id/unban", requireAdmin, async (ctx) => {
+  const userId = ctx.params.id;
+  const adminId = ctx.state.user.id;
+  
+  await client.queryObject(
+    `UPDATE users 
+     SET is_banned = false, 
+         banned_at = NULL, 
+         banned_until = NULL,
+         ban_reason = NULL
+     WHERE id = $1`,
+    [userId]
+  );
+  
+  // Logger l'action
+  await client.queryObject(
+    `INSERT INTO admin_actions (admin_id, action_type, target_user_id, reason)
+     VALUES ($1, 'unban', $2, 'Utilisateur débanni')`,
+    [adminId, userId]
+  );
+  
+  ctx.response.body = { message: "User unbanned successfully" };
+});
+
+
 // Dashboard stats
 adminRouter.get("/api/admin/dashboard", requireAdmin, async (ctx) => {
   try {

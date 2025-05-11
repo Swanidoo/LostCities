@@ -29,12 +29,19 @@ const elements = {
 };
 
 // Initialisation
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Vérifier si l'utilisateur est connecté
     const token = localStorage.getItem('authToken');
     if (!token) {
-        // Rediriger vers la page de connexion si non connecté
         window.location.href = '../login/login.html';
+        return;
+    }
+
+    // Vérifier le statut de ban
+    const banInfo = await checkBanStatus();
+    if (banInfo) {
+        alert(`Vous êtes banni. ${banInfo.reason ? 'Raison: ' + banInfo.reason : ''}`);
+        window.location.href = '/';
         return;
     }
 
@@ -60,6 +67,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Établir la connexion WebSocket
     connectWebSocket(cleanToken);
 });
+
+async function checkBanStatus() {
+    const token = localStorage.getItem('authToken');
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${API_URL}/profile`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.status === 403) {
+            const data = await response.json();
+            if (data.banInfo) {
+                return data.banInfo;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Error checking ban status:', error);
+        return false;
+    }
+}
 
 // Configuration des écouteurs d'événements
 function setupEventListeners() {
@@ -140,6 +171,16 @@ function handleWebSocketMessage(event) {
         console.log("📩 Message received:", data);
 
         switch (data.event) {
+            case "error":
+                if (data.data && data.data.type === "ban_error") {
+                    alert(`Vous êtes banni. ${data.data.banInfo?.reason ? 'Raison: ' + data.data.banInfo.reason : ''}`);
+                    window.location.href = '/';
+                    return;
+                }
+                // Gérer les autres erreurs
+                updateStatus(data.data?.message || "Une erreur est survenue", false);
+                break;
+
             case "matchmakingStatus":
                 // Update matchmaking status
                 updateStatus(data.data.message, data.data.status === "searching");

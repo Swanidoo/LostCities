@@ -8,7 +8,7 @@ let chatInput = null;
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_MESSAGE_LINES = 15;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const loginSection = document.getElementById('login-section');
     const userSection = document.getElementById('user-section');
     const usernameSpan = document.getElementById('username');
@@ -49,6 +49,78 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Erreur lors de la lecture du token:", error);
         }
+        
+        // Vérifier le statut de ban AVANT d'initialiser le chat
+        const banInfo = await checkBanStatus();
+        
+        if (banInfo) {
+            const playBtn = document.getElementById('play-btn');
+            if (playBtn) {
+                playBtn.classList.add('banned');
+                playBtn.disabled = true;
+                playBtn.style.backgroundColor = '#d32f2f';
+                playBtn.style.cursor = 'not-allowed';
+                playBtn.style.opacity = '0.8';
+                
+                // Créer le tooltip
+                const tooltip = document.createElement('div');
+                tooltip.className = 'ban-tooltip';
+                
+                let tooltipContent = '<p><strong>Vous êtes banni</strong></p>';
+                if (banInfo.until) {
+                    const untilDate = new Date(banInfo.until);
+                    const timeLeft = untilDate.getTime() - new Date().getTime();
+                    if (timeLeft > 0) {
+                        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                        
+                        let timeString = '';
+                        if (days > 0) timeString += `${days}j `;
+                        if (hours > 0) timeString += `${hours}h `;
+                        if (minutes > 0 && days === 0) timeString += `${minutes}min`;
+                        
+                        tooltipContent += `<p>Temps restant: ${timeString}</p>`;
+                        tooltipContent += `<p>Jusqu'à: ${untilDate.toLocaleString()}</p>`;
+                    }
+                } else {
+                    tooltipContent += '<p>Durée: Permanent</p>';
+                }
+                
+                if (banInfo.reason) {
+                    tooltipContent += `<p>Raison: ${banInfo.reason}</p>`;
+                }
+                
+                tooltip.innerHTML = tooltipContent;
+                
+                playBtn.addEventListener('mouseenter', (e) => {
+                    document.body.appendChild(tooltip);
+                    const rect = playBtn.getBoundingClientRect();
+                    tooltip.style.display = 'block';
+                    tooltip.style.position = 'absolute';
+                    tooltip.style.left = rect.left + 'px';
+                    tooltip.style.top = (rect.bottom + 5) + 'px';
+                    tooltip.style.zIndex = '1000';
+                });
+                
+                playBtn.addEventListener('mouseleave', () => {
+                    if (tooltip.parentNode) {
+                        tooltip.parentNode.removeChild(tooltip);
+                    }
+                });
+                
+                // Bloquer le clic sur le bouton
+                playBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            }
+        } else {
+            // Si l'utilisateur n'est pas banni, ajouter le gestionnaire normal
+            document.getElementById('play-btn').addEventListener('click', () => {
+                window.location.href = '/matchmaking/matchmaking.html';
+            });
+        }
     
         // Initialiser le chat automatiquement pour les utilisateurs connectés
         initializeChat();
@@ -58,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userSection.classList.remove('hidden');
     }
     
-    // Gestionnaires d'événements pour les boutons
+    // Gestionnaires d'événements pour les boutons (hors du if(token))
     document.getElementById('login-btn').addEventListener('click', () => {
         window.location.href = '/login/login.html';
     });
@@ -70,10 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('logout-btn').addEventListener('click', () => {
         localStorage.removeItem('authToken');
         window.location.reload();
-    });
-
-    document.getElementById('play-btn').addEventListener('click', () => {
-        window.location.href = '/matchmaking/matchmaking.html';
     });
 
     // UN SEUL gestionnaire pour le bouton toggle chat
@@ -687,6 +755,30 @@ async function submitReport(username, formData) {
     } catch (error) {
         console.error('Error submitting report:', error);
         alert('Erreur lors de l\'envoi du signalement');
+    }
+}
+
+async function checkBanStatus() {
+    const token = localStorage.getItem('authToken');
+    if (!token) return false;
+    
+    try {
+        const response = await fetch(`${API_URL}/profile`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.status === 403) {
+            const data = await response.json();
+            if (data.banInfo) {
+                return data.banInfo;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Error checking ban status:', error);
+        return false;
     }
 }
 

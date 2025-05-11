@@ -42,8 +42,10 @@ async function loadUsers(page = 1) {
                 <td>
                     <button onclick="viewProfile(${user.id})">Voir le profil</button>
                     <button onclick="muteUser(${user.id})">Mute</button>
-                    <button onclick="banUser(${user.id})">Ban</button>
-                    <button onclick="deleteUser(${user.id})">Delete</button>
+                    ${user.is_banned ? 
+                        `<button onclick="unbanUser(${user.id})">Unban</button>` : 
+                        `<button onclick="banUser(${user.id})">Ban</button>`
+                    }
                 </td>
             `;
             usersTableBody.appendChild(row);
@@ -54,6 +56,25 @@ async function loadUsers(page = 1) {
     } catch (error) {
         console.error("Error loading users:", error);
         alert(`Failed to load users: ${error.message}`);
+    }
+}
+
+async function unbanUser(userId) {
+    try {
+        const response = await fetch(`${API_URL}/api/admin/users/${userId}/unban`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+                "Content-Type": "application/json"
+            }
+        });
+        
+        if (response.ok) {
+            alert("Utilisateur débanni avec succès!");
+            loadUsers();
+        }
+    } catch (error) {
+        console.error("Error unbanning user:", error);
     }
 }
 
@@ -89,6 +110,30 @@ function searchUsers(query) {
         `;
         usersTableBody.appendChild(row);
     });
+}
+
+async function deleteMessage(messageId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce message ?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/api/admin/chat-messages/${messageId}`, {
+            method: "DELETE",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+            }
+        });
+        
+        if (response.ok) {
+            alert("Message supprimé avec succès!");
+            loadChatMessages();
+        } else {
+            alert("Erreur lors de la suppression du message");
+        }
+    } catch (error) {
+        console.error("Error deleting message:", error);
+    }
 }
 
 // Fonction pour charger les statistiques du dashboard

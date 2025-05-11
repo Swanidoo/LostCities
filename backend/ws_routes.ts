@@ -596,6 +596,34 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
 }
 
 function handleMatchmaking(socket, username, userId) {
+  try {
+    const banResult = await client.queryObject(
+      `SELECT is_banned, banned_until, ban_reason FROM users WHERE id = $1`,
+      [userId]
+    );
+    
+    if (banResult.rows.length > 0) {
+      const user = banResult.rows[0];
+      
+      if (user.is_banned && (!user.banned_until || new Date(user.banned_until) > new Date())) {
+        socket.send(JSON.stringify({
+          event: "error",
+          data: { 
+            message: "Vous êtes banni et ne pouvez pas rechercher de partie",
+            type: "ban_error",
+            banInfo: {
+              reason: user.ban_reason,
+              until: user.banned_until
+            }
+          }
+        }));
+        return;
+      }
+    }
+  } catch (error) {
+    console.error("Error checking ban status:", error);
+  }
+  
   console.log(`🎮 User ${username} (${userId}) is looking for a match`);
   
   // Remove any existing entry for this player (in case they're already searching)

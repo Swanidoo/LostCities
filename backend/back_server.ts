@@ -14,8 +14,9 @@ import { securityHeadersMiddleware } from "./middlewares/security_headers_middle
 import { rateLimitingMiddleware } from "./middlewares/rate_limiting_middleware.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
-import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 import profileRouter from "./profile_routes.ts";
+import { checkUserStatus } from "./middlewares/check_user_status.ts";
+import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
 const app = new Application();
 
@@ -76,6 +77,7 @@ app.use(publicUserRouter.allowedMethods());
 
 // 🔒 Auth middleware pour routes protégées
 app.use(authMiddleware);
+app.use(checkUserStatus);
 
 // 🔒 Routes protégées
 app.use(gameRouter.routes());
@@ -86,6 +88,7 @@ app.use(settingsRouter.routes());
 app.use(settingsRouter.allowedMethods());
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
+
 
 // 🚀 Lancer le serveur
 const port = parseInt(Deno.env.get("PORT") || "3000");

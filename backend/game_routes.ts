@@ -76,6 +76,28 @@ gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
     const userId = ctx.state.user.id;
     const gameId = Date.now(); // Use timestamp for ID
 
+    const userId = ctx.state.user.id;
+    const banResult = await client.queryObject(
+      `SELECT is_banned, banned_until, ban_reason FROM users WHERE id = $1`,
+      [userId]
+    );
+    
+    if (banResult.rows.length > 0) {
+      const user = banResult.rows[0];
+      
+      if (user.is_banned && (!user.banned_until || new Date(user.banned_until) > new Date())) {
+        ctx.response.status = 403;
+        ctx.response.body = { 
+          error: "You are banned and cannot create games",
+          banInfo: {
+            reason: user.ban_reason,
+            until: user.banned_until
+          }
+        };
+        return;
+      }
+    }
+
     console.log(`🎮 Creating new game ${gameId} between ${userId} and ${opponentId}`);
     
     // Create game entry
