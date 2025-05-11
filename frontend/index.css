@@ -483,7 +483,63 @@ body {
     display: none !important;
 }
 
+/* Notification de mute */
+.mute-notification {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(244, 67, 54, 0.95);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    max-width: 80%;
+    animation: fadeIn 0.3s ease, shake 0.5s ease;
+}
+
+.mute-icon {
+    font-size: 24px;
+}
+
+.mute-message {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.mute-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.mute-close:hover {
+    opacity: 1;
+}
+
 /* === Animations === */
+
+@keyframes shake {
+    0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translate(-50%, -50%) translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translate(-50%, -50%) translateX(5px); }
+}
+
+
 @keyframes fadeIn {
     from { 
         opacity: 0; 

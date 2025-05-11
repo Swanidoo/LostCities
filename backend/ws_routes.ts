@@ -174,6 +174,10 @@ wsRouter.get("/ws", async (ctx) => {
                     handleChatMessage(data.data, socket, clientData.username);
                 }
                 break;
+            case "checkMuteStatus":
+              // Vérifier le statut de mute et renvoyer l'info
+              handleCheckMuteStatus(socket, clientData.username);
+              break;
             case "movePlayed":
                 if (data.data?.gameId && data.data?.move) {
                     handleMovePlayed(data.data, socket, clientData.username);
@@ -275,6 +279,54 @@ wsRouter.get("/ws", async (ctx) => {
   }
 });
 
+async function handleCheckMuteStatus(socket: WebSocket, username: string) {
+  const userId = await getUserIdFromUsername(username);
+  if (!userId) return;
+  
+  const muteInfo = await getUserMuteInfo(userId);
+  
+  if (muteInfo.isMuted) {
+      let errorMessage = "Vous êtes muté et ne pouvez pas envoyer de messages.";
+      
+      if (muteInfo.reason) {
+          errorMessage += ` Raison: ${muteInfo.reason}`;
+      }
+      
+      if (muteInfo.until) {
+          const untilDate = new Date(muteInfo.until);
+          const now = new Date();
+          const timeLeft = untilDate.getTime() - now.getTime();
+          
+          if (timeLeft > 0) {
+              const minutes = Math.floor(timeLeft / (1000 * 60));
+              const hours = Math.floor(minutes / 60);
+              const days = Math.floor(hours / 24);
+              
+              let timeString = "";
+              if (days > 0) {
+                  timeString = `${days} jour${days > 1 ? 's' : ''}`;
+              } else if (hours > 0) {
+                  timeString = `${hours} heure${hours > 1 ? 's' : ''}`;
+              } else {
+                  timeString = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+              }
+              
+              errorMessage += ` Temps restant: ${timeString}`;
+          }
+      } else {
+          errorMessage += " (Permanent)";
+      }
+      
+      socket.send(JSON.stringify({
+          event: "error",
+          data: { 
+              message: errorMessage,
+              type: "mute_error"
+          }
+      }));
+  }
+}
+
 // Broadcast a system message to all clients except the excluded socket
 function broadcastSystemMessage(message: string, excludeSocket?: WebSocket) {
   console.log(`💬 Broadcasting system message: ${message}`);
@@ -329,9 +381,6 @@ function handleChatMessage(
   }
   
   getUserIdFromUsername(username).then(async (userId) => {
-    if (!userId) return;
-    
-    const muteInfo = await getUserMuteInfo(userId);
     if (muteInfo.isMuted) {
       let errorMessage = "Vous êtes muté et ne pouvez pas envoyer de messages.";
       
@@ -341,14 +390,36 @@ function handleChatMessage(
       
       if (muteInfo.until) {
         const untilDate = new Date(muteInfo.until);
-        errorMessage += ` Jusqu'à: ${untilDate.toLocaleString()}`;
+        const now = new Date();
+        const timeLeft = untilDate.getTime() - now.getTime();
+        
+        if (timeLeft > 0) {
+          // Calculer le temps restant
+          const minutes = Math.floor(timeLeft / (1000 * 60));
+          const hours = Math.floor(minutes / 60);
+          const days = Math.floor(hours / 24);
+          
+          let timeString = "";
+          if (days > 0) {
+            timeString = `${days} jour${days > 1 ? 's' : ''}`;
+          } else if (hours > 0) {
+            timeString = `${hours} heure${hours > 1 ? 's' : ''}`;
+          } else {
+            timeString = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+          }
+          
+          errorMessage += ` Temps restant: ${timeString}`;
+        }
       } else {
         errorMessage += " (Permanent)";
       }
       
       sender.send(JSON.stringify({
         event: "error",
-        data: { message: errorMessage }
+        data: { 
+          message: errorMessage,
+          type: "mute_error"
+        }
       }));
       return;
     }

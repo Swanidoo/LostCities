@@ -6,29 +6,59 @@ const profileRouter = new Router();
 
 // GET /api/profile/:id - Récupérer un profil public
 profileRouter.get("/api/profile/:id", async (ctx) => {
-  try {
-    const userId = ctx.params.id;
-    const result = await client.queryObject(
-      `SELECT id, username, avatar_url, bio, created_at,
-       (SELECT COUNT(*) FROM games WHERE player1_id = $1 OR player2_id = $1) as games_played,
-       (SELECT COUNT(*) FROM games WHERE (player1_id = $1 OR player2_id = $1) AND winner_id = $1) as games_won
-       FROM users WHERE id = $1`,
-      [userId]
-    );
-    
-    if (result.rows.length === 0) {
-      ctx.response.status = 404;
-      ctx.response.body = { error: "User not found" };
-      return;
+    try {
+      const userId = ctx.params.id;
+      
+      // First check if user exists
+      const userResult = await client.queryObject(
+        `SELECT id, username, avatar_url, bio, created_at FROM users WHERE id = $1`,
+        [userId]
+      );
+      
+      if (userResult.rows.length === 0) {
+        ctx.response.status = 404;
+        ctx.response.body = { error: "User not found" };
+        return;
+      }
+      
+      const user = userResult.rows[0];
+      
+      // Get game stats separately with error handling
+      let gamesPlayed = 0;
+      let gamesWon = 0;
+      
+      try {
+        const statsResult = await client.queryObject(
+          `SELECT 
+            COUNT(*) as games_played,
+            COUNT(CASE WHEN winner_id = $1 THEN 1 END) as games_won
+          FROM games 
+          WHERE player1_id = $1 OR player2_id = $1`,
+          [userId]
+        );
+        
+        if (statsResult.rows.length > 0) {
+          gamesPlayed = Number(statsResult.rows[0].games_played) || 0;
+          gamesWon = Number(statsResult.rows[0].games_won) || 0;
+        }
+      } catch (statsError) {
+        console.error("Error fetching game stats:", statsError);
+        // Continue with default values
+      }
+      
+      // Return combined data
+      ctx.response.body = {
+        ...user,
+        games_played: gamesPlayed,
+        games_won: gamesWon
+      };
+      
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+      ctx.response.status = 500;
+      ctx.response.body = { error: "Internal server error" };
     }
-    
-    ctx.response.body = result.rows[0];
-  } catch (err) {
-    console.error("Error fetching profile:", err);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
-  }
-});
+  });
 
 // PUT /api/profile - Mettre à jour son propre profil
 profileRouter.put("/api/profile", authMiddleware, async (ctx) => {

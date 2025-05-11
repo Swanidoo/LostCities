@@ -196,9 +196,16 @@ async function loadUserAvatar(userId) {
                     userAvatar.src = profile.avatar_url;
                 }
             }
+        } else {
+            console.warn(`Failed to load avatar for user ${userId}: ${response.status}`);
         }
     } catch (error) {
         console.error('Error loading user avatar:', error);
+        // Use default avatar on error
+        const userAvatar = document.getElementById('user-avatar');
+        if (userAvatar) {
+            userAvatar.src = '/assets/default-avatar.png';
+        }
     }
 }
 
@@ -263,6 +270,13 @@ function initializeChat() {
                 addChatMessage(data.data.username, data.data.message);
             } else if (data.event === 'systemMessage' && data.data) {
                 addSystemMessage(data.data.message);
+            } else if (data.event === 'error' && data.data) {
+                // Gérer les erreurs, notamment les erreurs de mute
+                if (data.data.type === 'mute_error') {
+                    showMuteError(data.data.message);
+                } else {
+                    addSystemMessage(`Erreur: ${data.data.message}`);
+                }
             }
         } catch (error) {
             console.error('Error parsing message:', error);
@@ -275,12 +289,13 @@ function initializeChat() {
         addSystemMessage('Déconnecté du chat');
     });
 
-
     // Fonction pour auto-resize le textarea
     function autoResizeTextarea(textarea) {
-        textarea.style.height = 'auto'; // Réinitialise la hauteur pour recalculer
-        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'; // Ajuste la hauteur avec une limite maximale
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
     }
+
+    checkMuteStatus();
 
     // Gérer l'envoi de messages
     const chatForm = document.getElementById('chat-form');
@@ -314,6 +329,44 @@ function initializeChat() {
             autoResizeTextarea(e.target);
             updateCharCounter(e.target);
         });
+    }
+}
+
+function checkMuteStatus() {
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        chatInput.addEventListener('focus', () => {
+            // Envoyer un message au serveur pour vérifier le statut de mute
+            if (chatWebSocket && chatWebSocket.readyState === WebSocket.OPEN) {
+                chatWebSocket.send(JSON.stringify({
+                    event: 'checkMuteStatus'
+                }));
+            }
+        });
+    }
+}
+
+function showMuteError(message) {
+    // Créer une notification d'erreur plus visible
+    const notification = document.createElement('div');
+    notification.className = 'mute-notification';
+    notification.innerHTML = `
+        <div class="mute-icon">🔇</div>
+        <div class="mute-message">${message}</div>
+        <button class="mute-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    // Ajouter au conteneur de chat
+    const chatContainer = document.querySelector('.chat-container');
+    if (chatContainer) {
+        chatContainer.appendChild(notification);
+        
+        // Supprimer automatiquement après 10 secondes
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 10000);
     }
 }
 
@@ -474,12 +527,16 @@ async function muteUserDirectly(username) {
     closeUserMenu();
     
     const duration = prompt("Durée du mute en secondes (laisser vide pour permanent):");
+    
+    // Check if user cancelled the duration prompt
+    if (duration === null) return; // User clicked Cancel
+    
     const reason = prompt("Raison du mute:");
     
-    if (reason === null) return; // L'utilisateur a annulé
+    if (reason === null) return; // User clicked Cancel on reason
     
     try {
-        // Récupérer l'ID de l'utilisateur
+        // Rest of the code...
         const response = await fetch(`${API_URL}/api/users`);
         const users = await response.json();
         const user = users.find(u => u.username === username);
@@ -489,7 +546,6 @@ async function muteUserDirectly(username) {
             return;
         }
         
-        // Envoyer la requête de mute
         const muteResponse = await fetch(`${API_URL}/api/admin/users/${user.id}/mute`, {
             method: "POST",
             headers: {
