@@ -45,7 +45,10 @@ async function loadUsers(page = 1) {
               <td>${user.role}</td>
               <td>
                 <button onclick="viewProfile(${user.id})">Voir le profil</button>
-                <button onclick="muteUser(${user.id})">Mute</button>
+                ${user.is_muted ? 
+                  `<button onclick="unmuteUser(${user.id})">Unmute</button>` : 
+                  `<button onclick="muteUser(${user.id})">Mute</button>`
+                }
                 ${isBanned ? 
                   `<button onclick="unbanUser(${user.id})">Unban</button>` : 
                   `<button onclick="banUser(${user.id})">Ban</button>`
@@ -53,7 +56,7 @@ async function loadUsers(page = 1) {
               </td>
             `;
             usersTableBody.appendChild(row);
-          });
+        });
         
         updatePaginationControls('users', data.pagination);
         
@@ -79,6 +82,25 @@ async function unbanUser(userId) {
         }
     } catch (error) {
         console.error("Error unbanning user:", error);
+    }
+}
+
+async function unmuteUser(userId) {
+    try {
+        const response = await fetch(`${API_URL}/api/admin/users/${userId}/unmute`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+                "Content-Type": "application/json"
+            }
+        });
+        
+        if (response.ok) {
+            alert("Utilisateur dé-muté avec succès!");
+            loadUsers(currentUsersPage);
+        }
+    } catch (error) {
+        console.error("Error unmuting user:", error);
     }
 }
 
@@ -121,21 +143,41 @@ async function deleteMessage(messageId) {
         return;
     }
     
+    console.log('Attempting to delete message with ID:', messageId, 'Type:', typeof messageId);
+    
     // Trouver la ligne du message
-    let messageRow = null;
+    const messageRow = document.querySelector(`#chatMessagesTable tbody tr[data-message-id="${messageId}"]`);
     const rows = document.querySelectorAll('#chatMessagesTable tbody tr');
+    console.log('Found', rows.length, 'rows in table');
+    
     rows.forEach(row => {
         const idCell = row.querySelector('td:first-child');
-        if (idCell && idCell.textContent.trim() === messageId.toString()) {
-            messageRow = row;
+        if (idCell) {
+            const cellText = idCell.textContent.trim();
+            console.log('Checking row with ID:', cellText, 'Type:', typeof cellText);
+            
+            // Comparer en convertissant les deux en string
+            if (cellText === String(messageId)) {
+                console.log('Found matching row!');
+                messageRow = row;
+            }
         }
     });
     
+    if (!messageRow) {
+        console.error('Could not find row for message ID:', messageId);
+        // Alternative: essayer avec un sélecteur d'attribut si vous avez un data-id
+        messageRow = document.querySelector(`#chatMessagesTable tbody tr[data-message-id="${messageId}"]`);
+    }
+    
     if (messageRow) {
+        console.log('Animating row deletion');
         // Ajouter une classe pour l'animation
         messageRow.style.transition = 'opacity 0.5s, transform 0.5s';
         messageRow.style.opacity = '0.5';
         messageRow.style.transform = 'scale(0.95)';
+    } else {
+        console.error('Message row not found!');
     }
     
     try {
@@ -154,11 +196,14 @@ async function deleteMessage(messageId) {
                 
                 // Supprimer après l'animation
                 setTimeout(() => {
-                    messageRow.remove();
+                    if (messageRow && messageRow.parentNode) {
+                        messageRow.remove();
+                        console.log('Row removed from DOM');
+                    }
                 }, 500);
             }
             
-            // Notification discrète (sans alert)
+            // Notification discrète
             const notification = document.createElement('div');
             notification.className = 'delete-notification';
             notification.textContent = 'Message supprimé';
@@ -177,6 +222,7 @@ async function deleteMessage(messageId) {
             setTimeout(() => notification.remove(), 2000);
             
         } else {
+            console.error('Server returned error:', response.status);
             alert("Erreur lors de la suppression du message");
             // Restaurer l'apparence si erreur
             if (messageRow) {
@@ -284,6 +330,8 @@ async function loadChatMessages(page = 1) {
         
         data.messages.forEach(msg => {
             const row = document.createElement("tr");
+            // Ajouter un data-attribute pour faciliter la recherche
+            row.dataset.messageId = msg.id;
             row.innerHTML = `
                 <td>${msg.id}</td>
                 <td><strong>${msg.sender_username}</strong></td>

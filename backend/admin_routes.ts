@@ -42,7 +42,12 @@ adminRouter.get("/api/admin/users", requireAdmin, async (ctx) => {
           THEN false 
           ELSE is_banned 
         END as is_banned,
-        is_muted, 
+        -- Vérifier si l'utilisateur est muté
+        EXISTS (
+          SELECT 1 FROM user_mutes 
+          WHERE user_id = users.id 
+          AND (muted_until IS NULL OR muted_until > NOW())
+        ) as is_muted,
         COALESCE(created_at, NOW()) as created_at,
         banned_until,
         ban_reason,
@@ -105,6 +110,30 @@ adminRouter.post("/api/admin/users/:id/mute", requireAdmin, async (ctx) => {
   );
   
   ctx.response.body = { message: "User muted successfully" };
+});
+
+// Dé-muter un utilisateur
+adminRouter.post("/api/admin/users/:id/unmute", requireAdmin, async (ctx) => {
+  const userId = ctx.params.id;
+  const adminId = ctx.state.user.id;
+  
+  // Mettre à jour tous les mutes actifs de cet utilisateur pour les terminer
+  await client.queryObject(
+    `UPDATE user_mutes 
+     SET muted_until = CURRENT_TIMESTAMP 
+     WHERE user_id = $1 
+     AND (muted_until IS NULL OR muted_until > NOW())`,
+    [userId]
+  );
+  
+  // Logger l'action
+  await client.queryObject(
+    `INSERT INTO admin_actions (admin_id, action_type, target_user_id, reason)
+     VALUES ($1, 'unmute', $2, 'Utilisateur dé-muté')`,
+    [adminId, userId]
+  );
+  
+  ctx.response.body = { message: "User unmuted successfully" };
 });
 
 // Bannir un utilisateur
