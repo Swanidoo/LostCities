@@ -7,7 +7,7 @@ let currentUsersPage = 1;
 let currentMessagesPage = 1;
 
 // Fonction pour charger les utilisateurs avec pagination
-sync function loadUsers(page = 1) {
+async function loadUsers(page = 1) {
     try {
         const response = await fetch(`${API_URL}/api/admin/users?page=${page}&limit=50`, {
             headers: {
