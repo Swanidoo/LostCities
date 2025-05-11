@@ -269,6 +269,20 @@ td small {
     margin-top: 2px;
 }
 
+/* Style pour les lignes supprimées */
+#chatMessagesTable tr.deleting {
+    opacity: 0.5;
+    background-color: rgba(244, 67, 54, 0.1);
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-20px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+}
+
+
 /* Responsive design */
 @media (max-width: 768px) {
     .stats-grid {

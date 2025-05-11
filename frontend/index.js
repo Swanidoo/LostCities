@@ -603,17 +603,16 @@ function showUserMenu(event, username) {
 async function muteUserDirectly(username) {
     closeUserMenu();
     
-    const duration = prompt("Durée du mute en secondes (laisser vide pour permanent):");
-    
-    // Check if user cancelled the duration prompt
-    if (duration === null) return; // User clicked Cancel
-    
+    // D'abord la raison
     const reason = prompt("Raison du mute:");
+    if (reason === null) return;
     
-    if (reason === null) return; // User clicked Cancel on reason
+    // Ensuite la durée
+    const duration = prompt("Durée du mute en secondes (laisser vide pour permanent):");
+    if (duration === null) return;
     
     try {
-        // Rest of the code...
+        // Récupérer l'ID de l'utilisateur
         const response = await fetch(`${API_URL}/api/users`);
         const users = await response.json();
         const user = users.find(u => u.username === username);

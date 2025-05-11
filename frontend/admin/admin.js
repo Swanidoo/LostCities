@@ -121,6 +121,23 @@ async function deleteMessage(messageId) {
         return;
     }
     
+    // Trouver la ligne du message
+    let messageRow = null;
+    const rows = document.querySelectorAll('#chatMessagesTable tbody tr');
+    rows.forEach(row => {
+        const idCell = row.querySelector('td:first-child');
+        if (idCell && idCell.textContent.trim() === messageId.toString()) {
+            messageRow = row;
+        }
+    });
+    
+    if (messageRow) {
+        // Ajouter une classe pour l'animation
+        messageRow.style.transition = 'opacity 0.5s, transform 0.5s';
+        messageRow.style.opacity = '0.5';
+        messageRow.style.transform = 'scale(0.95)';
+    }
+    
     try {
         const response = await fetch(`${API_URL}/api/admin/chat-messages/${messageId}`, {
             method: "DELETE",
@@ -130,13 +147,51 @@ async function deleteMessage(messageId) {
         });
         
         if (response.ok) {
-            alert("Message supprimé avec succès!");
-            loadChatMessages();
+            if (messageRow) {
+                // Animation de disparition
+                messageRow.style.opacity = '0';
+                messageRow.style.transform = 'scale(0.8)';
+                
+                // Supprimer après l'animation
+                setTimeout(() => {
+                    messageRow.remove();
+                }, 500);
+            }
+            
+            // Notification discrète (sans alert)
+            const notification = document.createElement('div');
+            notification.className = 'delete-notification';
+            notification.textContent = 'Message supprimé';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #4caf50;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 5px;
+                animation: fadeInOut 2s ease-in-out;
+                z-index: 1000;
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 2000);
+            
         } else {
             alert("Erreur lors de la suppression du message");
+            // Restaurer l'apparence si erreur
+            if (messageRow) {
+                messageRow.style.opacity = '1';
+                messageRow.style.transform = 'scale(1)';
+            }
         }
     } catch (error) {
         console.error("Error deleting message:", error);
+        alert("Erreur lors de la suppression du message");
+        // Restaurer l'apparence si erreur
+        if (messageRow) {
+            messageRow.style.opacity = '1';
+            messageRow.style.transform = 'scale(1)';
+        }
     }
 }
 
@@ -156,10 +211,19 @@ async function loadDashboardStats() {
     }
 }
 
-// Fonction pour mute un utilisateur
-async function muteUser(userId) {
-    const duration = prompt("Durée du mute en secondes (laisser vide pour permanent):");
-    const reason = prompt("Raison du mute:");
+
+async function muteUser(userId, username = null) {
+    // D'abord demander la raison
+    const reason = prompt(username ? `Raison du mute pour ${username}:` : "Raison du mute:");
+    
+    // Si l'utilisateur annule, on arrête tout
+    if (reason === null) return;
+    
+    // Ensuite demander la durée
+    const duration = prompt("Durée en secondes (laisser vide pour permanent):");
+    
+    // Si l'utilisateur annule à ce stade, on arrête aussi
+    if (duration === null) return;
     
     try {
         const response = await fetch(`${API_URL}/api/admin/users/${userId}/mute`, {
@@ -168,16 +232,29 @@ async function muteUser(userId) {
                 "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ duration: duration ? parseInt(duration) : null, reason })
+            body: JSON.stringify({ 
+                duration: duration ? parseInt(duration) : null, 
+                reason 
+            })
         });
         
         if (response.ok) {
-            alert("Utilisateur muté avec succès!");
-            loadUsers();
+            alert(username ? `${username} a été muté avec succès!` : "Utilisateur muté avec succès!");
+            // Recharger la liste appropriée
+            if (username) {
+                loadChatMessages();
+            } else {
+                loadUsers();
+            }
         }
     } catch (error) {
         console.error("Error muting user:", error);
+        alert("Erreur lors du mute");
     }
+}
+
+async function muteUserFromChat(userId, username) {
+    muteUser(userId, username);
 }
 
 // Fonction pour charger les messages de chat avec pagination
@@ -334,35 +411,6 @@ function animateValue(id, start, end, duration) {
     }, 50);
 }
 
-// Fonctions pour mute/ban depuis les messages
-async function muteUserFromChat(userId, username) {
-    const reason = prompt(`Raison du mute pour ${username}:`);
-    const duration = prompt("Durée en secondes (laisser vide pour permanent):");
-    
-    // Réutiliser la fonction muteUser existante
-    if (reason !== null) {
-        try {
-            const response = await fetch(`${API_URL}/api/admin/users/${userId}/mute`, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ 
-                    duration: duration ? parseInt(duration) : null, 
-                    reason 
-                })
-            });
-            
-            if (response.ok) {
-                alert(`${username} a été muté avec succès!`);
-                loadChatMessages(); // Recharger la liste
-            }
-        } catch (error) {
-            console.error("Error muting user:", error);
-        }
-    }
-}
 
 
 
