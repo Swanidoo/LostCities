@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil - Lost Cities</title>
+    <link rel="stylesheet" href="/shared/global.css">
+    <link rel="stylesheet" href="profile.css">
+</head>
+<body>
+    <div class="profile-container">
+        <button class="back-button" onclick="window.history.back()">← Retour</button>
+        
+        <div class="profile-card">
+            <div class="profile-header">
+                <img id="user-avatar" class="avatar" src="/assets/default-avatar.png" alt="Avatar">
+                <div class="profile-info">
+                    <h1 id="user-username">Chargement...</h1>
+                    <p class="member-since">Membre depuis <span id="member-date">...</span></p>
+                </div>
+                <button id="edit-profile-btn" class="edit-button" style="display: none;">
+                    Modifier le profil
+                </button>
+            </div>
+            
+            <div class="profile-bio">
+                <h2>À propos</h2>
+                <p id="user-bio">Aucune biographie pour le moment.</p>
+            </div>
+            
+            <div class="profile-stats">
+                <div class="stat-card">
+                    <h3>Parties jouées</h3>
+                    <p id="games-played">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Parties gagnées</h3>
+                    <p id="games-won">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Taux de victoire</h3>
+                    <p id="win-rate">0%</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal d'édition du profil -->
+        <div id="edit-modal" class="modal">
+            <div class="modal-content">
+                <h2>Modifier le profil</h2>
+                <form id="edit-form">
+                    <label>
+                        URL de l'avatar
+                        <input type="url" id="avatar-url" placeholder="https://example.com/avatar.jpg">
+                    </label>
+                    <label>
+                        Biographie
+                        <textarea id="bio-text" maxlength="500" placeholder="Parlez de vous..."></textarea>
+                    </label>
+                    <div class="modal-buttons">
+                        <button type="submit">Enregistrer</button>
+                        <button type="button" onclick="closeEditModal()">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="profile.js"></script>
+</body>
+</html>

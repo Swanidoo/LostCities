@@ -344,14 +344,77 @@ async function debugAuth() {
     }
 }
 
+// Fonction pour charger les rapports
+async function loadReports() {
+    try {
+        const response = await fetch(`${API_URL}/api/admin/reports?status=pending`, {
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const reports = await response.json();
+        
+        const reportsTableBody = document.querySelector("#reportsTable tbody");
+        reportsTableBody.innerHTML = "";
+        
+        reports.forEach(report => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${report.id}</td>
+                <td>${report.reporter_username || 'Inconnu'}</td>
+                <td>${report.reported_username || 'Inconnu'}</td>
+                <td>${report.report_type}</td>
+                <td>${report.description}</td>
+                <td><span class="status-badge status-${report.status}">${report.status}</span></td>
+                <td>
+                    <button onclick="resolveReport(${report.id}, 'resolved')">Résoudre</button>
+                    <button onclick="resolveReport(${report.id}, 'dismissed')">Rejeter</button>
+                </td>
+            `;
+            reportsTableBody.appendChild(row);
+        });
+        
+    } catch (error) {
+        console.error("Error loading reports:", error);
+    }
+}
+
+// Fonction pour résoudre un rapport
+async function resolveReport(reportId, resolution) {
+    const notes = prompt("Notes de résolution:");
+    
+    try {
+        const response = await fetch(`${API_URL}/api/admin/reports/${reportId}/resolve`, {
+            method: "PUT",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ resolution, notes })
+        });
+        
+        if (response.ok) {
+            alert("Rapport traité avec succès!");
+            loadReports();
+        }
+    } catch (error) {
+        console.error("Error resolving report:", error);
+    }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     debugAuth();
-    // First check if user has admin access
     const hasAccess = await checkAdminAccess();
     
     if (hasAccess) {
         loadUsers();
         loadDashboardStats();
         loadChatMessages();
+        loadReports();
     }
 });

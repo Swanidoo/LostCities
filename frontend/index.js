@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginSection = document.getElementById('login-section');
     const userSection = document.getElementById('user-section');
     const usernameSpan = document.getElementById('username');
+    const userAvatar = document.getElementById('user-avatar');
     
     // Vérifier si l'utilisateur est connecté
     const token = localStorage.getItem('authToken');
@@ -20,6 +21,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tokenParts.length === 3) {
                 const payload = JSON.parse(atob(tokenParts[1]));
                 usernameSpan.textContent = payload.username || payload.email;
+                
+                // Stocker l'ID de l'utilisateur pour l'utiliser plus tard
+                const userId = payload.id;
+                localStorage.setItem('user_id', userId);
+                
+                // Charger l'avatar de l'utilisateur
+                loadUserAvatar(userId);
+                
+                // Ajouter le gestionnaire de clic sur l'avatar
+                userAvatar.addEventListener('click', () => {
+                    window.location.href = `/profile/profile.html?id=${userId}`;
+                });
                 
                 // Vérifier si l'utilisateur est admin
                 if (payload.role === 'admin') {
@@ -169,6 +182,23 @@ async function loadLeaderboard(mode, withExtension) {
     } catch (error) {
         console.error('Erreur lors du chargement du leaderboard:', error);
         displayError();
+    }
+}
+
+async function loadUserAvatar(userId) {
+    try {
+        const response = await fetch(`${API_URL}/api/profile/${userId}`);
+        if (response.ok) {
+            const profile = await response.json();
+            if (profile.avatar_url) {
+                const userAvatar = document.getElementById('user-avatar');
+                if (userAvatar) {
+                    userAvatar.src = profile.avatar_url;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading user avatar:', error);
     }
 }
 
@@ -338,18 +368,261 @@ function addChatMessage(username, message) {
     
     const messageElement = document.createElement('div');
     const currentUsername = localStorage.getItem('username');
-    const isOwnMessage = username === currentUsername;
+    const token = localStorage.getItem('authToken');
+    let isOwnMessage = false;
+    
+    // Déterminer si c'est notre propre message
+    if (token) {
+        try {
+            const tokenParts = token.split('.');
+            const payload = JSON.parse(atob(tokenParts[1]));
+            isOwnMessage = username === payload.username || username === payload.email;
+        } catch (error) {
+            console.error("Error parsing token:", error);
+        }
+    }
     
     messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
     
-    // Échapper le HTML pour éviter les injections
-    const safeUsername = escapeHtml(username);
-    const safeMessage = escapeHtml(message);
+    // Créer un élément pour le pseudo
+    const senderElement = document.createElement('span');
+    senderElement.className = 'chat-sender';
+    senderElement.textContent = username;
     
-    messageElement.innerHTML = `<span class="chat-sender">${safeUsername}</span>: <span class="chat-text">${safeMessage}</span>`;
+    // Ajouter le gestionnaire de clic uniquement si ce n'est pas notre propre message
+    if (!isOwnMessage) {
+        senderElement.classList.add('clickable-username');
+        senderElement.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showUserMenu(e, username);
+        });
+    }
+    
+    const textElement = document.createElement('span');
+    textElement.className = 'chat-text';
+    textElement.textContent = message;
+    
+    messageElement.appendChild(senderElement);
+    messageElement.appendChild(document.createTextNode(': '));
+    messageElement.appendChild(textElement);
     
     messagesContainer.appendChild(messageElement);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+let currentUserMenu = null;
+
+function showUserMenu(event, username) {
+    // Fermer le menu existant s'il y en a un
+    if (currentUserMenu) {
+        currentUserMenu.remove();
+    }
+    
+    // Vérifier si l'utilisateur est admin
+    let isAdmin = false;
+    const token = localStorage.getItem('authToken');
+    if (token) {
+        try {
+            const tokenParts = token.split('.');
+            const payload = JSON.parse(atob(tokenParts[1]));
+            isAdmin = payload.role === 'admin';
+        } catch (error) {
+            console.error("Error parsing token:", error);
+        }
+    }
+    
+    // Créer le menu
+    const menu = document.createElement('div');
+    menu.className = 'user-menu-popup';
+    
+    if (isAdmin) {
+        menu.innerHTML = `
+            <div class="user-menu-item" onclick="viewProfile('${username}')">
+                <span class="menu-icon">👤</span> Voir le profil
+            </div>
+            <div class="user-menu-item" onclick="muteUserDirectly('${username}')">
+                <span class="menu-icon">🔇</span> Mute
+            </div>
+        `;
+    } else {
+        menu.innerHTML = `
+            <div class="user-menu-item" onclick="viewProfile('${username}')">
+                <span class="menu-icon">👤</span> Voir le profil
+            </div>
+            <div class="user-menu-item" onclick="reportUser('${username}')">
+                <span class="menu-icon">⚠️</span> Signaler
+            </div>
+        `;
+    }
+    
+    // Positionner le menu
+    document.body.appendChild(menu);
+    const rect = event.target.getBoundingClientRect();
+    menu.style.left = rect.left + 'px';
+    menu.style.top = (rect.bottom + 5) + 'px';
+    
+    currentUserMenu = menu;
+    
+    // Fermer le menu si on clique ailleurs
+    setTimeout(() => {
+        document.addEventListener('click', closeUserMenu);
+    }, 0);
+}
+
+// Ajouter une nouvelle fonction pour mute directement
+async function muteUserDirectly(username) {
+    closeUserMenu();
+    
+    const duration = prompt("Durée du mute en secondes (laisser vide pour permanent):");
+    const reason = prompt("Raison du mute:");
+    
+    if (reason === null) return; // L'utilisateur a annulé
+    
+    try {
+        // Récupérer l'ID de l'utilisateur
+        const response = await fetch(`${API_URL}/api/users`);
+        const users = await response.json();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            alert('Utilisateur introuvable');
+            return;
+        }
+        
+        // Envoyer la requête de mute
+        const muteResponse = await fetch(`${API_URL}/api/admin/users/${user.id}/mute`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                duration: duration ? parseInt(duration) : null,
+                reason: reason
+            })
+        });
+        
+        if (muteResponse.ok) {
+            alert(`${username} a été muté avec succès!`);
+        } else {
+            alert('Erreur lors du mute');
+        }
+        
+    } catch (error) {
+        console.error('Error muting user:', error);
+        alert('Erreur lors du mute');
+    }
+}
+
+function closeUserMenu() {
+    if (currentUserMenu) {
+        currentUserMenu.remove();
+        currentUserMenu = null;
+        document.removeEventListener('click', closeUserMenu);
+    }
+}
+
+async function viewProfile(username) {
+    closeUserMenu();
+    
+    // Récupérer l'ID de l'utilisateur
+    try {
+        const response = await fetch(`${API_URL}/api/users`);
+        const users = await response.json();
+        const user = users.find(u => u.username === username);
+        
+        if (user) {
+            window.location.href = `/profile/profile.html?id=${user.id}`;
+        }
+    } catch (error) {
+        console.error('Error fetching user:', error);
+    }
+}
+
+function reportUser(username) {
+    closeUserMenu();
+    showReportDialog(username);
+}
+
+function showReportDialog(username) {
+    const dialog = document.createElement('div');
+    dialog.className = 'report-dialog-overlay';
+    dialog.innerHTML = `
+        <div class="report-dialog">
+            <h3>Signaler ${username}</h3>
+            <form id="report-form">
+                <label>
+                    <input type="radio" name="report_type" value="chat_abuse" required>
+                    Abus dans le chat
+                </label>
+                <label>
+                    <input type="radio" name="report_type" value="harassment" required>
+                    Harcèlement
+                </label>
+                <label>
+                    <input type="radio" name="report_type" value="spam" required>
+                    Spam
+                </label>
+                <label>
+                    <input type="radio" name="report_type" value="other" required>
+                    Autre
+                </label>
+                <textarea name="description" placeholder="Description du problème" required></textarea>
+                <div class="dialog-buttons">
+                    <button type="submit">Envoyer</button>
+                    <button type="button" onclick="closeReportDialog()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    dialog.querySelector('#report-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await submitReport(username, new FormData(e.target));
+    });
+}
+
+function closeReportDialog() {
+    document.querySelector('.report-dialog-overlay')?.remove();
+}
+
+async function submitReport(username, formData) {
+    try {
+        // Récupérer l'ID de l'utilisateur
+        const response = await fetch(`${API_URL}/api/users`);
+        const users = await response.json();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            alert('Utilisateur introuvable');
+            return;
+        }
+        
+        const reportResponse = await fetch(`${API_URL}/api/report`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({
+                reported_user_id: user.id,
+                report_type: formData.get('report_type'),
+                description: formData.get('description')
+            })
+        });
+        
+        if (reportResponse.ok) {
+            alert('Signalement envoyé avec succès');
+            closeReportDialog();
+        } else {
+            alert('Erreur lors de l\'envoi du signalement');
+        }
+    } catch (error) {
+        console.error('Error submitting report:', error);
+        alert('Erreur lors de l\'envoi du signalement');
+    }
 }
 
 // Fonction pour ajouter un message système

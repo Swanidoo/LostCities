@@ -15,6 +15,7 @@ import { rateLimitingMiddleware } from "./middlewares/rate_limiting_middleware.t
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import "https://deno.land/x/dotenv@v3.2.2/load.ts";
+import profileRouter from "./profile_routes.ts";
 
 const app = new Application();
 
@@ -50,6 +51,8 @@ app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
 app.use(leaderboardRouter.routes());
 app.use(leaderboardRouter.allowedMethods());
+app.use(profileRouter.routes());
+app.use(profileRouter.allowedMethods());
 
 // 📡 WebSocket routes (avant auth)
 app.use(wsRouter.routes());
