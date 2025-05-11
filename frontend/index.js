@@ -336,7 +336,9 @@ function initializeChat() {
             const data = JSON.parse(event.data);
             
             if (data.event === 'chatMessage' && data.data) {
-                addChatMessage(data.data.username, data.data.message);
+                addChatMessage(data.data.username, data.data.message, data.data.messageId);
+            } else if (data.event === 'messageDeleted' && data.data) {
+                removeMessageFromChat(data.data.messageId);
             } else if (data.event === 'systemMessage' && data.data) {
                 addSystemMessage(data.data.message);
             } else if (data.event === 'error' && data.data) {
@@ -402,21 +404,26 @@ function autoResizeTextarea(textarea) {
 }
 
 function removeMessageFromChat(messageId) {
-    // On doit ajouter un identifiant aux messages lors de leur création
+    console.log(`Removing message with ID: ${messageId}`);
+    
+    // Try to find the message by its data-message-id attribute
     const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    
     if (messageElement) {
-        // Animation de suppression
-        messageElement.style.transition = 'opacity 0.3s, transform 0.3s';
-        messageElement.style.opacity = '0';
-        messageElement.style.transform = 'scale(0.8)';
-        
-        setTimeout(() => {
-            messageElement.remove();
-            // Optionnel : ajouter un message système
-            addSystemMessage('Un message a été supprimé par un administrateur');
-        }, 300);
+      console.log(`Found element to remove: `, messageElement);
+      // Animation de suppression
+      messageElement.style.transition = 'opacity 0.3s, transform 0.3s';
+      messageElement.style.opacity = '0';
+      messageElement.style.transform = 'scale(0.8)';
+      
+      setTimeout(() => {
+        messageElement.remove();
+        addSystemMessage('Un message a été supprimé par un administrateur');
+      }, 300);
+    } else {
+      console.log(`Could not find message element with ID ${messageId}`);
     }
-}
+  }
 
 function checkMuteStatus() {
     const chatInput = document.getElementById('chat-input');
@@ -515,6 +522,9 @@ function addChatMessage(username, message, messageId = null) {
     if (!messagesContainer) return;
     
     const messageElement = document.createElement('div');
+    // ALWAYS set a data-message-id attribute, even if it's temporary
+    messageElement.dataset.messageId = messageId || `temp-${Date.now()}`
+    
     // Ajouter l'ID du message comme attribut de données
     if (messageId) {
         messageElement.dataset.messageId = messageId;

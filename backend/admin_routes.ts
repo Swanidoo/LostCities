@@ -79,6 +79,8 @@ adminRouter.delete("/api/admin/chat-messages/:id", requireAdmin, async (ctx) => 
   const messageId = ctx.params.id;
   const adminId = ctx.state.user.id;
   
+  console.log(`Admin ${adminId} deleting message ${messageId}`);
+  
   await client.queryObject(
     `UPDATE chat_message 
      SET is_deleted = true, deleted_at = NOW(), deleted_by = $1

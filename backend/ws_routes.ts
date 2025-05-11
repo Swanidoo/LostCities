@@ -470,7 +470,7 @@ function handleChatMessage(
       data: { 
           username, 
           message: data.message,
-          messageId // Inclure l'ID
+          messageId // Include the ID
       } 
   });
     
@@ -650,20 +650,24 @@ async function handleMatchmaking(socket, username, userId) {
 }
 
 export function broadcastMessageDeletion(messageId: string) {
+  console.log(`Broadcasting message deletion for ID: ${messageId}`);
   const deletionMessage = JSON.stringify({
     event: "messageDeleted",
     data: { messageId }
   });
   
+  let sentCount = 0;
   connectedClients.forEach((client) => {
     try {
       if (client.socket.readyState === WebSocket.OPEN) {
         client.socket.send(deletionMessage);
+        sentCount++;
       }
     } catch (error) {
       console.error(`Error sending deletion notification to ${client.username}:`, error);
     }
   });
+  console.log(`Sent deletion notification to ${sentCount} clients`);
 }
 
 // Handle play card action
