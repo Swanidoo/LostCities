@@ -394,6 +394,16 @@ function handleChatMessage(
     }));
     return;
   }
+
+  const MAX_MESSAGE_LINES = 15;
+  const lineCount = (data.message.match(/\n/g) || []).length + 1;
+  if (lineCount > MAX_MESSAGE_LINES) {
+    sender.send(JSON.stringify({
+      event: "error",
+      data: { message: `Message trop long. Maximum ${MAX_MESSAGE_LINES} lignes.` }
+    }));
+    return;
+  }
   
   // Récupérer l'ID de l'utilisateur et vérifier s'il est muté
   getUserIdFromUsername(username).then(async (userId) => {

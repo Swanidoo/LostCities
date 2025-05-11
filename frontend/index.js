@@ -5,7 +5,8 @@ const API_URL = window.location.hostname === "localhost"
 let chatWebSocket = null;
 let chatConnected = false;
 let chatInput = null;
-const MAX_MESSAGE_LENGTH = 500
+const MAX_MESSAGE_LENGTH = 500;
+const MAX_MESSAGE_LINES = 15;
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginSection = document.getElementById('login-section');
@@ -379,6 +380,13 @@ function sendChatMessage() {
         alert(`Le message est trop long. Maximum ${MAX_MESSAGE_LENGTH} caractères.`);
         return;
     }
+
+    const lineCount = (message.match(/\n/g) || []).length + 1;
+
+    if (lineCount > MAX_MESSAGE_LINES) {
+        alert(`Le message contient trop de lignes. Maximum ${MAX_MESSAGE_LINES} lignes.`);
+        return;
+    }
     
     if (message && chatConnected) {
         chatWebSocket.send(JSON.stringify({
@@ -396,12 +404,14 @@ function updateCharCounter(textarea) {
     const charCounter = document.getElementById('char-counter');
     if (charCounter) {
         const length = textarea.value.length;
-        charCounter.textContent = `${length}/${MAX_MESSAGE_LENGTH}`;
+        const lineCount = (textarea.value.match(/\n/g) || []).length + 1;
+        
+        charCounter.textContent = `${length}/${MAX_MESSAGE_LENGTH} • ${lineCount}/${MAX_MESSAGE_LINES} lignes`;
         
         charCounter.classList.remove('warning', 'error');
-        if (length > MAX_MESSAGE_LENGTH) {
+        if (length > MAX_MESSAGE_LENGTH || lineCount > MAX_MESSAGE_LINES) {
             charCounter.classList.add('error');
-        } else if (length > MAX_MESSAGE_LENGTH * 0.8) {
+        } else if (length > MAX_MESSAGE_LENGTH * 0.8 || lineCount >= MAX_MESSAGE_LINES - 1) {
             charCounter.classList.add('warning');
         }
     }
