@@ -292,7 +292,47 @@ BEGIN
     
 END $$;
 
--- 10. Ajouter quelques messages supplémentaires récents pour le chat
+
+-- 10. Ajouter des moves de test pour les parties terminées
+DO $$
+DECLARE
+    alice_id INTEGER;
+    bob_id INTEGER;
+    diana_id INTEGER;
+    charlie_id INTEGER;
+    nice_id INTEGER;
+BEGIN
+    -- Récupérer les IDs
+    SELECT id INTO alice_id FROM users WHERE email = 'alice@test.com';
+    SELECT id INTO bob_id FROM users WHERE email = 'bob@test.com';
+    SELECT id INTO diana_id FROM users WHERE email = 'diana@test.com';
+    SELECT id INTO charlie_id FROM users WHERE email = 'charlie@test.com';
+    SELECT id INTO nice_id FROM users WHERE email = 'nice@test.com';
+    
+    -- Moves pour la partie 1001 (Alice vs Bob)
+    INSERT INTO move (game_id, player_id, turn_number, action, card_id, destination, color, timestamp) VALUES
+    (1001, alice_id, 1, 'play_card', 'red_wager_0', 'expedition', 'red', NOW() - INTERVAL '2 hours'),
+    (1001, bob_id, 2, 'discard_card', 'blue_3', 'discard_pile', 'blue', NOW() - INTERVAL '2 hours' + INTERVAL '2 minutes'),
+    (1001, alice_id, 3, 'draw_card', null, null, null, NOW() - INTERVAL '2 hours' + INTERVAL '4 minutes'),
+    (1001, bob_id, 4, 'play_card', 'green_5', 'expedition', 'green', NOW() - INTERVAL '2 hours' + INTERVAL '6 minutes'),
+    (1001, alice_id, 5, 'play_card', 'red_6', 'expedition', 'red', NOW() - INTERVAL '2 hours' + INTERVAL '8 minutes'),
+    (1001, bob_id, 6, 'draw_card', null, null, null, NOW() - INTERVAL '2 hours' + INTERVAL '10 minutes'),
+    
+    -- Moves pour la partie 1002 (Diana vs Charlie)
+    (1002, diana_id, 1, 'play_card', 'yellow_wager_0', 'expedition', 'yellow', NOW() - INTERVAL '1 day'),
+    (1002, charlie_id, 2, 'play_card', 'white_4', 'expedition', 'white', NOW() - INTERVAL '1 day' + INTERVAL '3 minutes'),
+    (1002, diana_id, 3, 'discard_card', 'blue_8', 'discard_pile', 'blue', NOW() - INTERVAL '1 day' + INTERVAL '6 minutes'),
+    (1002, charlie_id, 4, 'draw_card', null, null, null, NOW() - INTERVAL '1 day' + INTERVAL '9 minutes'),
+    
+    -- Moves pour une partie rapide 1006 (Alice vs Diana)
+    (1006, alice_id, 1, 'play_card', 'green_3', 'expedition', 'green', NOW() - INTERVAL '5 hours'),
+    (1006, diana_id, 2, 'play_card', 'red_5', 'expedition', 'red', NOW() - INTERVAL '5 hours' + INTERVAL '1 minute'),
+    (1006, alice_id, 3, 'discard_card', 'yellow_7', 'discard_pile', 'yellow', NOW() - INTERVAL '5 hours' + INTERVAL '2 minutes'),
+    (1006, diana_id, 4, 'draw_card', null, null, null, NOW() - INTERVAL '5 hours' + INTERVAL '3 minutes');
+    
+END $$;
+
+-- 11. Ajouter quelques messages supplémentaires récents pour le chat
 DO $$
 DECLARE
     alice_id INTEGER;
