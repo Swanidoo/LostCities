@@ -343,8 +343,9 @@ function displayGameHistory(games) {
         gamesListContainer.innerHTML = `
             <div class="no-games-message">
                 <div class="no-games-icon">🎮</div>
-                <h3>Aucune partie trouvée</h3>
-                <p>Commence ta première partie pour voir ton historique ici !</p>
+                <h3>Aucune partie récente</h3>
+                <p>Aucune partie trouvée dans les 30 derniers jours</p>
+                <p><small>Les statistiques globales incluent toutes vos parties</small></p>
             </div>
         `;
         return;
@@ -625,7 +626,11 @@ async function showGameDetail(gameId) {
     
     // Charger les détails depuis l'API
     try {
-        const response = await fetch(`${API_URL}/api/games/${gameId}/details`);
+        const response = await fetch(`${API_URL}/api/games/${gameId}/details`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+        });
         if (!response.ok) {
             throw new Error('Failed to load game details');
         }

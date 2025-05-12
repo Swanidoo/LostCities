@@ -22,7 +22,9 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
     const countResult = await client.queryObject<{count: string}>(`
       SELECT COUNT(*) as count
       FROM games 
-      WHERE (player1_id = $1 OR player2_id = $1) AND status = 'finished'
+      WHERE (player1_id = $1 OR player2_id = $1) 
+        AND status = 'finished'
+        AND started_at > NOW() - INTERVAL '30 days'
     `, [userId]);
     
     const totalGames = parseInt(countResult.rows[0].count);
@@ -48,9 +50,10 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
       JOIN users u2 ON g.player2_id = u2.id
       WHERE (g.player1_id = $1 OR g.player2_id = $1) 
         AND g.status = 'finished'
+        AND g.started_at > NOW() - INTERVAL '1 month'
       ORDER BY g.started_at DESC
       LIMIT $2 OFFSET $3
-    `, [userId, limit, offset]);
+    `, [userId, Math.min(limit, 10), offset]);
     
     console.log("🎯 Found games:", gamesResult.rows.length);
     
