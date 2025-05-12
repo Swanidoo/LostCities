@@ -16,6 +16,7 @@ import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import profileRouter from "./profile_routes.ts";
 import { checkUserStatus } from "./middlewares/check_user_status.ts";
+import gameDetailsRouter from "./game_details_routes.ts";
 import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
 const app = new Application();
@@ -88,6 +89,8 @@ app.use(settingsRouter.routes());
 app.use(settingsRouter.allowedMethods());
 app.use(adminRouter.routes());
 app.use(adminRouter.allowedMethods());
+app.use(gameDetailsRouter.routes());
+app.use(gameDetailsRouter.allowedMethods());
 
 // Fonction pour nettoyer les bans et mutes expirés
 async function cleanupExpiredBansAndMutes() {

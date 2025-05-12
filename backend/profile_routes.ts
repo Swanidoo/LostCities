@@ -158,7 +158,7 @@ profileRouter.get("/api/profile/:id/messages", authMiddleware, async (ctx) => {
 
 
 // GET /api/profile/:id - Récupérer un profil public
-profileRouter.get("/api/profile/:id", async (ctx) => {
+profileRouter.get("/api/profile/:id", authMiddleware, async (ctx) => {
   try {
     const userId = ctx.params.id;
     

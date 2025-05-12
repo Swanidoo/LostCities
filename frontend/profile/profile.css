@@ -760,7 +760,9 @@ body {
 
 /* Modal de détail de partie */
 .game-detail-modal .modal-content {
-    max-width: 700px;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
 .game-detail-content {
@@ -781,6 +783,12 @@ body {
     transition: var(--transition);
 }
 
+.game-detail-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 1.5rem;
+}
+
 .game-detail-content li:hover {
     border-left-color: var(--primary-color);
     background: rgba(255, 255, 255, 0.02);
@@ -791,6 +799,7 @@ body {
     margin-bottom: 1.5rem;
     text-align: center;
 }
+
 
 .modal-content label {
     display: block;
@@ -823,6 +832,212 @@ body {
 .modal-content textarea {
     min-height: 120px;
     resize: vertical;
+}
+
+.detail-tab-btn {
+    flex: 1;
+    padding: 1rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+}
+
+.detail-tab-btn:hover {
+    color: var(--text-light);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.detail-tab-btn.active {
+    color: var(--primary-color);
+}
+
+.detail-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--primary-color);
+}
+
+.detail-tab-pane {
+    display: none;
+}
+
+.detail-tab-pane.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Résumé de la partie */
+.game-summary {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.summary-row:last-child {
+    border-bottom: none;
+}
+
+.summary-label {
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.summary-value {
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.winner-name {
+    color: var(--primary-color);
+}
+
+.rounds-summary h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.rounds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.round-item {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.round-number {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.round-scores {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Chronologie des mouvements */
+.moves-timeline {
+    max-height: 400px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.move-item {
+    display: grid;
+    grid-template-columns: 80px 120px 1fr;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    align-items: center;
+}
+
+.move-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.move-player {
+    font-weight: 600;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.move-player.player1 {
+    background: rgba(76, 175, 80, 0.2);
+    color: var(--primary-color);
+}
+
+.move-player.player2 {
+    background: rgba(33, 150, 243, 0.2);
+    color: #2196F3;
+}
+
+.move-action {
+    color: var(--text-light);
+}
+
+.card-name {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* Statistiques */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1.25rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-card h4 {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card .stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.player-stats h4 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.player-stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.player-name {
+    font-weight: 500;
+}
+
+.error-message {
+    text-align: center;
+    color: var(--error-color);
+    padding: 2rem;
 }
 
 /* Validation et compteurs */

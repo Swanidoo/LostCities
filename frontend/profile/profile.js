@@ -230,7 +230,11 @@ function playTabSound() {
 // Chargement du profil
 async function loadProfile() {
     try {
-        const response = await fetch(`${API_URL}/api/profile/${currentUserId}`);
+        const response = await fetch(`${API_URL}/api/profile/${currentUserId}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+        });
         
         if (!response.ok) {
             throw new Error('Profile not found');
@@ -601,21 +605,14 @@ function addGameDetailHandlers() {
 }
 
 // Modal de détail de partie (placeholder)
-function showGameDetail(gameId) {
+async function showGameDetail(gameId) {
     const modal = document.createElement('div');
     modal.className = 'modal game-detail-modal';
     modal.innerHTML = `
         <div class="modal-content">
             <h2>Détails de la partie #${gameId}</h2>
             <div class="game-detail-content">
-                <p>Fonctionnalité en développement...</p>
-                <p>Ici s'afficheront les détails complets de la partie :</p>
-                <ul>
-                    <li>Scores par manche</li>
-                    <li>Cartes jouées</li>
-                    <li>Chronologie de la partie</li>
-                    <li>Statistiques détaillées</li>
-                </ul>
+                <div class="loading">Chargement des détails...</div>
             </div>
             <div class="modal-buttons">
                 <button type="button" onclick="closeGameDetail()">Fermer</button>
@@ -625,6 +622,194 @@ function showGameDetail(gameId) {
     
     document.body.appendChild(modal);
     modal.classList.add('visible');
+    
+    // Charger les détails depuis l'API
+    try {
+        const response = await fetch(`${API_URL}/api/games/${gameId}/details`);
+        if (!response.ok) {
+            throw new Error('Failed to load game details');
+        }
+        
+        const details = await response.json();
+        displayGameDetails(details, modal);
+        
+    } catch (error) {
+        console.error('Error loading game details:', error);
+        const content = modal.querySelector('.game-detail-content');
+        content.innerHTML = `
+            <div class="error-message">
+                <p>❌ Erreur lors du chargement des détails</p>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function displayGameDetails(details, modal) {
+    const content = modal.querySelector('.game-detail-content');
+    
+    // Calculer les informations additionnelles
+    const winner = details.basic.winner;
+    const winnerIndex = details.basic.players.indexOf(winner);
+    const winnerScore = details.basic.scores[winnerIndex];
+    const loserScore = details.basic.scores[1 - winnerIndex];
+    const margin = winnerScore - loserScore;
+    
+    // Formater la durée
+    let durationText = 'Durée inconnue';
+    if (details.basic.duration) {
+        const hours = Math.floor(details.basic.duration / 60);
+        const minutes = details.basic.duration % 60;
+        durationText = hours > 0 ? `${hours}h${minutes}m` : `${minutes}m`;
+    }
+    
+    content.innerHTML = `
+        <div class="game-detail-tabs">
+            <button class="detail-tab-btn active" data-tab="resume">Résumé</button>
+            <button class="detail-tab-btn" data-tab="moves">Chronologie</button>
+            <button class="detail-tab-btn" data-tab="stats">Statistiques</button>
+        </div>
+        
+        <div class="detail-tab-content">
+            <!-- Onglet Résumé -->
+            <div class="detail-tab-pane active" id="resume-pane">
+                <div class="game-summary">
+                    <div class="summary-row">
+                        <span class="summary-label">🏆 Vainqueur :</span>
+                        <span class="summary-value winner-name">${winner}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">📊 Score final :</span>
+                        <span class="summary-value">${details.basic.scores.join(' - ')}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">🎯 Marge de victoire :</span>
+                        <span class="summary-value">${margin} points</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">⏱️ Durée :</span>
+                        <span class="summary-value">${durationText}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">🎮 Mode :</span>
+                        <span class="summary-value">${
+                            details.basic.mode === 'quick' ? 'Rapide' : 'Classique'
+                        }${details.basic.withExtension ? ' + Extension' : ''}</span>
+                    </div>
+                </div>
+                
+                <div class="rounds-summary">
+                    <h3>Scores par manche</h3>
+                    <div class="rounds-grid">
+                        ${details.rounds.map(round => `
+                            <div class="round-item">
+                                <div class="round-number">Manche ${round.round}</div>
+                                <div class="round-scores">
+                                    <span>${details.basic.players[0]}: ${round.score_p1}</span>
+                                    <span>${details.basic.players[1]}: ${round.score_p2}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Onglet Chronologie -->
+            <div class="detail-tab-pane" id="moves-pane">
+                <div class="moves-timeline">
+                    ${details.moves.map(move => `
+                        <div class="move-item">
+                            <div class="move-time">${new Date(move.timestamp).toLocaleTimeString('fr-FR')}</div>
+                            <div class="move-player ${move.player === details.basic.players[0] ? 'player1' : 'player2'}">${move.player}</div>
+                            <div class="move-action">${formatMoveAction(move)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Onglet Statistiques -->
+            <div class="detail-tab-pane" id="stats-pane">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h4>Actions totales</h4>
+                        <div class="stat-value">${details.statistics.totalMoves}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Cartes jouées</h4>
+                        <div class="stat-value">${details.statistics.cardsByAction.played}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Cartes défaussées</h4>
+                        <div class="stat-value">${details.statistics.cardsByAction.discarded}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Cartes piochées</h4>
+                        <div class="stat-value">${details.statistics.cardsByAction.drawn}</div>
+                    </div>
+                </div>
+                
+                <div class="player-stats">
+                    <h4>Actions par joueur</h4>
+                    ${Object.entries(details.statistics.movesPerPlayer).map(([player, count]) => `
+                        <div class="player-stat-row">
+                            <span class="player-name">${player}</span>
+                            <span class="stat-value">${count} actions</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Activer la navigation entre onglets
+    setupDetailTabs(modal);
+}
+
+function formatMoveAction(move) {
+    const actionTexts = {
+        'play_card': 'a joué',
+        'discard_card': 'a défaussé',
+        'draw_card': 'a pioché'
+    };
+    
+    let description = actionTexts[move.action] || move.action;
+    
+    if (move.card) {
+        description += ` <span class="card-name">${move.card}</span>`;
+    }
+    
+    if (move.destination === 'expedition') {
+        description += ` sur l'expédition ${move.color}`;
+    } else if (move.destination === 'discard_pile') {
+        description += ` dans la défausse ${move.color}`;
+    }
+    
+    if (move.source === 'discard_pile') {
+        description += ` depuis la défausse ${move.color}`;
+    } else if (move.source === 'deck') {
+        description += ` depuis le deck`;
+    }
+    
+    return description;
+}
+
+function setupDetailTabs(modal) {
+    const tabBtns = modal.querySelectorAll('.detail-tab-btn');
+    const tabPanes = modal.querySelectorAll('.detail-tab-pane');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.dataset.tab;
+            
+            // Retirer l'état actif de tous les onglets et panneaux
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanes.forEach(p => p.classList.remove('active'));
+            
+            // Activer l'onglet et le panneau cliqué
+            btn.classList.add('active');
+            modal.querySelector(`#${targetTab}-pane`).classList.add('active');
+        });
+    });
 }
 
 function closeGameDetail() {
