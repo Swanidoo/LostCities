@@ -946,8 +946,11 @@ async function createGame(
 ): Promise<void> {
   try {
     console.log(`🎮 Creating new game ${gameId} between ${player1Id} and ${player2Id}`, options);
+
+    // Déterminer le nombre de manches selon le mode
+    const totalRounds = options.gameMode === 'quick' ? 1 : 3;
     
-    // Create the game record with the correct mode
+    // Create the game record with the correct mode and rounds
     await client.queryObject(`
       INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id, turn_phase, started_at, game_mode)
       VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP, $4)

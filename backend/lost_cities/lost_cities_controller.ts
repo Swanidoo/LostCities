@@ -44,7 +44,15 @@ import {
       // Game configuration
       this.gameId = options.gameId;
       this.usePurpleExpedition = options.usePurpleExpedition || false;
-      this.totalRounds = options.totalRounds || 3;
+      
+      // CORRECTION : Déterminer totalRounds selon gameMode ou options
+      if (options.totalRounds) {
+        this.totalRounds = options.totalRounds;
+      } else if (options.gameMode) {
+        this.totalRounds = options.gameMode === 'quick' ? 1 : 3;
+      } else {
+        this.totalRounds = 3; // Valeur par défaut
+      }
       
       // Game state
       this.player1 = {
@@ -499,7 +507,7 @@ import {
       this.scores.player1.total += player1Score;
       this.scores.player2.total += player2Score;
       
-      // Check if game is over
+      // VERIFICATION : Utilise bien this.totalRounds
       if (this.currentRound >= this.totalRounds) {
         this.endGame();
       } else {

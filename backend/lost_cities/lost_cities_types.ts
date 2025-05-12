@@ -23,6 +23,7 @@ export interface Card {
     gameId: string | number;
     usePurpleExpedition?: boolean;
     totalRounds?: number;
+    gameMode?: string;  // AJOUT
     player1?: Partial<Player>;
     player2?: Partial<Player>;
     onGameStateChanged?: (gameState: any) => void;

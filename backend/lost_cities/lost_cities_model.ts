@@ -178,12 +178,16 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   
   const gameData = gameResult.rows[0];
   console.log(`📋 Found game data:`, gameData);
-  
+
+  //Nombre de round en fonction du mode d jeu!
+  const totalRounds = gameData.game_mode === 'quick' ? 1 : 3;
+
   // Initialize the game object
   const game = new LostCitiesGame({
     gameId: gameId,
     usePurpleExpedition: gameData.use_purple_expedition || false,
-    totalRounds: 3,
+    totalRounds: totalRounds,
+    gameMode: gameData.game_mode,
     player1: { id: gameData.player1_id, hand: [], expeditions: {} },
     player2: { id: gameData.player2_id, hand: [], expeditions: {} },
     onGameStateChanged: () => {},
