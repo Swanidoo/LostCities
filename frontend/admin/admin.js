@@ -28,6 +28,30 @@ function showNotification(message, success = true) {
     setTimeout(() => notification.remove(), 2500);
 }
 
+// Fonction pour créer une ligne d'utilisateur (réutilisable)
+function createUserRow(user) {
+    const isBanned = user.is_banned && 
+        (!user.banned_until || new Date(user.banned_until) > new Date());
+    
+    return `
+        <td>${user.id}</td>
+        <td>${user.username}</td>
+        <td>${user.email}</td>
+        <td>${user.role}</td>
+        <td>
+            <button onclick="viewProfile(${user.id})">Voir le profil</button>
+            ${user.is_muted ? 
+                `<button onclick="unmuteUser(${user.id})">Unmute</button>` : 
+                `<button onclick="muteUser(${user.id})">Mute</button>`
+            }
+            ${isBanned ? 
+                `<button onclick="unbanUser(${user.id})">Unban</button>` : 
+                `<button onclick="banUser(${user.id})">Ban</button>`
+            }
+        </td>
+    `;
+}
+
 
 // Fonction pour charger les utilisateurs avec pagination
 async function loadUsers(page = 1) {
@@ -56,28 +80,8 @@ async function loadUsers(page = 1) {
         window.allUsers = data.users;
 
         data.users.forEach(user => {
-            // Vérifier si le ban a expiré côté client aussi
-            const isBanned = user.is_banned && 
-              (!user.banned_until || new Date(user.banned_until) > new Date());
-            
             const row = document.createElement("tr");
-            row.innerHTML = `
-              <td>${user.id}</td>
-              <td>${user.username}</td>
-              <td>${user.email}</td>
-              <td>${user.role}</td>
-              <td>
-                <button onclick="viewProfile(${user.id})">Voir le profil</button>
-                ${user.is_muted ? 
-                  `<button onclick="unmuteUser(${user.id})">Unmute</button>` : 
-                  `<button onclick="muteUser(${user.id})">Mute</button>`
-                }
-                ${isBanned ? 
-                  `<button onclick="unbanUser(${user.id})">Unban</button>` : 
-                  `<button onclick="banUser(${user.id})">Ban</button>`
-                }
-              </td>
-            `;
+            row.innerHTML = createUserRow(user);
             usersTableBody.appendChild(row);
         });
         
@@ -147,18 +151,7 @@ function searchUsers(query) {
 
     filteredUsers.forEach(user => {
         const row = document.createElement("tr");
-        row.innerHTML = `
-            <td>${user.id}</td>
-            <td>${user.username}</td>
-            <td>${user.email}</td>
-            <td>${user.role}</td>
-            <td>
-                <button onclick="viewProfile(${user.id})">Voir le profil</button>
-                <button onclick="muteUser(${user.id})">Mute</button>
-                <button onclick="banUser(${user.id})">Ban</button>
-                <button onclick="deleteUser(${user.id})">Delete</button>
-            </td>
-        `;
+        row.innerHTML = createUserRow(user);
         usersTableBody.appendChild(row);
     });
 }
