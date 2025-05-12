@@ -11,78 +11,221 @@
     <div class="profile-container">
         <button class="back-button" onclick="window.history.back()">← Retour</button>
         
-        <div class="profile-card">
-            <div class="profile-header">
-                <img id="user-avatar" class="avatar" src="/assets/default-avatar.png" alt="Avatar">
-                <div class="profile-info">
-                    <h1 id="user-username">Chargement...</h1>
-                    <p class="member-since">Membre depuis <span id="member-date">...</span></p>
-                </div>
-                <button id="edit-profile-btn" class="edit-button" style="display: none;">
-                    Modifier le profil
+        <!-- Sidebar avec avatar et infos de base -->
+        <div class="profile-sidebar">
+            <div class="avatar-section">
+                <img id="user-avatar" class="profile-avatar" src="/assets/default-avatar.png" alt="Avatar">
+                <button id="edit-avatar-btn" class="edit-avatar-btn" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                    </svg>
                 </button>
             </div>
             
-            <div class="profile-bio">
-                <h2>À propos</h2>
-                <p id="user-bio">Aucune biographie pour le moment.</p>
-            </div>
+            <h1 id="user-username">Chargement...</h1>
+            <p class="member-since">Membre depuis <span id="member-date">...</span></p>
             
-            <div class="profile-stats">
-                <div class="stat-card">
-                    <h3>Parties jouées</h3>
-                    <p id="games-played">0</p>
+            <!-- Statistiques rapides -->
+            <div class="quick-stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="games-played">0</span>
+                    <span class="stat-label">Parties</span>
                 </div>
-                <div class="stat-card">
-                    <h3>Parties gagnées</h3>
-                    <p id="games-won">0</p>
+                <div class="stat-item">
+                    <span class="stat-value" id="games-won">0</span>
+                    <span class="stat-label">Victoires</span>
                 </div>
-                <div class="stat-card">
-                    <h3>Taux de victoire</h3>
-                    <p id="win-rate">0%</p>
-                </div>
-            </div>
-            <div id="admin-section" style="display: none;">
-                <h2>Messages récents (Admin)</h2>
-                <div class="messages-container">
-                    <table class="messages-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Contexte</th>
-                                <th>Message</th>
-                                <th>Statut</th>
-                            </tr>
-                        </thead>
-                        <tbody id="user-messages">
-                            <tr>
-                                <td colspan="4">Chargement...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="stat-item">
+                    <span class="stat-value" id="win-rate">0%</span>
+                    <span class="stat-label">Taux de réussite</span>
                 </div>
             </div>
         </div>
         
-        <!-- Modal d'édition du profil -->
-        <div id="edit-modal" class="modal">
-            <div class="modal-content">
-                <h2>Modifier le profil</h2>
-                <form id="edit-form">
-                    <label>
-                        URL de l'avatar
-                        <input type="url" id="avatar-url" placeholder="https://example.com/avatar.jpg">
-                    </label>
-                    <label>
-                        Biographie
-                        <textarea id="bio-text" maxlength="500" placeholder="Parlez de vous..."></textarea>
-                    </label>
-                    <div class="modal-buttons">
-                        <button type="submit">Enregistrer</button>
-                        <button type="button" onclick="closeEditModal()">Annuler</button>
+        <!-- Contenu principal avec onglets -->
+        <div class="profile-content">
+            <!-- Navigation par onglets -->
+            <nav class="profile-tabs">
+                <button class="tab-button active" data-tab="profile">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    Profil
+                </button>
+                <button class="tab-button" data-tab="games">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5 3H19C20.11 3 21 3.89 21 5V19C21 20.11 20.11 21 19 21H5C3.89 21 3 20.11 3 19V5C3 3.89 3.89 3 5 3M16 10.78L18.43 8.35L19.84 9.76L18.43 11.17L19.84 12.59L18.43 14L16 11.56L13.56 14L12.15 12.59L13.56 11.17L12.15 9.76L13.56 8.35L16 10.78M7.24 17L9.76 14.5L8.35 13.08L5 16.43L8.35 19.78L9.76 18.37L7.24 17Z"/>
+                    </svg>
+                    Historique
+                </button>
+                <button class="tab-button" data-tab="settings" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12,15.5C10.07,15.5 8.5,13.93 8.5,12C8.5,10.07 10.07,8.5 12,8.5C13.93,8.5 15.5,10.07 15.5,12C15.5,13.93 13.93,15.5 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.65 15.48,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.52,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.52,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.48,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+                    </svg>
+                    Paramètres
+                </button>
+                <button class="tab-button" data-tab="messages" id="admin-messages-tab" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                    </svg>
+                    Messages (Admin)
+                </button>
+            </nav>
+            
+            <!-- Contenu des onglets -->
+            <div class="tab-content">
+                <!-- Onglet Profil -->
+                <div class="tab-pane active" id="profile-tab">
+                    <div class="profile-info-card">
+                        <h2>À propos</h2>
+                        <div class="bio-section">
+                            <p id="user-bio">Aucune biographie pour le moment.</p>
+                            <button id="edit-bio-btn" class="edit-btn" style="display: none;">
+                                Modifier la bio
+                            </button>
+                        </div>
                     </div>
-                </form>
+                </div>
+                
+                <!-- Onglet Historique des parties -->
+                <div class="tab-pane" id="games-tab">
+                    <div class="games-history-card">
+                        <h2>Parties récentes</h2>
+                        <div class="games-list" id="games-list">
+                            <div class="loading">Chargement de l'historique...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Onglet Paramètres (visible seulement si c'est notre profil) -->
+                <div class="tab-pane" id="settings-tab">
+                    <div class="settings-card">
+                        <h2>Paramètres du compte</h2>
+                        <div class="settings-list">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <h3>Nom d'utilisateur</h3>
+                                    <p>Changez votre nom d'utilisateur affiché</p>
+                                </div>
+                                <button class="setting-btn" onclick="openUsernameModal()">
+                                    Modifier
+                                </button>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <h3>Mot de passe</h3>
+                                    <p>Modifiez votre mot de passe</p>
+                                </div>
+                                <button class="setting-btn" onclick="openPasswordModal()">
+                                    Modifier
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Onglet Messages (Admins seulement) -->
+                <div class="tab-pane" id="messages-tab">
+                    <div class="messages-card">
+                        <h2>Messages récents (Admin)</h2>
+                        <div class="messages-container">
+                            <table class="messages-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Contexte</th>
+                                        <th>Message</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-messages">
+                                    <tr>
+                                        <td colspan="4">Chargement...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
+    </div>
+    
+    <!-- Modals existants mis à jour -->
+    <div id="edit-bio-modal" class="modal">
+        <div class="modal-content">
+            <h2>Modifier la biographie</h2>
+            <form id="bio-form">
+                <label>
+                    <textarea id="bio-text" maxlength="500" placeholder="Parlez de vous..."></textarea>
+                    <span class="char-count">0/500</span>
+                </label>
+                <div class="modal-buttons">
+                    <button type="submit">Enregistrer</button>
+                    <button type="button" onclick="closeBioModal()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Nouveaux modals pour username, password, avatar -->
+    <div id="username-modal" class="modal">
+        <div class="modal-content">
+            <h2>Modifier le nom d'utilisateur</h2>
+            <form id="username-form">
+                <label>
+                    Nouveau nom d'utilisateur
+                    <input type="text" id="new-username" required minlength="3" maxlength="20">
+                    <span class="validation-message" id="username-validation"></span>
+                </label>
+                <div class="modal-buttons">
+                    <button type="submit">Enregistrer</button>
+                    <button type="button" onclick="closeUsernameModal()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="password-modal" class="modal">
+        <div class="modal-content">
+            <h2>Modifier le mot de passe</h2>
+            <form id="password-form">
+                <label>
+                    Mot de passe actuel
+                    <input type="password" id="current-password" required>
+                </label>
+                <label>
+                    Nouveau mot de passe
+                    <input type="password" id="new-password" required minlength="6">
+                </label>
+                <label>
+                    Confirmer le nouveau mot de passe
+                    <input type="password" id="confirm-password" required>
+                </label>
+                <div class="modal-buttons">
+                    <button type="submit">Enregistrer</button>
+                    <button type="button" onclick="closePasswordModal()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="avatar-modal" class="modal">
+        <div class="modal-content">
+            <h2>Modifier l'avatar</h2>
+            <form id="avatar-form">
+                <label>
+                    URL de l'avatar
+                    <input type="url" id="avatar-url" placeholder="https://exemple.com/avatar.jpg">
+                </label>
+                <div class="avatar-preview">
+                    <img id="avatar-preview-img" src="/assets/default-avatar.png" alt="Aperçu">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit">Enregistrer</button>
+                    <button type="button" onclick="closeAvatarModal()">Annuler</button>
+                </div>
+            </form>
         </div>
     </div>
     

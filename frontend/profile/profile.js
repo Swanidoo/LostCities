@@ -2,8 +2,15 @@ const API_URL = window.location.hostname === "localhost"
     ? "http://localhost:3000"
     : "https://lostcitiesbackend.onrender.com";
 
+// État global de l'application
 let currentUserId = null;
 let isOwnProfile = false;
+let isAdmin = false;
+
+// État pour la pagination
+let currentPage = 1;
+let totalPages = 1;
+let isLoadingGames = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -16,10 +23,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     currentUserId = userId;
     
-    // Vérifier si l'utilisateur connecté est admin
-    const token = localStorage.getItem('authToken');
-    let isAdmin = false;
+    // Ajouter un loader élégant
+    showPageLoader();
     
+    // Vérifier les permissions utilisateur
+    const token = localStorage.getItem('authToken');
     if (token) {
         try {
             const tokenParts = token.split('.');
@@ -31,24 +39,195 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
-    // Afficher le bouton d'édition si c'est notre profil
-    if (isOwnProfile) {
-        document.getElementById('edit-profile-btn').style.display = 'block';
+    try {
+        // Configuration de l'interface basée sur les permissions
+        setupUI();
+        
+        // Charger le profil
+        await loadProfile();
+        
+        // Charger l'historique des parties
+        await loadGameHistory();
+        
+        // Si admin, charger les messages
+        if (isAdmin) {
+            await loadUserMessages(userId);
+        }
+        
+        // Configurer les gestionnaires d'événements
+        setupEventListeners();
+        
+        // Animer l'apparition du contenu
+        animateContentAppearance();
+        
+    } catch (error) {
+        console.error('Error initializing profile:', error);
+        showNotification('Erreur lors du chargement du profil', 'error');
+    } finally {
+        hidePageLoader();
     }
-    
-    // Charger le profil
-    await loadProfile();
-    
-    // Si admin, charger et afficher les messages
-    if (isAdmin) {
-        document.getElementById('admin-section').style.display = 'block';
-        await loadUserMessages(userId);
-    }
-    
-    // Configurer les gestionnaires d'événements
-    setupEventListeners();
 });
 
+// Loader de page
+function showPageLoader() {
+    const loader = document.createElement('div');
+    loader.id = 'page-loader';
+    loader.className = 'page-loader';
+    loader.innerHTML = `
+        <div class="loader-spinner">
+            <div class="spinner"></div>
+            <p>Chargement du profil...</p>
+        </div>
+    `;
+    document.body.appendChild(loader);
+}
+
+function hidePageLoader() {
+    const loader = document.getElementById('page-loader');
+    if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 300);
+    }
+}
+
+// Animation d'apparition du contenu
+function animateContentAppearance() {
+    const elementsToAnimate = [
+        '.profile-sidebar',
+        '.profile-content',
+        '.quick-stats .stat-item'
+    ];
+    
+    elementsToAnimate.forEach((selector, index) => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((element, elementIndex) => {
+            element.style.opacity = '0';
+            element.style.transform = 'translateY(30px)';
+            element.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+            
+            setTimeout(() => {
+                element.style.opacity = '1';
+                element.style.transform = 'translateY(0)';
+            }, (index * 100) + (elementIndex * 50));
+        });
+    });
+}
+
+function setupUI() {
+    // Montrer/cacher les éléments selon les permissions
+    if (isOwnProfile) {
+        // Montrer les boutons d'édition
+        document.getElementById('edit-avatar-btn').style.display = 'block';
+        document.getElementById('edit-bio-btn').style.display = 'block';
+        
+        // Montrer l'onglet paramètres
+        const settingsTab = document.querySelector('[data-tab="settings"]');
+        settingsTab.style.display = 'flex';
+    }
+    
+    if (isAdmin) {
+        // Montrer l'onglet messages
+        const messagesTab = document.getElementById('admin-messages-tab');
+        messagesTab.style.display = 'flex';
+    }
+}
+
+function setupEventListeners() {
+    // Gestion des onglets
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => switchTab(button.dataset.tab));
+    });
+    
+    // Boutons d'édition
+    document.getElementById('edit-avatar-btn').addEventListener('click', openAvatarModal);
+    document.getElementById('edit-bio-btn').addEventListener('click', openBioModal);
+    
+    // Formulaires
+    setupFormHandlers();
+    
+    // Validation temps réel pour username (format seulement)
+    const usernameInput = document.getElementById('new-username');
+    if (usernameInput) {
+        usernameInput.addEventListener('input', validateUsername);
+    }
+    
+    // Aperçu avatar
+    const avatarUrlInput = document.getElementById('avatar-url');
+    if (avatarUrlInput) {
+        avatarUrlInput.addEventListener('input', previewAvatar);
+    }
+    
+    // Compteur de caractères bio
+    const bioTextarea = document.getElementById('bio-text');
+    if (bioTextarea) {
+        bioTextarea.addEventListener('input', updateCharCount);
+    }
+    
+    // Amélioration des effets de hover
+    setTimeout(setupEnhancedHoverEffects, 1000);
+}
+
+// Amélioration de la gestion des onglets avec animations
+function switchTab(tabName) {
+    // Désactiver tous les onglets
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Masquer tous les contenus avec animation
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        if (pane.classList.contains('active')) {
+            pane.style.opacity = '0';
+            pane.style.transform = 'translateX(-20px)';
+            
+            setTimeout(() => {
+                pane.classList.remove('active');
+            }, 200);
+        }
+    });
+    
+    // Activer l'onglet sélectionné
+    setTimeout(() => {
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        const targetPane = document.getElementById(`${tabName}-tab`);
+        targetPane.classList.add('active');
+        
+        // Animer l'apparition
+        requestAnimationFrame(() => {
+            targetPane.style.opacity = '1';
+            targetPane.style.transform = 'translateX(0)';
+        });
+    }, 200);
+    
+    // Effet sonore subtil (optionnel)
+    playTabSound();
+}
+
+// Son subtil pour les onglets (optionnel)
+function playTabSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.02, audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (error) {
+        // Ignore errors in sound creation
+    }
+}
+
+// Chargement du profil
 async function loadProfile() {
     try {
         const response = await fetch(`${API_URL}/api/profile/${currentUserId}`);
@@ -79,12 +258,379 @@ async function loadProfile() {
         
     } catch (error) {
         console.error('Error loading profile:', error);
-        alert('Erreur lors du chargement du profil');
+        showNotification('Erreur lors du chargement du profil', 'error');
     }
 }
 
+// Chargement de l'historique des parties avec pagination
+async function loadGameHistory(page = 1) {
+    if (isLoadingGames) return;
+    
+    try {
+        isLoadingGames = true;
+        const gamesListContainer = document.getElementById('games-list');
+        
+        // Afficher le loader seulement si c'est la première page
+        if (page === 1) {
+            gamesListContainer.innerHTML = '<div class="loading">Chargement de l\'historique...</div>';
+        } else {
+            // Pour les pages suivantes, afficher un loader en bas
+            const existingLoader = document.querySelector('.pagination-loader');
+            if (!existingLoader) {
+                const loader = document.createElement('div');
+                loader.className = 'pagination-loader loading';
+                loader.textContent = 'Chargement...';
+                gamesListContainer.appendChild(loader);
+            }
+        }
+        
+        // Charger l'historique depuis l'API
+        const response = await fetch(`${API_URL}/api/profile/${currentUserId}/games?page=${page}&limit=10`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load game history');
+        }
+        
+        const data = await response.json();
+        currentPage = page;
+        totalPages = data.pagination.totalPages;
+        
+        // Afficher les résultats
+        if (page === 1) {
+            displayGameHistory(data.games);
+        } else {
+            appendGameHistory(data.games);
+        }
+        
+        // Ajouter la pagination
+        updatePagination(data.pagination);
+        
+    } catch (error) {
+        console.error('Error loading game history:', error);
+        showNotification('Erreur lors du chargement de l\'historique', 'error');
+        
+        // Afficher un message d'erreur dans le conteneur
+        const gamesListContainer = document.getElementById('games-list');
+        if (currentPage === 1) {
+            gamesListContainer.innerHTML = '<div class="loading">Erreur lors du chargement de l\'historique</div>';
+        }
+    } finally {
+        isLoadingGames = false;
+        // Supprimer le loader de pagination s'il existe
+        const loader = document.querySelector('.pagination-loader');
+        if (loader) {
+            loader.remove();
+        }
+    }
+}
 
+function displayGameHistory(games) {
+    const gamesListContainer = document.getElementById('games-list');
+    
+    if (games.length === 0) {
+        gamesListContainer.innerHTML = `
+            <div class="no-games-message">
+                <div class="no-games-icon">🎮</div>
+                <h3>Aucune partie trouvée</h3>
+                <p>Commence ta première partie pour voir ton historique ici !</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const gamesHTML = games.map(game => {
+        const isVictory = game.result === 'victory';
+        const resultClass = isVictory ? 'victory' : 'defeat';
+        const resultIcon = isVictory ? '🏆' : '❌';
+        const resultText = isVictory ? 'Victoire' : 'Défaite';
+        
+        // Formater la date et l'heure
+        const gameDate = new Date(game.date);
+        const formattedDate = gameDate.toLocaleDateString('fr-FR');
+        const formattedTime = gameDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        
+        // Déterminer le mode de jeu avec icônes
+        let modeText = game.mode === 'quick' ? '⚡ Mode Rapide' : '🎯 Mode Classique';
+        if (game.with_extension) {
+            modeText += ' 🟣';
+        }
+        
+        // Afficher la durée avec formatage
+        let durationDisplay = '';
+        if (game.duration !== null) {
+            const hours = Math.floor(game.duration / 60);
+            const minutes = game.duration % 60;
+            if (hours > 0) {
+                durationDisplay = `⏱️ ${hours}h${minutes}m`;
+            } else {
+                durationDisplay = `⏱️ ${minutes}m`;
+            }
+        }
+        
+        // Calcul du différentiel de score
+        const scoreDiff = Math.abs(game.score.player - game.score.opponent);
+        let victoryType = '';
+        if (isVictory) {
+            if (scoreDiff > 50) victoryType = ' • Victoire écrasante!';
+            else if (scoreDiff > 20) victoryType = ' • Victoire confortable';
+            else if (scoreDiff <= 5) victoryType = ' • Victoire serrée!';
+        }
+        
+        return `
+            <div class="game-item" data-game-id="${game.id}">
+                <div class="game-info">
+                    <div class="game-header">
+                        <h4>vs ${game.opponent}</h4>
+                        <span class="game-mode">${modeText}</span>
+                    </div>
+                    <div class="game-details">
+                        <span class="game-date">📅 ${formattedDate} à ${formattedTime}</span>
+                        ${durationDisplay ? `<span class="game-duration">${durationDisplay}</span>` : ''}
+                    </div>
+                </div>
+                <div class="game-result ${resultClass}">
+                    <div class="result-header">
+                        <span class="result-icon">${resultIcon}</span>
+                        <span class="result-text">${resultText}${victoryType}</span>
+                    </div>
+                    <div class="game-score">
+                        <span class="score-player ${isVictory ? 'winning-score' : ''}">${game.score.player}</span>
+                        <span class="score-separator">-</span>
+                        <span class="score-opponent ${!isVictory ? 'winning-score' : ''}">${game.score.opponent}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    gamesListContainer.innerHTML = gamesHTML;
+    
+    // Ajouter les gestionnaires d'événements pour les détails
+    addGameDetailHandlers();
+}
+
+// Ajouter des parties à la liste existante (pagination)
+function appendGameHistory(games) {
+    const gamesListContainer = document.getElementById('games-list');
+    
+    games.forEach(game => {
+        const isVictory = game.result === 'victory';
+        const resultClass = isVictory ? 'victory' : 'defeat';
+        const resultIcon = isVictory ? '🏆' : '❌';
+        const resultText = isVictory ? 'Victoire' : 'Défaite';
+        
+        const gameDate = new Date(game.date);
+        const formattedDate = gameDate.toLocaleDateString('fr-FR');
+        const formattedTime = gameDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        
+        let modeText = game.mode === 'quick' ? '⚡ Mode Rapide' : '🎯 Mode Classique';
+        if (game.with_extension) {
+            modeText += ' 🟣';
+        }
+        
+        let durationDisplay = '';
+        if (game.duration !== null) {
+            const hours = Math.floor(game.duration / 60);
+            const minutes = game.duration % 60;
+            if (hours > 0) {
+                durationDisplay = `⏱️ ${hours}h${minutes}m`;
+            } else {
+                durationDisplay = `⏱️ ${minutes}m`;
+            }
+        }
+        
+        const scoreDiff = Math.abs(game.score.player - game.score.opponent);
+        let victoryType = '';
+        if (isVictory) {
+            if (scoreDiff > 50) victoryType = ' • Victoire écrasante!';
+            else if (scoreDiff > 20) victoryType = ' • Victoire confortable';
+            else if (scoreDiff <= 5) victoryType = ' • Victoire serrée!';
+        }
+        
+        const gameElement = document.createElement('div');
+        gameElement.className = 'game-item';
+        gameElement.dataset.gameId = game.id;
+        gameElement.innerHTML = `
+            <div class="game-info">
+                <div class="game-header">
+                    <h4>vs ${game.opponent}</h4>
+                    <span class="game-mode">${modeText}</span>
+                </div>
+                <div class="game-details">
+                    <span class="game-date">📅 ${formattedDate} à ${formattedTime}</span>
+                    ${durationDisplay ? `<span class="game-duration">${durationDisplay}</span>` : ''}
+                </div>
+            </div>
+            <div class="game-result ${resultClass}">
+                <div class="result-header">
+                    <span class="result-icon">${resultIcon}</span>
+                    <span class="result-text">${resultText}${victoryType}</span>
+                </div>
+                <div class="game-score">
+                    <span class="score-player ${isVictory ? 'winning-score' : ''}">${game.score.player}</span>
+                    <span class="score-separator">-</span>
+                    <span class="score-opponent ${!isVictory ? 'winning-score' : ''}">${game.score.opponent}</span>
+                </div>
+            </div>
+        `;
+        
+        // Ajouter avec animation
+        gameElement.style.opacity = '0';
+        gameElement.style.transform = 'translateY(20px)';
+        gamesListContainer.appendChild(gameElement);
+        
+        // Animer l'apparition
+        requestAnimationFrame(() => {
+            gameElement.style.transition = 'all 0.3s ease';
+            gameElement.style.opacity = '1';
+            gameElement.style.transform = 'translateY(0)';
+        });
+    });
+    
+    addGameDetailHandlers();
+}
+
+// Mise à jour de la pagination
+function updatePagination(pagination) {
+    let paginationContainer = document.querySelector('.games-pagination');
+    
+    // Créer le conteneur s'il n'existe pas
+    if (!paginationContainer) {
+        paginationContainer = document.createElement('div');
+        paginationContainer.className = 'games-pagination';
+        document.getElementById('games-list').parentNode.appendChild(paginationContainer);
+    }
+    
+    // Masquer la pagination s'il n'y a qu'une page
+    if (pagination.totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+    
+    paginationContainer.style.display = 'flex';
+    
+    // Créer les boutons de pagination
+    let paginationHTML = `
+        <div class="pagination-info">
+            Page ${pagination.page} sur ${pagination.totalPages}
+        </div>
+        <div class="pagination-buttons">
+    `;
+    
+    // Bouton Précédent
+    paginationHTML += `
+        <button class="pagination-btn" onclick="loadGameHistory(${pagination.page - 1})" 
+                ${pagination.page <= 1 ? 'disabled' : ''}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+            </svg>
+            Précédent
+        </button>
+    `;
+    
+    // Numéros de page
+    const startPage = Math.max(1, pagination.page - 2);
+    const endPage = Math.min(pagination.totalPages, pagination.page + 2);
+    
+    if (startPage > 1) {
+        paginationHTML += `<button class="pagination-btn" onclick="loadGameHistory(1)">1</button>`;
+        if (startPage > 2) {
+            paginationHTML += '<span class="pagination-dots">...</span>';
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        paginationHTML += `
+            <button class="pagination-btn ${i === pagination.page ? 'active' : ''}" 
+                    onclick="loadGameHistory(${i})">${i}</button>
+        `;
+    }
+    
+    if (endPage < pagination.totalPages) {
+        if (endPage < pagination.totalPages - 1) {
+            paginationHTML += '<span class="pagination-dots">...</span>';
+        }
+        paginationHTML += `<button class="pagination-btn" onclick="loadGameHistory(${pagination.totalPages})">${pagination.totalPages}</button>`;
+    }
+    
+    // Bouton Suivant
+    paginationHTML += `
+        <button class="pagination-btn" onclick="loadGameHistory(${pagination.page + 1})" 
+                ${pagination.page >= pagination.totalPages ? 'disabled' : ''}>
+            Suivant
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+            </svg>
+        </button>
+    `;
+    
+    paginationHTML += '</div>';
+    
+    paginationContainer.innerHTML = paginationHTML;
+}
+
+// Gestionnaires d'événements pour les détails des parties
+function addGameDetailHandlers() {
+    document.querySelectorAll('.game-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const gameId = item.dataset.gameId;
+            if (gameId) {
+                showGameDetail(gameId);
+            }
+        });
+        
+        // Effet hover amélioré
+        item.addEventListener('mouseenter', () => {
+            item.style.transform = 'translateY(-4px)';
+            item.style.boxShadow = '0 8px 25px rgba(76, 175, 80, 0.15)';
+        });
+        
+        item.addEventListener('mouseleave', () => {
+            item.style.transform = 'translateY(0)';
+            item.style.boxShadow = 'none';
+        });
+    });
+}
+
+// Modal de détail de partie (placeholder)
+function showGameDetail(gameId) {
+    const modal = document.createElement('div');
+    modal.className = 'modal game-detail-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h2>Détails de la partie #${gameId}</h2>
+            <div class="game-detail-content">
+                <p>Fonctionnalité en développement...</p>
+                <p>Ici s'afficheront les détails complets de la partie :</p>
+                <ul>
+                    <li>Scores par manche</li>
+                    <li>Cartes jouées</li>
+                    <li>Chronologie de la partie</li>
+                    <li>Statistiques détaillées</li>
+                </ul>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" onclick="closeGameDetail()">Fermer</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.classList.add('visible');
+}
+
+function closeGameDetail() {
+    const modal = document.querySelector('.game-detail-modal');
+    if (modal) {
+        modal.classList.remove('visible');
+        setTimeout(() => modal.remove(), 300);
+    }
+}
+
+// Chargement des messages pour les admins
 async function loadUserMessages(userId) {
+    if (!isAdmin) return;
+    
     try {
         const response = await fetch(`${API_URL}/api/profile/${userId}/messages`, {
             headers: {
@@ -128,41 +674,187 @@ function displayMessages(messages) {
     });
 }
 
-function setupEventListeners() {
-    // Bouton d'édition
-    document.getElementById('edit-profile-btn').addEventListener('click', openEditModal);
-    
-    // Formulaire d'édition
-    document.getElementById('edit-form').addEventListener('submit', handleEditSubmit);
-}
-
-function openEditModal() {
-    const modal = document.getElementById('edit-modal');
+// Gestion des modals
+function openAvatarModal() {
+    const modal = document.getElementById('avatar-modal');
     modal.classList.add('visible');
     
-    // Préremplir les champs
+    // Préremplir avec l'avatar actuel s'il existe
     const currentAvatar = document.getElementById('user-avatar').src;
-    const currentBio = document.getElementById('user-bio').textContent;
-    
     if (!currentAvatar.includes('default-avatar.png')) {
         document.getElementById('avatar-url').value = currentAvatar;
+        document.getElementById('avatar-preview-img').src = currentAvatar;
     }
+}
+
+function openBioModal() {
+    const modal = document.getElementById('edit-bio-modal');
+    modal.classList.add('visible');
     
+    // Préremplir avec la bio actuelle
+    const currentBio = document.getElementById('user-bio').textContent;
     if (currentBio !== 'Aucune biographie pour le moment.') {
         document.getElementById('bio-text').value = currentBio;
+        updateCharCount();
     }
 }
 
-function closeEditModal() {
-    document.getElementById('edit-modal').classList.remove('visible');
+function openUsernameModal() {
+    const modal = document.getElementById('username-modal');
+    modal.classList.add('visible');
+    
+    // Préremplir avec le username actuel
+    const currentUsername = document.getElementById('user-username').textContent;
+    document.getElementById('new-username').value = currentUsername;
 }
 
-async function handleEditSubmit(e) {
-    e.preventDefault();
+function openPasswordModal() {
+    const modal = document.getElementById('password-modal');
+    modal.classList.add('visible');
+}
+
+// Fermeture des modals
+function closeAvatarModal() {
+    document.getElementById('avatar-modal').classList.remove('visible');
+}
+
+function closeBioModal() {
+    document.getElementById('edit-bio-modal').classList.remove('visible');
+}
+
+function closeUsernameModal() {
+    document.getElementById('username-modal').classList.remove('visible');
+}
+
+function closePasswordModal() {
+    document.getElementById('password-modal').classList.remove('visible');
+}
+
+// Fermer les modals en cliquant à l'extérieur
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+        e.target.classList.remove('visible');
+    }
+});
+
+// Prévisualisation de l'avatar
+function previewAvatar() {
+    const url = document.getElementById('avatar-url').value;
+    const preview = document.getElementById('avatar-preview-img');
     
-    const avatarUrl = document.getElementById('avatar-url').value;
-    const bio = document.getElementById('bio-text').value;
+    if (url && isValidImageUrl(url)) {
+        preview.src = url;
+        preview.onerror = () => {
+            preview.src = '/assets/default-avatar.png';
+        };
+    } else {
+        preview.src = '/assets/default-avatar.png';
+    }
+}
+
+function isValidImageUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+// Validation du username (format seulement, PAS d'unicité)
+function validateUsername() {
+    const input = document.getElementById('new-username');
+    const validationMsg = document.getElementById('username-validation');
+    const username = input.value.trim();
     
+    // Reset styles
+    validationMsg.className = 'validation-message';
+    validationMsg.textContent = '';
+    
+    if (username.length < 3) {
+        validationMsg.textContent = 'Le nom d\'utilisateur doit contenir au moins 3 caractères';
+        validationMsg.classList.add('error');
+        return false;
+    }
+    
+    if (username.length > 20) {
+        validationMsg.textContent = 'Le nom d\'utilisateur ne peut pas dépasser 20 caractères';
+        validationMsg.classList.add('error');
+        return false;
+    }
+    
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        validationMsg.textContent = 'Seuls les lettres, chiffres et _ sont autorisés';
+        validationMsg.classList.add('error');
+        return false;
+    }
+    
+    // PAS de vérification d'unicité - les usernames ne sont pas uniques
+    validationMsg.textContent = 'Format valide ✓';
+    validationMsg.classList.add('success');
+    return true;
+}
+
+// Mise à jour du compteur de caractères
+function updateCharCount() {
+    const textarea = document.getElementById('bio-text');
+    const counter = document.querySelector('.char-count');
+    
+    if (textarea && counter) {
+        const length = textarea.value.length;
+        counter.textContent = `${length}/500`;
+        
+        if (length > 450) {
+            counter.style.color = 'var(--error-color)';
+        } else if (length > 400) {
+            counter.style.color = 'var(--warning-color)';
+        } else {
+            counter.style.color = 'var(--text-muted)';
+        }
+    }
+}
+
+// Configuration des gestionnaires de formulaires
+function setupFormHandlers() {
+    // Formulaire bio
+    document.getElementById('bio-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const bio = document.getElementById('bio-text').value;
+        await updateProfile({ bio });
+    });
+    
+    // Formulaire username
+    document.getElementById('username-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('new-username').value;
+        await updateUsername(username);
+    });
+    
+    // Formulaire password
+    document.getElementById('password-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const currentPassword = document.getElementById('current-password').value;
+        const newPassword = document.getElementById('new-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+        
+        if (newPassword !== confirmPassword) {
+            showNotification('Les mots de passe ne correspondent pas', 'error');
+            return;
+        }
+        
+        await updatePassword(currentPassword, newPassword);
+    });
+    
+    // Formulaire avatar
+    document.getElementById('avatar-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const avatarUrl = document.getElementById('avatar-url').value;
+        await updateProfile({ avatar_url: avatarUrl });
+    });
+}
+
+// Fonctions de mise à jour
+async function updateProfile(data) {
     try {
         const response = await fetch(`${API_URL}/api/profile`, {
             method: 'PUT',
@@ -170,23 +862,225 @@ async function handleEditSubmit(e) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('authToken')}`
             },
-            body: JSON.stringify({
-                avatar_url: avatarUrl,
-                bio: bio
-            })
+            body: JSON.stringify(data)
         });
         
         if (response.ok) {
-            closeEditModal();
-            await loadProfile(); // Recharger le profil
+            showNotification('Profil mis à jour avec succès', 'success');
+            await loadProfile();
+            
+            // Fermer les modals appropriés
+            if (data.bio !== undefined) closeBioModal();
+            if (data.avatar_url !== undefined) closeAvatarModal();
         } else {
-            alert('Erreur lors de la mise à jour du profil');
+            throw new Error('Erreur lors de la mise à jour');
         }
     } catch (error) {
         console.error('Error updating profile:', error);
-        alert('Erreur lors de la mise à jour du profil');
+        showNotification('Erreur lors de la mise à jour du profil', 'error');
     }
 }
 
-// Rendre la fonction globale pour le onclick
-window.closeEditModal = closeEditModal;
+async function updateUsername(username) {
+    try {
+        const response = await fetch(`${API_URL}/api/profile/username`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({ username })
+        });
+        
+        if (response.ok) {
+            showNotification('Nom d\'utilisateur mis à jour avec succès', 'success');
+            await loadProfile();
+            closeUsernameModal();
+        } else {
+            const error = await response.json();
+            showNotification(error.message || 'Erreur lors de la mise à jour', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating username:', error);
+        showNotification('Erreur lors de la mise à jour du nom d\'utilisateur', 'error');
+    }
+}
+
+async function updatePassword(currentPassword, newPassword) {
+    try {
+        const response = await fetch(`${API_URL}/api/profile/password`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        
+        if (response.ok) {
+            showNotification('Mot de passe mis à jour avec succès', 'success');
+            closePasswordModal();
+            
+            // Réinitialiser le formulaire
+            document.getElementById('password-form').reset();
+        } else {
+            const error = await response.json();
+            showNotification(error.message || 'Erreur lors de la mise à jour', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating password:', error);
+        showNotification('Erreur lors de la mise à jour du mot de passe', 'error');
+    }
+}
+
+// Système de notifications amélioré avec pile
+const notificationStack = [];
+const maxNotifications = 3;
+
+function showNotification(message, type = 'info', duration = 5000) {
+    // Limiter le nombre de notifications
+    while (notificationStack.length >= maxNotifications) {
+        const oldest = notificationStack.shift();
+        oldest.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    // Icônes pour chaque type
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${icons[type] || icons.info}</span>
+            <span class="notification-message">${message}</span>
+        </div>
+        <button class="notification-close" onclick="closeNotification(this)">×</button>
+    `;
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: ${2 + (notificationStack.length * 80)}px;
+        right: 2rem;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        color: white;
+        z-index: 1001;
+        min-width: 300px;
+        opacity: 0;
+        transform: translateX(100%);
+        animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(10px);
+    `;
+    
+    switch (type) {
+        case 'success':
+            notification.style.background = 'linear-gradient(135deg, #4CAF50, #45a049)';
+            break;
+        case 'error':
+            notification.style.background = 'linear-gradient(135deg, #f44336, #da190b)';
+            break;
+        case 'warning':
+            notification.style.background = 'linear-gradient(135deg, #ff9800, #f57c00)';
+            break;
+        default:
+            notification.style.background = 'linear-gradient(135deg, #2196F3, #1976D2)';
+    }
+    
+    document.body.appendChild(notification);
+    notificationStack.push(notification);
+    
+    // Auto-suppression
+    setTimeout(() => {
+        closeNotification(notification.querySelector('.notification-close'));
+    }, duration);
+}
+
+function closeNotification(closeBtn) {
+    const notification = closeBtn.parentElement;
+    const index = notificationStack.indexOf(notification);
+    
+    if (index > -1) {
+        notification.style.animation = 'slideOutRight 0.3s ease forwards';
+        
+        // Réajuster les positions des autres notifications
+        notificationStack.slice(index + 1).forEach((notif, i) => {
+            notif.style.top = `${parseInt(notif.style.top) - 80}px`;
+        });
+        
+        setTimeout(() => {
+            notification.remove();
+            notificationStack.splice(index, 1);
+        }, 300);
+    }
+}
+
+// Amélioration des effets de hover avec animations
+function setupEnhancedHoverEffects() {
+    // Boutons avec effet de hover amélioré
+    document.querySelectorAll('button:not(.no-hover)').forEach(button => {
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'translateY(-2px)';
+            button.style.filter = 'brightness(1.1)';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'translateY(0)';
+            button.style.filter = 'brightness(1)';
+        });
+        
+        button.addEventListener('mousedown', () => {
+            button.style.transform = 'translateY(0) scale(0.98)';
+        });
+        
+        button.addEventListener('mouseup', () => {
+            button.style.transform = 'translateY(-2px) scale(1)';
+        });
+    });
+    
+    // Cards avec effet de hover
+    document.querySelectorAll('.profile-info-card, .games-history-card, .settings-card, .messages-card').forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            card.style.transform = 'translateY(-4px)';
+            card.style.boxShadow = '0 12px 30px rgba(76, 175, 80, 0.1)';
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'translateY(0)';
+            card.style.boxShadow = 'none';
+        });
+    });
+}
+
+// Styles d'animation pour les notifications
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);
