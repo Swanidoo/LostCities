@@ -240,6 +240,14 @@ async function loadProfile() {
         
         // Mettre à jour l'interface
         document.getElementById('user-username').textContent = profile.username;
+        // Afficher l'email s'il est disponible
+        const emailElement = document.getElementById('user-email');
+        if (profile.email) {
+            emailElement.textContent = profile.email;
+            emailElement.style.display = 'block';
+        } else {
+            emailElement.style.display = 'none';
+        }
         document.getElementById('user-bio').textContent = profile.bio || 'Aucune biographie pour le moment.';
         document.getElementById('member-date').textContent = new Date(profile.created_at).toLocaleDateString('fr-FR');
         document.getElementById('games-played').textContent = profile.games_played;
