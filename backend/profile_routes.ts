@@ -6,9 +6,11 @@ const profileRouter = new Router();
 
 
 // GET /api/profile/:id/games - Récupérer l'historique des parties d'un utilisateur
+// GET /api/profile/:id/games - Récupérer l'historique des parties d'un utilisateur
 profileRouter.get("/api/profile/:id/games", async (ctx) => {
   try {
-    const userId = ctx.params.id;
+    const userId = parseInt(ctx.params.id);
+    console.log("🎮 Fetching games for user:", userId);
     
     // Parse query parameters for pagination
     const url = new URL(ctx.request.url);
@@ -16,78 +18,80 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
     const limit = parseInt(url.searchParams.get('limit') || '10');
     const offset = (page - 1) * limit;
     
-    // Get total count of games for this user
-    const countResult = await client.queryObject<{total: number}>(`
-      SELECT COUNT(*) as total 
+    // Get total count de manière simple
+    const countResult = await client.queryObject<{count: string}>(`
+      SELECT COUNT(*) as count
       FROM games 
-      WHERE player1_id = $1 OR player2_id = $1
+      WHERE (player1_id = $1 OR player2_id = $1) AND status = 'finished'
     `, [userId]);
     
-    const totalGames = Number(countResult.rows[0].total);
+    const totalGames = parseInt(countResult.rows[0].count);
+    console.log("📊 Total games:", totalGames);
     
-    // Get games with opponents and results
+    // Requête simplifiée pour les parties
     const gamesResult = await client.queryObject(`
       SELECT 
         g.id,
-        g.started_at as date,
+        g.started_at,
         g.ended_at,
-        g.game_mode as mode,
+        g.game_mode,
         g.status,
         g.score_player1,
         g.score_player2,
         g.winner_id,
-        CASE 
-          WHEN g.player1_id = $1 THEN u2.username 
-          ELSE u1.username 
-        END as opponent,
-        CASE 
-          WHEN g.player1_id = $1 THEN g.score_player1 
-          ELSE g.score_player2 
-        END as score_player,
-        CASE 
-          WHEN g.player1_id = $1 THEN g.score_player2 
-          ELSE g.score_player1 
-        END as score_opponent,
-        CASE 
-          WHEN g.winner_id = $1 THEN 'victory'
-          WHEN g.winner_id IS NULL THEN 'draw'
-          ELSE 'defeat'
-        END as result,
-        -- Check if game used extension by looking at board
-        COALESCE(b.use_purple_expedition, false) as with_extension,
-        -- Calculate duration in minutes
-        CASE 
-          WHEN g.ended_at IS NOT NULL AND g.started_at IS NOT NULL 
-          THEN EXTRACT(EPOCH FROM (g.ended_at - g.started_at)) / 60 
-          ELSE NULL 
-        END as duration
+        g.player1_id,
+        g.player2_id,
+        u1.username as player1_name,
+        u2.username as player2_name
       FROM games g
       JOIN users u1 ON g.player1_id = u1.id
       JOIN users u2 ON g.player2_id = u2.id
-      LEFT JOIN board b ON g.id = b.game_id
-      WHERE g.player1_id = $1 OR g.player2_id = $1
+      WHERE (g.player1_id = $1 OR g.player2_id = $1) 
+        AND g.status = 'finished'
       ORDER BY g.started_at DESC
       LIMIT $2 OFFSET $3
     `, [userId, limit, offset]);
     
-    // Format the results
-    const games = gamesResult.rows.map(game => ({
-      id: game.id,
-      date: game.date,
-      mode: game.mode,
-      opponent: game.opponent,
-      result: game.result,
-      score: {
-        player: Number(game.score_player || 0),
-        opponent: Number(game.score_opponent || 0)
-      },
-      with_extension: game.with_extension,
-      duration: game.duration ? Math.round(Number(game.duration)) : null,
-      status: game.status
-    }));
+    console.log("🎯 Found games:", gamesResult.rows.length);
     
-    // Return games with pagination info
-    ctx.response.body = {
+    // Traitement des résultats côté JavaScript
+    const games = gamesResult.rows.map(row => {
+      const isPlayer1 = Number(row.player1_id) === userId;
+      const opponent = isPlayer1 ? row.player2_name : row.player1_name;
+      const playerScore = isPlayer1 ? row.score_player1 : row.score_player2;
+      const opponentScore = isPlayer1 ? row.score_player2 : row.score_player1;
+      
+      let result = 'defeat';
+      if (Number(row.winner_id) === userId) result = 'victory';
+      else if (row.winner_id === null) result = 'draw';
+      
+      // Calculate duration in minutes if both dates exist
+      let duration = null;
+      if (row.started_at && row.ended_at) {
+        const durationMs = new Date(row.ended_at).getTime() - new Date(row.started_at).getTime();
+        duration = Math.round(durationMs / (1000 * 60)); // Convert to minutes
+      }
+      
+      return {
+        id: Number(row.id),
+        date: row.started_at,
+        mode: row.game_mode || 'classic',
+        opponent: opponent,
+        result: result,
+        score: {
+          player: Number(playerScore) || 0,
+          opponent: Number(opponentScore) || 0
+        },
+        with_extension: false, // Pour l'instant, on met false par défaut
+        duration: duration,
+        status: row.status
+      };
+    });
+    
+    console.log("✅ Processed games:", games.length);
+    
+    // Préparer la réponse
+    const responseData = {
       games,
       pagination: {
         page,
@@ -97,10 +101,19 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
       }
     };
     
+    //Conversion des BigInt en Number pour éviter les erreurs JSON
+    ctx.response.body = JSON.parse(JSON.stringify(responseData, (key, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    ));
+    
   } catch (err) {
-    console.error("Error fetching game history:", err);
+    console.error("❌ Error fetching game history:", err);
+    console.error("Stack trace:", err.stack);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { 
+      error: "Internal server error",
+      message: err.message
+    };
   }
 });
 
