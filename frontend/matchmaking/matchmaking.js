@@ -236,10 +236,10 @@ function startMatchmaking() {
         matchmakingState.socket.send(JSON.stringify({
             event: "findMatch",
             data: {
-                userId: matchmakingState.userId,
-                username: matchmakingState.username,
-                gameMode: gameMode,         // Ajout du mode de jeu
-                useExtension: useExtension  // Ajout de l'option d'extension
+              userId: matchmakingState.userId,
+              username: matchmakingState.username,
+              gameMode: gameMode,         // 'classic' ou 'quick'
+              useExtension: useExtension  // true ou false
             }
         }));
 

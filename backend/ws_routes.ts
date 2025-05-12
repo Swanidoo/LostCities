@@ -6,7 +6,15 @@ import { LostCitiesGame } from "./lost_cities/lost_cities_controller.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
-const playersLookingForMatch: { socket: WebSocket; userId: string; username: string }[] = [];
+const playersLookingForMatch: { 
+  socket: WebSocket; 
+  userId: string; 
+  username: string;
+  preferences: {
+    gameMode: string;
+    useExtension: boolean;
+  };
+}[] = [];
 const gameSubscriptions: Map<string, Set<WebSocket>> = new Map();
 
 const jwtKey = Deno.env.get("JWT_SECRET");
@@ -200,7 +208,7 @@ wsRouter.get("/ws", async (ctx) => {
                 break;
             case "findMatch":
                 // Use the userId from the message data, not from unknown scope
-                handleMatchmaking(socket, clientData.username, data.data?.userId);
+                handleMatchmaking(socket, clientData.username, data.data?.userId, data.data);
                 break;
             case "cancelMatch":
                 removeFromMatchmaking(socket);
@@ -602,8 +610,9 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
   }
 }
 
-async function handleMatchmaking(socket, username, userId) {
+async function handleMatchmaking(socket, username, userId, gameOptions = {}) {
   try {
+    // Vérifier le statut de ban
     const banResult = await client.queryObject(
       `SELECT is_banned, banned_until, ban_reason FROM users WHERE id = $1`,
       [userId]
@@ -613,6 +622,7 @@ async function handleMatchmaking(socket, username, userId) {
       const user = banResult.rows[0];
       
       if (user.is_banned && (!user.banned_until || new Date(user.banned_until) > new Date())) {
+        console.log(`❌ Banned user ${username} (${userId}) tried to find match`);
         socket.send(JSON.stringify({
           event: "error",
           data: { 
@@ -627,26 +637,54 @@ async function handleMatchmaking(socket, username, userId) {
         return;
       }
     }
+    
+    // Log les options de jeu reçues
+    console.log(`🎮 User ${username} (${userId}) is looking for a match with options:`, {
+      gameMode: gameOptions.gameMode || 'classic',
+      useExtension: gameOptions.useExtension || false
+    });
+    
+    // Remove any existing entry for this player (in case they're already searching)
+    removeFromMatchmaking(socket);
+    
+    // Add to matchmaking queue with preferences
+    playersLookingForMatch.push({ 
+      socket, 
+      userId, 
+      username,
+      preferences: {
+        gameMode: gameOptions.gameMode || 'classic',
+        useExtension: gameOptions.useExtension || false
+      }
+    });
+    
+    console.log(`📋 Added ${username} to matchmaking queue. Total players waiting: ${playersLookingForMatch.length}`);
+    console.log(`🎯 Looking for: ${gameOptions.gameMode || 'classic'} mode, extension: ${gameOptions.useExtension || false}`);
+    
+    // Send confirmation to player
+    socket.send(JSON.stringify({
+      event: "matchmakingStatus",
+      data: { 
+        status: "searching", 
+        message: `Searching for ${gameOptions.gameMode || 'classic'} match${gameOptions.useExtension ? ' with extension' : ''}...` 
+      }
+    }));
+    
+    // Try to find a match immediately
+    tryFindMatch();
+    
   } catch (error) {
-    console.error("Error checking ban status:", error);
+    console.error("❌ Error in handleMatchmaking:", error);
+    
+    // Send error to the player
+    socket.send(JSON.stringify({
+      event: "error",
+      data: { 
+        message: "Erreur lors de la recherche de partie",
+        type: "matchmaking_error"
+      }
+    }));
   }
-
-  console.log(`🎮 User ${username} (${userId}) is looking for a match`);
-  
-  // Remove any existing entry for this player (in case they're already searching)
-  removeFromMatchmaking(socket);
-  
-  // Add to matchmaking queue
-  playersLookingForMatch.push({ socket, userId, username });
-  
-  // Send confirmation to player
-  socket.send(JSON.stringify({
-    event: "matchmakingStatus",
-    data: { status: "searching", message: "Looking for an opponent..." }
-  }));
-  
-  // Try to find a match
-  tryFindMatch();
 }
 
 export function broadcastMessageDeletion(messageId: string) {
@@ -806,70 +844,134 @@ function removeFromMatchmaking(socket: WebSocket) {
 function tryFindMatch() {
   // Need at least 2 players to make a match
   if (playersLookingForMatch.length >= 2) {
-    // Take the first two players in the queue
-    const player1 = playersLookingForMatch.shift();
-    const player2 = playersLookingForMatch.shift();
+    console.log(`🎯 Trying to find match with ${playersLookingForMatch.length} players`);
     
-    console.log(`🎮 Match found between ${player1.username} and ${player2.username}`);
-    
-    // Create a simple game ID (just using timestamp for now)
-    const gameId = Date.now().toString();
-    
-    // CREATE THE GAME IN THE DATABASE
-    createGame(gameId, player1.userId, player2.userId)
-      .then(() => {
-        // Notify both players
-        player1.socket.send(JSON.stringify({
-          event: "matchFound",
-          data: { 
-            gameId,
-            opponentId: player2.userId,
-            opponentName: player2.username
-          }
-        }));
+    // Search for compatible players
+    for (let i = 0; i < playersLookingForMatch.length - 1; i++) {
+      const player1 = playersLookingForMatch[i];
+      
+      for (let j = i + 1; j < playersLookingForMatch.length; j++) {
+        const player2 = playersLookingForMatch[j];
         
-        player2.socket.send(JSON.stringify({
-          event: "matchFound",
-          data: { 
-            gameId,
-            opponentId: player1.userId,
-            opponentName: player1.username
-          }
-        }));
-      })
-      .catch(error => {
-        console.error("❌ Error creating game:", error);
-        // Notify players of the error
-        const errorMessage = JSON.stringify({
-          event: "matchmakingError",
-          data: { message: "Failed to create game. Please try again." }
-        });
-        player1.socket.send(errorMessage);
-        player2.socket.send(errorMessage);
-      });
+        // Check if preferences are compatible
+        if (player1.preferences.gameMode === player2.preferences.gameMode &&
+            player1.preferences.useExtension === player2.preferences.useExtension) {
+          
+          console.log(`🎮 Match found between ${player1.username} and ${player2.username}`, {
+            gameMode: player1.preferences.gameMode,
+            useExtension: player1.preferences.useExtension
+          });
+          
+          // Remove players from queue BEFORE creating the game
+          playersLookingForMatch.splice(j, 1);
+          playersLookingForMatch.splice(i, 1);
+          
+          // Create game
+          const gameId = Date.now().toString();
+          
+          // CREATE GAME AND THEN NOTIFY - this is the key fix
+          createGame(gameId, player1.userId, player2.userId, {
+            gameMode: player1.preferences.gameMode,
+            useExtension: player1.preferences.useExtension
+          })
+          .then(() => {
+            console.log(`✅ Game ${gameId} created, notifying players`);
+            
+            // Notify both players - THIS PART WAS MISSING OR FAILING
+            try {
+              if (player1.socket.readyState === WebSocket.OPEN) {
+                player1.socket.send(JSON.stringify({
+                  event: "matchFound",
+                  data: { 
+                    gameId,
+                    opponentId: player2.userId,
+                    opponentName: player2.username
+                  }
+                }));
+                console.log(`🔔 Notified ${player1.username} about match`);
+              } else {
+                console.error(`❌ Player1 socket not open for ${player1.username}`);
+              }
+              
+              if (player2.socket.readyState === WebSocket.OPEN) {
+                player2.socket.send(JSON.stringify({
+                  event: "matchFound",
+                  data: { 
+                    gameId,
+                    opponentId: player1.userId,
+                    opponentName: player1.username
+                  }
+                }));
+                console.log(`🔔 Notified ${player2.username} about match`);
+              } else {
+                console.error(`❌ Player2 socket not open for ${player2.username}`);
+              }
+            } catch (error) {
+              console.error("❌ Error sending match notifications:", error);
+            }
+          })
+          .catch(error => {
+            console.error("❌ Error creating game:", error);
+            // Re-add players to queue if game creation failed
+            playersLookingForMatch.unshift(player1, player2);
+            
+            // Notify players of the error
+            const errorMessage = JSON.stringify({
+              event: "matchmakingError",
+              data: { message: "Failed to create game. Please try again." }
+            });
+            
+            if (player1.socket.readyState === WebSocket.OPEN) {
+              player1.socket.send(errorMessage);
+            }
+            if (player2.socket.readyState === WebSocket.OPEN) {
+              player2.socket.send(errorMessage);
+            }
+          });
+          
+          return; // Exit the function after finding a match
+        }
+      }
+    }
+    
+    console.log('🕐 No matching players found with compatible preferences');
   }
 }
 
-async function createGame(gameId: string, player1Id: string, player2Id: string): Promise<void> {
+async function createGame(
+  gameId: string, 
+  player1Id: string, 
+  player2Id: string,
+  options: { gameMode: string; useExtension: boolean } = { gameMode: 'classic', useExtension: false }
+): Promise<void> {
   try {
-    // Create the game record
-    await client.queryObject(`
-      INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id, turn_phase, started_at)
-      VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP)
-    `, [gameId, player1Id, player2Id]);
+    console.log(`🎮 Creating new game ${gameId} between ${player1Id} and ${player2Id}`, options);
     
-    // Create the board record
+    // Create the game record with the correct mode
+    await client.queryObject(`
+      INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id, turn_phase, started_at, game_mode)
+      VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP, $4)
+    `, [gameId, player1Id, player2Id, options.gameMode]);
+    
+    console.log(`✅ Game entry created with mode: ${options.gameMode}`);
+    
+    // Create the board record with extension settings
     const boardResult = await client.queryObject<{id: number}>(
       `INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
-       VALUES ($1, false, 60, 1) RETURNING id`,
-      [gameId]
+       VALUES ($1, $2, 60, 1) RETURNING id`,
+      [gameId, options.useExtension]
     );
     
     const boardId = boardResult.rows[0].id;
-    console.log(`✅ Board created with ID ${boardId}`);
+    console.log(`✅ Board created with ID ${boardId}, purple extension: ${options.useExtension}`);
     
-    // Initialize expedition slots
+    // Initialize expedition slots and colors
     const colors = ['red', 'green', 'white', 'blue', 'yellow'];
+    if (options.useExtension) {
+      colors.push('purple');
+    }
+    
+    console.log(`🎨 Using colors: ${colors.join(', ')}`);
     
     // Create expedition entries for both players
     for (const color of colors) {
@@ -892,6 +994,8 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
         [boardId, color]
       );
     }
+    
+    console.log(`✅ Expeditions and discard piles created for ${colors.length} colors`);
     
     // Create a deck of cards
     const deck: { id: string; color: string; type: string; value: number | string }[] = [];
@@ -918,15 +1022,22 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
       }
     }
     
+    const expectedCards = options.useExtension ? 72 : 60; // 6 couleurs * 12 cartes ou 5 couleurs * 12 cartes
+    console.log(`✅ Deck created with ${deck.length} cards (expected: ${expectedCards})`);
+    
     // Shuffle the deck
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     
+    console.log(`✅ Deck shuffled`);
+    
     // Deal initial hands (8 cards each)
     const player1Hand = deck.splice(0, 8);
     const player2Hand = deck.splice(0, 8);
+    
+    console.log(`✅ Dealt hands: Player 1: ${player1Hand.length} cards, Player 2: ${player2Hand.length} cards`);
     
     // Add cards to database - Player 1 hand
     for (let i = 0; i < player1Hand.length; i++) {
@@ -938,6 +1049,8 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
       );
     }
     
+    console.log(`✅ Player 1 cards saved to database`);
+    
     // Add cards to database - Player 2 hand
     for (let i = 0; i < player2Hand.length; i++) {
       const card = player2Hand[i];
@@ -947,6 +1060,8 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
         [gameId, card.id, i]
       );
     }
+    
+    console.log(`✅ Player 2 cards saved to database`);
     
     // Add remaining cards to deck
     for (let i = 0; i < deck.length; i++) {
@@ -958,13 +1073,28 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
       );
     }
     
+    console.log(`✅ Deck cards saved to database`);
+    
     // Update deck count in board
     await client.queryObject(
       `UPDATE board SET remaining_cards_in_deck = $1 WHERE game_id = $2`,
       [deck.length, gameId]
     );
     
-    console.log(`✅ Game ${gameId} created successfully with ${deck.length} cards in deck, 8 cards per player`);
+    console.log(`✅ Board deck count updated to ${deck.length}`);
+    
+    // Verification of total cards
+    const verifyResult = await client.queryObject(`
+      SELECT COUNT(*) as count FROM game_card WHERE game_id = $1
+    `, [gameId]);
+    console.log(`🔍 After creation, game ${gameId} has ${verifyResult.rows[0].count} cards in game_card`);
+    
+    if (Number(verifyResult.rows[0].count) !== expectedCards) {
+      console.error(`❌ Expected ${expectedCards} cards but found ${verifyResult.rows[0].count} for game ${gameId}`);
+    }
+    
+    console.log(`🎯 Game ${gameId} creation completed successfully with options:`, options);
+    
   } catch (error) {
     console.error("❌ Error creating game in database:", error);
     throw error;

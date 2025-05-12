@@ -256,7 +256,11 @@ async function loadLeaderboard(mode, withExtension) {
 
 async function loadUserAvatar(userId) {
     try {
-        const response = await fetch(`${API_URL}/api/profile/${userId}`);
+        const response = await fetch(`${API_URL}/api/profile/${userId}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+        });
         if (response.ok) {
             const profile = await response.json();
             if (profile.avatar_url) {
