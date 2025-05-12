@@ -138,4 +138,103 @@ profileRouter.post("/api/report", authMiddleware, async (ctx) => {
   }
 });
 
+// GET /api/profile/:id/games - Récupérer l'historique des parties d'un utilisateur
+profileRouter.get("/api/profile/:id/games", async (ctx) => {
+  try {
+    const userId = ctx.params.id;
+    
+    // Parse query parameters for pagination
+    const url = new URL(ctx.request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+    const offset = (page - 1) * limit;
+    
+    // Get total count of games for this user
+    const countResult = await client.queryObject<{total: number}>(`
+      SELECT COUNT(*) as total 
+      FROM games 
+      WHERE player1_id = $1 OR player2_id = $1
+    `, [userId]);
+    
+    const totalGames = Number(countResult.rows[0].total);
+    
+    // Get games with opponents and results
+    const gamesResult = await client.queryObject(`
+      SELECT 
+        g.id,
+        g.started_at as date,
+        g.ended_at,
+        g.game_mode as mode,
+        g.status,
+        g.score_player1,
+        g.score_player2,
+        g.winner_id,
+        CASE 
+          WHEN g.player1_id = $1 THEN u2.username 
+          ELSE u1.username 
+        END as opponent,
+        CASE 
+          WHEN g.player1_id = $1 THEN g.score_player1 
+          ELSE g.score_player2 
+        END as score_player,
+        CASE 
+          WHEN g.player1_id = $1 THEN g.score_player2 
+          ELSE g.score_player1 
+        END as score_opponent,
+        CASE 
+          WHEN g.winner_id = $1 THEN 'victory'
+          WHEN g.winner_id IS NULL THEN 'draw'
+          ELSE 'defeat'
+        END as result,
+        -- Check if game used extension by looking at board
+        COALESCE(b.use_purple_expedition, false) as with_extension,
+        -- Calculate duration in minutes
+        CASE 
+          WHEN g.ended_at IS NOT NULL AND g.started_at IS NOT NULL 
+          THEN EXTRACT(EPOCH FROM (g.ended_at - g.started_at)) / 60 
+          ELSE NULL 
+        END as duration
+      FROM games g
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
+      LEFT JOIN board b ON g.id = b.game_id
+      WHERE g.player1_id = $1 OR g.player2_id = $1
+      ORDER BY g.started_at DESC
+      LIMIT $2 OFFSET $3
+    `, [userId, limit, offset]);
+    
+    // Format the results
+    const games = gamesResult.rows.map(game => ({
+      id: game.id,
+      date: game.date,
+      mode: game.mode,
+      opponent: game.opponent,
+      result: game.result,
+      score: {
+        player: Number(game.score_player || 0),
+        opponent: Number(game.score_opponent || 0)
+      },
+      with_extension: game.with_extension,
+      duration: game.duration ? Math.round(Number(game.duration)) : null,
+      status: game.status
+    }));
+    
+    // Return games with pagination info
+    ctx.response.body = {
+      games,
+      pagination: {
+        page,
+        limit,
+        total: totalGames,
+        totalPages: Math.ceil(totalGames / limit)
+      }
+    };
+    
+  } catch (err) {
+    console.error("Error fetching game history:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+});
+
 export default profileRouter;
