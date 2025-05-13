@@ -21,7 +21,6 @@ import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
 const app = new Application();
 
-// 🔥 Partie Database propre 🔥
 const rawDatabaseUrl = Deno.env.get("DATABASE_URL");
 if (!rawDatabaseUrl) {
   console.error("❌ DATABASE_URL is not set in the environment variables.");
