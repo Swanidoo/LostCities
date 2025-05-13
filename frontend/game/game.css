@@ -96,7 +96,7 @@ body {
     font-size: var(--font-sm);
 }
 
-/* ===== RESPONSIVE BOARD LAYOUT (CORRECTED) ===== */
+/* ===== RESPONSIVE BOARD LAYOUT ===== */
 .board {
     display: flex;
     flex-direction: column;
@@ -117,7 +117,7 @@ body {
     }
 }
 
-/* ===== EXPEDITION AREAS (CORRECTED ALIGNMENT) ===== */
+/* ===== EXPEDITION AREAS ===== */
 .opponent-area, .player-area {
     display: flex;
     justify-content: center;
@@ -126,7 +126,6 @@ body {
     max-width: min(100vw, calc(6 * (var(--card-width) + var(--card-spacing))));
 }
 
-/* CORRECTION: Alignement fixe pour éviter le décalage diagonal */
 .opponent-area {
     align-items: flex-start;
     margin-bottom: var(--spacing-lg);
@@ -259,10 +258,13 @@ body {
     cursor: pointer;
 }
 
+/* CORRECTION: Ajout de l'image de fond pour la pioche */
 .deck-pile {
     background-color: #2c3e50;
+    background-image: url('./assets/cards/card-back.png');
     background-size: cover;
     background-position: center;
+    background-repeat: no-repeat;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
@@ -329,7 +331,7 @@ body {
     transform: translateY(-2px);
 }
 
-/* ===== RESPONSIVE PLAYER HAND (CORRECTED) ===== */
+/* ===== RESPONSIVE PLAYER HAND (CORRECTED POUR CHROME) ===== */
 .hand-area {
     height: var(--hand-area-height);
     position: fixed;
@@ -340,86 +342,87 @@ body {
     max-width: var(--container-lg);
     perspective: 800px;
     overflow: visible;
-    z-index: var(--z-hand); /* CORRECTION: z-index plus élevé */
+    z-index: 100; /* CORRECTION: Z-index très élevé pour Chrome */
     display: flex;
     justify-content: center;
     align-items: flex-end;
-    pointer-events: none; /* IMPORTANT */
+    pointer-events: none;
 }
 
 .hand-area .card {
     position: absolute;
     transform-origin: bottom center;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    pointer-events: auto; /* IMPORTANT */
+    pointer-events: auto;
+    z-index: inherit; /* CORRECTION: Hérite du z-index du parent */
 }
 
 /* Responsive fan arrangement */
 .hand-area .card:nth-child(1) { 
     transform: translateX(calc(-3.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * 1.5)); 
-    z-index: 1; 
+    z-index: 101; 
 }
 .hand-area .card:nth-child(2) { 
     transform: translateX(calc(-2.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * 1)); 
-    z-index: 2; 
+    z-index: 102; 
 }
 .hand-area .card:nth-child(3) { 
     transform: translateX(calc(-1.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * 0.5)); 
-    z-index: 3; 
+    z-index: 103; 
 }
 .hand-area .card:nth-child(4) { 
     transform: translateX(calc(-0.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * 0.2)); 
-    z-index: 4; 
+    z-index: 104; 
 }
 .hand-area .card:nth-child(5) { 
     transform: translateX(calc(0.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * -0.2)); 
-    z-index: 5; 
+    z-index: 105; 
 }
 .hand-area .card:nth-child(6) { 
     transform: translateX(calc(1.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * -0.5)); 
-    z-index: 6; 
+    z-index: 106; 
 }
 .hand-area .card:nth-child(7) { 
     transform: translateX(calc(2.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * -1)); 
-    z-index: 7; 
+    z-index: 107; 
 }
 .hand-area .card:nth-child(8) { 
     transform: translateX(calc(3.5 * var(--card-fan-spacing))) rotate(calc(var(--card-fan-angle) * -1.5)); 
-    z-index: 8; 
+    z-index: 108; 
 }
 
 /* Hover effects for hand cards */
 .hand-area .card:nth-child(1):hover { 
     transform: translateX(calc(-3.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-xl))) rotate(calc(var(--card-fan-angle) * 1.5)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 .hand-area .card:nth-child(2):hover { 
     transform: translateX(calc(-2.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-xl))) rotate(calc(var(--card-fan-angle) * 1)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 .hand-area .card:nth-child(3):hover { 
     transform: translateX(calc(-1.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-xl))) rotate(calc(var(--card-fan-angle) * 0.5)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 .hand-area .card:nth-child(4):hover { 
     transform: translateX(calc(-0.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-lg))) rotate(calc(var(--card-fan-angle) * 0.2)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 .hand-area .card:nth-child(5):hover { 
     transform: translateX(calc(0.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-lg))) rotate(calc(var(--card-fan-angle) * -0.2)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 .hand-area .card:nth-child(6):hover { 
     transform: translateX(calc(1.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-xl))) rotate(calc(var(--card-fan-angle) * -0.5)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 .hand-area .card:nth-child(7):hover { 
     transform: translateX(calc(2.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-xl))) rotate(calc(var(--card-fan-angle) * -1)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 .hand-area .card:nth-child(8):hover { 
     transform: translateX(calc(3.5 * var(--card-fan-spacing))) translateY(calc(-1 * var(--spacing-xl))) rotate(calc(var(--card-fan-angle) * -1.5)) scale(1.1); 
-    z-index: var(--z-ui); 
+    z-index: 200; 
 }
 
 /* ===== CARD STATES ===== */
@@ -435,11 +438,10 @@ body {
 .card.selected.yellow { box-shadow: 0 0 20px 4px rgba(255, 235, 59, 0.8) !important; }
 .card.selected.purple { box-shadow: 0 0 20px 4px rgba(111, 66, 193, 0.8) !important; }
 
-/* CORRECTION: Z-index différent pour valid-target */
 .valid-target {
     box-shadow: 0 0 20px 4px gold;
     animation: pulse 1.5s infinite;
-    z-index: calc(var(--z-ui) - 5); /* Plus petit que hand mais plus grand que cards */
+    z-index: calc(var(--z-ui) - 5);
     position: relative;
 }
 
@@ -449,51 +451,33 @@ body {
     100% { box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.4); }
 }
 
-/* ===== RESPONSIVE GAME CONTROLS (CORRECTED) ===== */
+/* ===== RESPONSIVE GAME CONTROLS (TOUS LES BOUTONS DU MÊME CÔTÉ) ===== */
 .game-controls {
     position: fixed;
     bottom: var(--spacing-md);
-    left: 0;
-    right: 0; /* CORRECTION: au lieu de width: 100% */
-    padding: 0 var(--spacing-md);
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    z-index: var(--z-ui);
+    left: var(--spacing-md); /* CORRECTION: Positionnement à gauche */
+    z-index: 40; /* CORRECTION: Z-index plus bas que les cartes */
     pointer-events: none;
-    gap: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    align-items: flex-start;
 }
 
 @media (max-width: 768px) {
     .game-controls {
-        flex-direction: column;
-        align-items: stretch;
-        gap: var(--spacing-sm);
         bottom: var(--spacing-sm);
+        left: var(--spacing-sm);
     }
 }
 
-.game-controls-left {
+/* CORRECTION: Tous les boutons ensemble */
+.game-controls-left,
+.game-controls-all {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
     pointer-events: auto;
-}
-
-@media (max-width: 768px) {
-    .game-controls-left {
-        flex-direction: row;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-}
-
-/* CORRECTION: chat-btn pour éviter le débordement */
-#chat-btn {
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    align-self: flex-end;
-    pointer-events: auto;
-    margin-right: env(safe-area-inset-right); /* Support pour écrans avec encoche */
 }
 
 /* ===== RESPONSIVE BUTTON DESIGN ===== */
@@ -561,6 +545,10 @@ body {
     background: linear-gradient(135deg, #28b463, #229954);
 }
 
+#chat-btn {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+}
+
 #chat-btn:hover {
     background: linear-gradient(135deg, #2e86c1, #2471a3);
 }
@@ -584,7 +572,7 @@ body {
     margin-left: var(--spacing-xs);
 }
 
-/* ===== RESPONSIVE CHAT AREA (CORRECTED) ===== */
+/* ===== RESPONSIVE CHAT AREA ===== */
 .chat-area {
     position: fixed;
     bottom: 0;
@@ -599,7 +587,7 @@ body {
     transition: right 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
     z-index: calc(var(--z-ui) + 10);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    max-width: min(var(--chat-width), 100vw); /* CORRECTION: évite le débordement */
+    max-width: min(var(--chat-width), 100vw);
 }
 
 .chat-area.open {
