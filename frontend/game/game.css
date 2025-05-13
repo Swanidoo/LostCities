@@ -96,7 +96,7 @@ body {
     font-size: var(--font-sm);
 }
 
-/* ===== RESPONSIVE BOARD LAYOUT ===== */
+/* ===== RESPONSIVE BOARD LAYOUT (CORRECTED) ===== */
 .board {
     display: flex;
     flex-direction: column;
@@ -106,35 +106,35 @@ body {
     width: 100%;
     max-width: var(--container-lg);
     margin: 0 auto;
-    padding: var(--game-header-height) var(--spacing-md) var(--spacing-xl);
-    gap: var(--spacing-md);
+    padding: var(--game-header-height) var(--spacing-md) calc(var(--hand-area-height) + 60px);
+    gap: var(--spacing-lg);
 }
 
 @media (max-width: 768px) {
     .board {
-        gap: var(--spacing-sm);
-        padding: calc(var(--game-header-height) * 1.5) var(--spacing-sm) var(--spacing-lg);
+        gap: var(--spacing-md);
+        padding: calc(var(--game-header-height) * 1.2) var(--spacing-sm) calc(var(--hand-area-height) + 80px);
     }
 }
 
-/* ===== EXPEDITION AREAS ===== */
+/* ===== EXPEDITION AREAS (CORRECTED ALIGNMENT) ===== */
 .opponent-area, .player-area {
     display: flex;
     justify-content: center;
     gap: var(--card-spacing);
     width: 100%;
     max-width: min(100vw, calc(6 * (var(--card-width) + var(--card-spacing))));
-    z-index: var(--z-ui);
 }
 
+/* CORRECTION: Alignement fixe pour éviter le décalage diagonal */
 .opponent-area {
-    align-self: flex-start;
-    margin-top: auto;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-lg);
 }
 
 .player-area {
-    align-self: flex-end;
-    margin-bottom: auto;
+    align-items: flex-end;
+    margin-top: var(--spacing-lg);
 }
 
 /* ===== EXPEDITION SLOTS (RESPONSIVE) ===== */
@@ -329,23 +329,29 @@ body {
     transform: translateY(-2px);
 }
 
-/* ===== RESPONSIVE PLAYER HAND ===== */
+/* ===== RESPONSIVE PLAYER HAND (CORRECTED) ===== */
 .hand-area {
+    height: var(--hand-area-height);
     position: fixed;
-    bottom: var(--spacing-xl);
+    bottom: calc(var(--spacing-xl) + var(--spacing-md));
     left: 50%;
     transform: translateX(-50%);
-    width: min(100vw, calc(8 * var(--card-fan-spacing) + var(--card-width)));
-    height: var(--hand-area-height);
-    perspective: 1000px;
+    width: 100%;
+    max-width: var(--container-lg);
+    perspective: 800px;
     overflow: visible;
-    z-index: var(--z-hand);
+    z-index: var(--z-hand); /* CORRECTION: z-index plus élevé */
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    pointer-events: none; /* IMPORTANT */
 }
 
 .hand-area .card {
     position: absolute;
     transform-origin: bottom center;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: auto; /* IMPORTANT */
 }
 
 /* Responsive fan arrangement */
@@ -429,9 +435,12 @@ body {
 .card.selected.yellow { box-shadow: 0 0 20px 4px rgba(255, 235, 59, 0.8) !important; }
 .card.selected.purple { box-shadow: 0 0 20px 4px rgba(111, 66, 193, 0.8) !important; }
 
+/* CORRECTION: Z-index différent pour valid-target */
 .valid-target {
     box-shadow: 0 0 20px 4px gold;
     animation: pulse 1.5s infinite;
+    z-index: calc(var(--z-ui) - 5); /* Plus petit que hand mais plus grand que cards */
+    position: relative;
 }
 
 @keyframes pulse {
@@ -440,12 +449,12 @@ body {
     100% { box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.4); }
 }
 
-/* ===== RESPONSIVE GAME CONTROLS ===== */
+/* ===== RESPONSIVE GAME CONTROLS (CORRECTED) ===== */
 .game-controls {
     position: fixed;
     bottom: var(--spacing-md);
     left: 0;
-    width: 100%;
+    right: 0; /* CORRECTION: au lieu de width: 100% */
     padding: 0 var(--spacing-md);
     display: flex;
     justify-content: space-between;
@@ -460,6 +469,7 @@ body {
         flex-direction: column;
         align-items: stretch;
         gap: var(--spacing-sm);
+        bottom: var(--spacing-sm);
     }
 }
 
@@ -476,6 +486,14 @@ body {
         justify-content: center;
         flex-wrap: wrap;
     }
+}
+
+/* CORRECTION: chat-btn pour éviter le débordement */
+#chat-btn {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    align-self: flex-end;
+    pointer-events: auto;
+    margin-right: env(safe-area-inset-right); /* Support pour écrans avec encoche */
 }
 
 /* ===== RESPONSIVE BUTTON DESIGN ===== */
@@ -543,53 +561,30 @@ body {
     background: linear-gradient(135deg, #28b463, #229954);
 }
 
-#chat-btn {
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    align-self: flex-end;
-}
-
 #chat-btn:hover {
     background: linear-gradient(135deg, #2e86c1, #2471a3);
 }
 
 /* Button icons */
-#surrender-btn::before,
-#rules-btn::before,
-#chat-btn::before {
-    font-size: clamp(14px, 1.5vw, 18px);
-}
-
-#surrender-btn {
-    position: relative;
-}
-
 #surrender-btn::after {
     content: "⚠️";
     font-size: clamp(14px, 1.5vw, 18px);
-    margin-right: var(--spacing-xs);
-}
-
-#rules-btn {
-    position: relative;
+    margin-left: var(--spacing-xs);
 }
 
 #rules-btn::after {
     content: "📋";
     font-size: clamp(14px, 1.5vw, 18px);
-    margin-right: var(--spacing-xs);
-}
-
-#chat-btn {
-    position: relative;
+    margin-left: var(--spacing-xs);
 }
 
 #chat-btn::after {
     content: "💬";
     font-size: clamp(14px, 1.5vw, 18px);
-    margin-right: var(--spacing-xs);
+    margin-left: var(--spacing-xs);
 }
 
-/* ===== RESPONSIVE CHAT AREA ===== */
+/* ===== RESPONSIVE CHAT AREA (CORRECTED) ===== */
 .chat-area {
     position: fixed;
     bottom: 0;
@@ -602,8 +597,9 @@ body {
     display: flex;
     flex-direction: column;
     transition: right 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-    z-index: calc(var(--z-ui) + 20);
+    z-index: calc(var(--z-ui) + 10);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    max-width: min(var(--chat-width), 100vw); /* CORRECTION: évite le débordement */
 }
 
 .chat-area.open {
@@ -828,7 +824,7 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    z-index: calc(var(--z-modal) + 50);
+    z-index: calc(var(--z-modal) + 10);
 }
 
 .spinner {
@@ -872,16 +868,9 @@ body {
     .board {
         max-width: var(--container-md);
     }
-    
-    .hand-area {
-        --card-fan-spacing: clamp(25px, 5vw, 60px);
-    }
 }
 
 @media (max-width: 768px) {
-    .card-width: var(--card-width);
-    .card-height: var(--card-height);
-    
     .opponent-area, .player-area {
         flex-wrap: wrap;
         max-width: 100%;
@@ -891,22 +880,13 @@ body {
         margin: var(--spacing-lg) 0;
     }
     
-    .game-controls {
-        bottom: var(--spacing-sm);
-    }
-    
     .hand-area {
         bottom: calc(var(--spacing-xl) + 60px);
-        --card-fan-spacing: clamp(20px, 4vw, 45px);
         width: 100vw;
     }
 }
 
 @media (max-width: 480px) {
-    :root {
-        --card-width: clamp(40px, 6vw, 60px);
-    }
-    
     .header {
         position: relative;
         top: 0;
