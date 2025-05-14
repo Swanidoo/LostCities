@@ -107,6 +107,37 @@ wsRouter.get("/ws", async (ctx) => {
       // Verify with the CryptoKey
       const payload = await verify(token, cryptoKey);
       console.log("✅ Token valid:", payload);
+      wsRouter.get("/ws", async (ctx) => {
+  try {
+    if (!ctx.isUpgradable) {
+      console.error("❌ WebSocket upgrade not supported");
+      ctx.throw(400, "WebSocket connection not supported.");
+    }
+
+    const { searchParams } = new URL(ctx.request.url.href);
+    const token = searchParams.get("token");
+    console.log("🔍 Received token:", token ? `${token.substring(0, 20)}...` : "null");
+    
+    if (!token) {
+      console.error("❌ Missing token in query string");
+      ctx.throw(400, "Missing token");
+    }
+
+    try {
+      // Create the same CryptoKey used for signing in auth_routes.ts
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode(jwtKey);
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["verify"]
+      );
+      
+      // Verify with the CryptoKey
+      const payload = await verify(token, cryptoKey);
+      console.log("✅ Token valid:", payload);
       
       if (typeof payload !== "object" || payload === null) {
         console.error("❌ Invalid token payload structure");
@@ -128,7 +159,7 @@ wsRouter.get("/ws", async (ctx) => {
         console.error(`❌ Failed to upgrade connection for ${username}:`, error);
         ctx.throw(500, "Failed to upgrade connection");
       }
-      
+
       // Check for existing connections with the same username and remove them
       const existingIndex = connectedClients.findIndex(client => client.username === username);
       if (existingIndex !== -1) {
@@ -140,39 +171,30 @@ wsRouter.get("/ws", async (ctx) => {
         }
         connectedClients.splice(existingIndex, 1);
       }
-      
+
+      // IMPORTANT: Définir onopen AVANT d'envoyer des messages
       socket.onopen = function() {
-        // Ajouter le client à la liste après que la connexion est ouverte
+        console.log(`🔗 WebSocket opened for ${username}`);
+        
+        // Ajouter le client à la liste APRÈS que la connexion soit ouverte
         connectedClients.push({ socket, username });
         console.log(`👥 Current connected clients: ${connectedClients.length}`);
         
-        // Envoyer le message de bienvenue
+        // Envoyer le message de bienvenue SEULEMENT dans onopen
         try {
           socket.send(JSON.stringify({
             event: "systemMessage",
             data: { message: `Bienvenue sur le chat, ${username}!` }
           }));
+          console.log(`✅ Welcome message sent to ${username}`);
         } catch (error) {
           console.error(`❌ Error sending welcome message to ${username}:`, error);
         }
         
-        // Notifier les autres utilisateurs
+        // Notifier les autres utilisateurs SEULEMENT dans onopen
         broadcastSystemMessage(`${username} a rejoint le chat.`, socket);
       };
       logConnectedClients();
-      
-      // Send a welcome message to the client
-      try {
-        socket.send(JSON.stringify({
-          event: "systemMessage",
-          data: { message: `Bienvenue sur le chat, ${username}!` }
-        }));
-      } catch (error) {
-        console.error(`❌ Error sending welcome message to ${username}:`, error);
-      }
-      
-      // Notify others that a new user has joined
-      broadcastSystemMessage(`${username} a rejoint le chat.`, socket);
       
       // WebSocket message event handler 
       socket.onmessage = function(event) {
@@ -261,26 +283,208 @@ wsRouter.get("/ws", async (ctx) => {
       
       // WebSocket onclose event handler 
       socket.onclose = function(event) {
-        // Find client data from the array instead of using local variables
+        // Améliorer la gestion de la déconnexion
         const clientIndex = connectedClients.findIndex(client => client.socket === socket);
-        const clientData = clientIndex !== -1 ? connectedClients[clientIndex] : { username: "unknown user" };
         
-        console.log(`👋 Client ${clientData.username} disconnected with code ${event.code} and reason "${event.reason}"`);
-        
-        // Remove the client from the connected clients array
         if (clientIndex !== -1) {
+          const clientData = connectedClients[clientIndex];
+          console.log(`👋 Client ${clientData.username} disconnected with code ${event.code}`);
+          
+          // Supprimer de la liste
           connectedClients.splice(clientIndex, 1);
           console.log(`👥 Remaining connected clients: ${connectedClients.length}`);
+          
+          // Notifier les autres
+          broadcastSystemMessage(`${clientData.username} a quitté le chat.`);
         } else {
-          console.warn("⚠️ Could not find client in connected clients array!");
+          console.warn("⚠️ Disconnected client not found in array");
         }
-        
-        // Notify others that the user has left
-        broadcastSystemMessage(`${clientData.username} a quitté le chat.`);
         
         // Handle player disconnect for matchmaking
         removeFromMatchmaking(socket);
+      };
+      
+      socket.onerror = (error) => {
+        console.error(`❌ WebSocket error for ${username}:`, error);
+      };
+      
+    } catch (err) {
+      console.error("❌ Invalid or expired token:", err.message);
+      ctx.throw(401, "Invalid or expired token");
+    }
+  } catch (error) {
+    console.error("❌ Error in WebSocket route:", error);
+    if (!ctx.response.writable) {
+      console.error("❌ Cannot respond, context already used");
+      return;
+    }
+    ctx.response.status = error.status || 500;
+    ctx.response.body = { error: error.message || "Internal server error" };
+  }
+});
+      if (typeof payload !== "object" || payload === null) {
+        console.error("❌ Invalid token payload structure");
+        ctx.throw(401, "Invalid token payload structure");
       }
+      
+      const username = (payload as Record<string, unknown>).username || (payload as Record<string, unknown>).email;
+      if (typeof username !== "string") {
+        console.error("❌ Invalid token payload: Missing username or email");
+        ctx.throw(401, "Invalid token payload");
+      }
+      
+      // Upgrade the connection
+      let socket;
+      try {
+        socket = ctx.upgrade();
+        console.log(`✅ Client connected to WebSocket as ${username}!`);
+      } catch (error) {
+        console.error(`❌ Failed to upgrade connection for ${username}:`, error);
+        ctx.throw(500, "Failed to upgrade connection");
+      }
+
+      // Check for existing connections with the same username and remove them
+      const existingIndex = connectedClients.findIndex(client => client.username === username);
+      if (existingIndex !== -1) {
+        console.log(`⚠️ Found existing connection for ${username}, closing it.`);
+        try {
+          connectedClients[existingIndex].socket.close(1000, "User reconnected");
+        } catch (e) {
+          console.error("Error closing existing connection:", e);
+        }
+        connectedClients.splice(existingIndex, 1);
+      }
+
+      // La socket est DÉJÀ ouverte après ctx.upgrade(), traiter immédiatement
+      console.log(`🔗 WebSocket ready for ${username}`);
+
+      // Ajouter le client à la liste immédiatement
+      connectedClients.push({ socket, username });
+      console.log(`👥 Current connected clients: ${connectedClients.length}`);
+
+      // Envoyer le message de bienvenue immédiatement
+      try {
+        socket.send(JSON.stringify({
+          event: "systemMessage",
+          data: { message: `Bienvenue sur le chat, ${username}!` }
+        }));
+        console.log(`✅ Welcome message sent to ${username}`);
+      } catch (error) {
+        console.error(`❌ Error sending welcome message to ${username}:`, error);
+      }
+
+      // Notifier les autres utilisateurs immédiatement
+      broadcastSystemMessage(`${username} a rejoint le chat.`, socket);
+      
+      // Log des clients connectés
+      logConnectedClients();
+      
+      // WebSocket message event handler 
+      socket.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("📩 Message received:", data);
+
+          // Find the client in our connected clients array
+          const clientIndex = connectedClients.findIndex(client => client.socket === socket);
+          if (clientIndex === -1) {
+            console.warn("⚠️ Message received from unknown client");
+            return;
+          }
+          
+          // Get client data including username
+          const clientData = connectedClients[clientIndex];
+          
+          // Handle different message types
+          switch (data.event) {
+            case "chatMessage":
+                if (data.data?.message) {
+                    handleChatMessage(data.data, socket, clientData.username);
+                }
+                break;
+            case "checkMuteStatus":
+                // Vérifier le statut de mute et renvoyer l'info
+                handleCheckMuteStatus(socket, clientData.username);
+                break;
+            case "movePlayed":
+                if (data.data?.gameId && data.data?.move) {
+                    handleMovePlayed(data.data, socket, clientData.username);
+                }
+                break;
+            case "findMatch":
+                // Use the userId from the message data
+                handleMatchmaking(socket, clientData.username, data.data?.userId, data.data);
+                break;
+            case "cancelMatch":
+                removeFromMatchmaking(socket);
+                break;
+            case "getOnlinePlayers":
+                // Handle request for online players
+                handleGetOnlinePlayers(socket);
+                break;
+            case "subscribeGame":
+                // Handle game subscriptions
+                if (data.data?.gameId) {
+                    handleGameSubscription(data.data, socket, clientData.username);
+                }
+                break;
+            case "requestGameState":
+                // Handle game state requests
+                if (data.data?.gameId) {
+                    handleGameStateRequest(data.data, socket, clientData.username);
+                }
+                break;
+            case "gameAction":
+                if (data.data?.gameId && data.data?.action) {
+                    switch (data.data.action) {
+                        case "request_state":
+                            // Handle game state request
+                            handleGameStateRequest(data.data, socket, clientData.username);
+                            break;
+                        case "play_card":
+                            handlePlayCard(data.data, socket, clientData.username);
+                            break;
+                        case "discard_card":
+                            handleDiscardCard(data.data, socket, clientData.username);
+                            break;
+                        case "draw_card":
+                            handleDrawCard(data.data, socket, clientData.username);
+                            break;
+                        default:
+                            console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
+                    }
+                }
+                break;
+            default:
+                console.warn("⚠️ Unknown message type or missing data:", data);
+          }
+        } catch (error) {
+          console.error("❌ Error parsing message:", error);
+        }
+      };
+            
+      // WebSocket onclose event handler 
+      socket.onclose = function(event) {
+        // Améliorer la gestion de la déconnexion
+        const clientIndex = connectedClients.findIndex(client => client.socket === socket);
+        
+        if (clientIndex !== -1) {
+          const clientData = connectedClients[clientIndex];
+          console.log(`👋 Client ${clientData.username} disconnected with code ${event.code} and reason "${event.reason}"`);
+          
+          // Supprimer de la liste
+          connectedClients.splice(clientIndex, 1);
+          console.log(`👥 Remaining connected clients: ${connectedClients.length}`);
+          
+          // Notifier les autres
+          broadcastSystemMessage(`${clientData.username} a quitté le chat.`);
+        } else {
+          console.warn("⚠️ Disconnected client not found in array");
+        }
+        
+        // Handle player disconnect for matchmaking
+        removeFromMatchmaking(socket);
+      };
       
       // Set up error event listener
       socket.onerror = (error) => {

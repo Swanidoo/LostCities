@@ -312,6 +312,13 @@ function displayError() {
 function initializeChat() {
     const token = localStorage.getItem('authToken');
     if (!token) return;
+    
+    // Si une connexion existe déjà, la fermer proprement
+    if (chatWebSocket && chatWebSocket.readyState === WebSocket.OPEN) {
+        console.log('Closing existing chat connection');
+        chatWebSocket.close();
+    }
+    
     chatInput = document.getElementById('chat-input');
     
     // Connexion WebSocket pour le chat
@@ -332,7 +339,6 @@ function initializeChat() {
     chatWebSocket.addEventListener('open', () => {
         console.log('Chat WebSocket connected');
         chatConnected = true;
-        addSystemMessage('Connecté au chat');
     });
     
     chatWebSocket.addEventListener('message', (event) => {
