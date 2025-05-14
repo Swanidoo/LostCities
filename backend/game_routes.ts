@@ -294,6 +294,7 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
              g.current_round,
              g.started_at,
              g.ended_at,
+             g.last_discarded_pile,  -- ← Ajoutez cette ligne
              b.use_purple_expedition, 
              b.current_round as board_current_round,
              b.remaining_cards_in_deck,

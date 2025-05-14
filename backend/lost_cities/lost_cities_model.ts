@@ -163,6 +163,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
            g.current_turn_player_id,
            g.turn_phase,
            g.winner_id,
+           g.last_discarded_pile,  -- ← Ajoutez cette ligne
            b.use_purple_expedition, 
            b.current_round as board_current_round,
            b.remaining_cards_in_deck,
@@ -171,7 +172,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
     JOIN board b ON g.id = b.game_id
     WHERE g.id = $1
   `, [gameId]);
-  
+
   if (gameResult.rows.length === 0) {
     throw new Error("Game not found");
   }
@@ -384,6 +385,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   game.gameStatus = gameData.status;
   game.turnPhase = gameData.turn_phase || 'play';
   game.winner = gameData.winner_id;
+  game.lastDiscardedPile = gameData.last_discarded_pile; 
   
   console.log(`✅ Game state loaded: ${game.player1.hand.length} + ${game.player2.hand.length} cards in hands, ${game.deck.length} in deck`);  
   return game;
@@ -401,13 +403,15 @@ export async function saveGameState(game: LostCitiesGame): Promise<void> {
     SET current_turn_player_id = $1,
         status = $2,
         winner_id = $3,
-        turn_phase = $4
-    WHERE id = $5`,
+        turn_phase = $4,
+        last_discarded_pile = $5
+    WHERE id = $6`,
     [
       game.currentPlayerId,
       game.gameStatus,
       game.winner || null,
       game.turnPhase,
+      game.lastDiscardedPile || null,
       gameId
     ]
   );

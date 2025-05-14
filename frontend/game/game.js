@@ -1047,11 +1047,21 @@ function updateDiscardAndDeck() {
     // Get all discard piles (including potential purple one)
     const discardPiles = document.querySelectorAll('.discard-pile');
     
+    // *** AJOUTEZ CES LIGNES POUR NETTOYER LES CLASSES ***
+    // First, clear all recently-discarded classes from all piles
+    discardPiles.forEach(pile => {
+        pile.classList.remove('recently-discarded');
+    });
+    
     // Process each discard pile
     discardPiles.forEach(pile => {
         // Clone to remove previous event listeners
         const newPile = pile.cloneNode(false);
         pile.parentNode.replaceChild(newPile, pile);
+        
+        // *** AJOUTEZ CETTE LIGNE AUSSI ***
+        // Make sure recently-discarded is removed from the new element too
+        newPile.classList.remove('recently-discarded');
         
         const color = newPile.dataset.color;
         const cards = gameState.gameData.discardPiles[color] || [];
@@ -1101,6 +1111,8 @@ function updateDiscardAndDeck() {
             } else if (gameState.currentPhase === 'draw' && cards.length > 0) {
                 // During draw phase, check if this is the pile just discarded to
                 const isLastDiscardedPile = gameState.gameData.lastDiscardedPile === color;
+                
+                console.log(`Color ${color}: lastDiscardedPile=${gameState.gameData.lastDiscardedPile}, isLastDiscardedPile=${isLastDiscardedPile}`);
                 
                 if (!isLastDiscardedPile) {
                     // Highlight non-empty discard piles (except the one just discarded to)
