@@ -150,14 +150,14 @@ wsRouter.get("/ws", async (ctx) => {
         try {
           socket.send(JSON.stringify({
             event: "systemMessage",
-            data: { message: `Welcome to the chat, ${username}!` }
+            data: { message: `Bienvenue sur le chat, ${username}!` }
           }));
         } catch (error) {
           console.error(`❌ Error sending welcome message to ${username}:`, error);
         }
         
         // Notifier les autres utilisateurs
-        broadcastSystemMessage(`${username} has joined the chat.`, socket);
+        broadcastSystemMessage(`${username} a rejoint le chat.`, socket);
       };
       logConnectedClients();
       
@@ -165,14 +165,14 @@ wsRouter.get("/ws", async (ctx) => {
       try {
         socket.send(JSON.stringify({
           event: "systemMessage",
-          data: { message: `Welcome to the chat, ${username}!` }
+          data: { message: `Bienvenue sur le chat, ${username}!` }
         }));
       } catch (error) {
         console.error(`❌ Error sending welcome message to ${username}:`, error);
       }
       
       // Notify others that a new user has joined
-      broadcastSystemMessage(`${username} has joined the chat.`, socket);
+      broadcastSystemMessage(`${username} a rejoint le chat.`, socket);
       
       // WebSocket message event handler 
       socket.onmessage = function(event) {
@@ -276,7 +276,7 @@ wsRouter.get("/ws", async (ctx) => {
         }
         
         // Notify others that the user has left
-        broadcastSystemMessage(`${clientData.username} has left the chat.`);
+        broadcastSystemMessage(`${clientData.username} a quitté le chat.`);
         
         // Handle player disconnect for matchmaking
         removeFromMatchmaking(socket);
