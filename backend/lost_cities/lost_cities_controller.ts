@@ -621,6 +621,7 @@ import {
         turnPhase: this.turnPhase,
         usePurpleExpedition: this.usePurpleExpedition,
         cardsInDeck: this.deck.length,
+        lastDiscardedPile: this.lastDiscardedPile, // Ajoutez cette ligne
         player1: {
           id: this.player1.id,
           expeditions: this.player1.expeditions,

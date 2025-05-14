@@ -1075,6 +1075,17 @@ body {
     font-size: var(--font-xs);
 }
 
+.discard-pile.recently-discarded {
+    opacity: 0.5;
+    filter: grayscale(50%);
+    cursor: not-allowed;
+}
+
+.discard-pile.recently-discarded:hover {
+    transform: none;
+    box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+}
+
 /* ===== UTILITY CLASSES ===== */
 .hidden {
     display: none !important;
