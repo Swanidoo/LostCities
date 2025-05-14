@@ -1,4 +1,4 @@
-/* ==================== ADMIN CSS - RESPONSIVE VERSION ==================== */
+/* ==================== ADMIN CSS - STYLE ORIGINAL RESPONSIVE ==================== */
 
 /* Reset and base styles */
 * {
@@ -8,7 +8,7 @@
 }
 
 body {
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
     color: #e0e0e0;
     min-height: 100vh;
@@ -22,23 +22,22 @@ body {
     }
 }
 
-/* ===== RESPONSIVE ADMIN TITLE ===== */
+/* ===== TITRES ===== */
 h1 {
-    color: white;
-    font-size: clamp(2rem, 5vw, 3rem);
+    color: #ffffff;
+    font-size: clamp(2rem, 5vw, 2.5rem);
     margin-bottom: var(--spacing-xl);
     text-align: center;
     font-weight: 700;
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
-    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
 h2 {
-    color: white;
-    font-size: clamp(1.25rem, 3vw, 1.75rem);
+    color: #ffffff;
+    font-size: clamp(1.25rem, 3vw, 1.5rem);
     margin-bottom: var(--spacing-lg);
     padding-bottom: var(--spacing-sm);
-    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid #444;
     font-weight: 600;
 }
 
@@ -48,23 +47,23 @@ h2 {
     }
 }
 
-/* ===== RESPONSIVE ADMIN CONTAINER ===== */
+/* ===== CONTENEUR ADMIN ===== */
 #adminContent {
-    max-width: var(--container-xl);
+    max-width: 1400px;
     margin: 0 auto;
 }
 
-/* ===== RESPONSIVE STATS DASHBOARD ===== */
+/* ===== DASHBOARD STATS ===== */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: var(--spacing-lg);
     margin-bottom: var(--spacing-xxl);
 }
 
 @media (max-width: 768px) {
     .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: var(--spacing-md);
         margin-bottom: var(--spacing-xl);
     }
@@ -76,59 +75,34 @@ h2 {
     }
 }
 
-/* ===== RESPONSIVE STAT CARDS ===== */
+/* ===== STAT CARDS (Style original) ===== */
 .stat-card {
-    background: linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.08), 
-        rgba(255, 255, 255, 0.05)
-    );
-    backdrop-filter: blur(15px);
-    border-radius: clamp(10px, 1.5vw, 16px);
-    padding: var(--spacing-lg);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 25px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #4CAF50, #45a049);
-    transform: scaleX(0);
-    transition: transform 0.3s ease;
-}
-
-.stat-card:hover::before {
-    transform: scaleX(1);
+    transition: all 0.3s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     border-color: rgba(255, 255, 255, 0.2);
-    background: linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.12), 
-        rgba(255, 255, 255, 0.08)
-    );
 }
 
 .stat-card h3 {
     color: #aaa;
-    font-size: var(--font-xs);
-    margin-bottom: var(--spacing-sm);
+    font-size: 0.9rem;
+    margin-bottom: 10px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     font-weight: 500;
 }
 
 .stat-card p {
-    color: white;
-    font-size: clamp(2rem, 5vw, 3rem);
+    color: #ffffff;
+    font-size: clamp(2rem, 5vw, 2.5rem);
     font-weight: 700;
     line-height: 1;
 }
@@ -139,22 +113,21 @@ h2 {
     }
 }
 
-/* ===== RESPONSIVE TABLES ===== */
+/* ===== TABLES (Style original) ===== */
 table {
     width: 100%;
     border-collapse: collapse;
     background: rgba(0, 0, 0, 0.3);
-    border-radius: clamp(10px, 1.5vw, 16px);
+    border-radius: 12px;
     overflow: hidden;
     margin-bottom: var(--spacing-xxl);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
-/* Table wrapper for horizontal scroll on mobile */
+/* Table wrapper pour le scroll horizontal mobile */
 .table-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    border-radius: clamp(10px, 1.5vw, 16px);
+    border-radius: 12px;
 }
 
 .table-wrapper::-webkit-scrollbar {
@@ -171,61 +144,33 @@ table {
 }
 
 thead {
-    background: linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.15), 
-        rgba(255, 255, 255, 0.1)
-    );
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 th {
-    padding: var(--spacing-md);
+    padding: 15px;
     text-align: left;
     font-weight: 600;
-    color: white;
+    color: #ffffff;
     text-transform: uppercase;
-    font-size: var(--font-xs);
+    font-size: 0.85rem;
     letter-spacing: 0.5px;
-    position: relative;
-}
-
-th::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #4CAF50, transparent);
 }
 
 td {
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: 12px 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     color: #e0e0e0;
     font-size: var(--font-sm);
 }
 
+/* FIX: Hover sans décalage */
 tr {
-    transition: all 0.3s ease;
-    position: relative;
+    transition: background-color 0.3s ease;
 }
 
 tr:hover {
     background: rgba(255, 255, 255, 0.05);
-    transform: translateX(5px);
-}
-
-tr:hover::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: #4CAF50;
 }
 
 tr:last-child td {
@@ -234,11 +179,11 @@ tr:last-child td {
 
 @media (max-width: 768px) {
     th, td {
-        padding: var(--spacing-xs) var(--spacing-sm);
-        font-size: var(--font-xs);
+        padding: 10px;
+        font-size: 0.9rem;
     }
     
-    /* Stack table cells on mobile */
+    /* Table responsive pour mobile */
     table, thead, tbody, th, td, tr {
         display: block;
     }
@@ -251,7 +196,7 @@ tr:last-child td {
     
     tr {
         background: rgba(255, 255, 255, 0.05);
-        border-radius: clamp(8px, 1vw, 12px);
+        border-radius: 12px;
         margin-bottom: var(--spacing-md);
         padding: var(--spacing-md);
     }
@@ -272,40 +217,21 @@ tr:last-child td {
         font-weight: bold;
         color: #4CAF50;
         text-transform: uppercase;
-        font-size: var(--font-xs);
+        font-size: 0.8rem;
     }
 }
 
-/* ===== RESPONSIVE BUTTONS ===== */
+/* ===== BUTTONS (Style original) ===== */
 button {
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: 8px 16px;
     border: none;
-    border-radius: clamp(4px, 0.5vw, 8px);
-    font-size: var(--font-xs);
+    border-radius: 6px;
+    font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-    margin-right: var(--spacing-xs);
+    transition: all 0.3s ease;
+    margin-right: 5px;
     min-height: 36px;
-    position: relative;
-    overflow: hidden;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-}
-
-button:hover::before {
-    left: 100%;
 }
 
 button:hover {
@@ -313,85 +239,92 @@ button:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-button:active {
-    transform: translateY(0);
-}
-
-/* Specific button colors */
-button:contains("Mute") {
+/* Action buttons avec couleurs spécifiques */
+button:contains("Mute"),
+button[onclick*="muteUser"] {
     background: linear-gradient(135deg, #ff9800, #ff6d00);
     color: white;
 }
 
-button:contains("Mute"):hover {
+button:contains("Mute"):hover,
+button[onclick*="muteUser"]:hover {
     background: linear-gradient(135deg, #ff6d00, #e65100);
-    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
 }
 
-button:contains("Ban") {
+button:contains("Ban"),
+button[onclick*="banUser"] {
     background: linear-gradient(135deg, #f44336, #d32f2f);
     color: white;
 }
 
-button:contains("Ban"):hover {
+button:contains("Ban"):hover,
+button[onclick*="banUser"]:hover {
     background: linear-gradient(135deg, #d32f2f, #b71c1c);
-    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
 }
 
-button:contains("Delete") {
+button:contains("Delete"),
+button[onclick*="deleteMessage"] {
     background: linear-gradient(135deg, #9e9e9e, #616161);
     color: white;
 }
 
-button:contains("Delete"):hover {
+button:contains("Delete"):hover,
+button[onclick*="deleteMessage"]:hover {
     background: linear-gradient(135deg, #616161, #424242);
-    box-shadow: 0 4px 12px rgba(158, 158, 158, 0.4);
 }
 
 button:contains("Unmute"),
-button:contains("Unban") {
+button[onclick*="unmuteUser"] {
     background: linear-gradient(135deg, #4caf50, #388e3c);
     color: white;
 }
 
 button:contains("Unmute"):hover,
-button:contains("Unban"):hover {
+button[onclick*="unmuteUser"]:hover {
     background: linear-gradient(135deg, #388e3c, #2e7d32);
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
 }
 
-/* Default button style */
-button:not([style*="background"]) {
+button:contains("Unban"),
+button[onclick*="unbanUser"] {
     background: linear-gradient(135deg, #2196f3, #1976d2);
     color: white;
 }
 
-button:not([style*="background"]):hover {
+button:contains("Unban"):hover,
+button[onclick*="unbanUser"]:hover {
     background: linear-gradient(135deg, #1976d2, #1565c0);
-    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+/* Boutons par défaut - Style cohérent avec le site (vert) */
+button:not([style*="background"]):not([onclick*="mute"]):not([onclick*="ban"]):not([onclick*="delete"]):not([onclick*="unmute"]):not([onclick*="unban"]) {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+}
+
+button:not([style*="background"]):not([onclick*="mute"]):not([onclick*="ban"]):not([onclick*="delete"]):not([onclick*="unmute"]):not([onclick*="unban"]):hover {
+    background: linear-gradient(135deg, #45a049, #3e8e41);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
 }
 
 @media (max-width: 768px) {
     button {
         width: 100%;
-        margin: var(--spacing-xs) 0;
+        margin: 2px 0;
         margin-right: 0;
+        padding: 6px 12px;
+        font-size: 0.8rem;
     }
 }
 
-/* ===== RESPONSIVE SECTIONS ===== */
+/* ===== SECTIONS (Style original) ===== */
 #dashboard-stats,
 #users-section,
 #chat-messages-section,
 #reports-section {
-    background: linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.05), 
-        rgba(255, 255, 255, 0.02)
-    );
-    backdrop-filter: blur(15px);
-    border-radius: clamp(12px, 2vw, 20px);
-    padding: var(--spacing-xl);
-    margin-bottom: var(--spacing-xl);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 25px;
+    margin-bottom: 30px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     transition: all 0.3s ease;
 }
@@ -400,12 +333,7 @@ button:not([style*="background"]):hover {
 #users-section:hover,
 #chat-messages-section:hover,
 #reports-section:hover {
-    background: linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.08), 
-        rgba(255, 255, 255, 0.05)
-    );
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 @media (max-width: 768px) {
@@ -418,11 +346,11 @@ button:not([style*="background"]):hover {
     }
 }
 
-/* ===== RESPONSIVE SEARCH CONTAINER ===== */
+/* ===== SEARCH CONTAINER ===== */
 .search-container {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 20px;
     display: flex;
-    gap: var(--spacing-md);
+    gap: 10px;
     align-items: center;
 }
 
@@ -430,87 +358,84 @@ button:not([style*="background"]):hover {
     .search-container {
         flex-direction: column;
         align-items: stretch;
-        gap: var(--spacing-sm);
     }
 }
 
 .search-container input {
     flex: 1;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: clamp(6px, 1vw, 10px);
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
     background: rgba(0, 0, 0, 0.3);
     color: white;
-    font-size: var(--font-sm);
+    font-size: 0.9rem;
     transition: all 0.3s ease;
 }
 
 .search-container input:focus {
     outline: none;
     border-color: #4CAF50;
-    background: rgba(0, 0, 0, 0.4);
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
 }
 
 .search-container input::placeholder {
     color: #aaa;
 }
 
-.search-container button {
-    padding: var(--spacing-sm) var(--spacing-lg);
-    background: linear-gradient(135deg, #666, #444);
+/* Boutons "Voir le profil" et autres actions neutres */
+button[onclick*="viewProfile"],
+button:contains("Voir le profil"),
+button:contains("Effacer"),
+.search-container button,
+.pagination-controls button {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
     color: white;
-    border: none;
-    border-radius: clamp(6px, 1vw, 10px);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
 }
 
-.search-container button:hover {
-    background: linear-gradient(135deg, #777, #555);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 102, 102, 0.4);
+button[onclick*="viewProfile"]:hover,
+button:contains("Voir le profil"):hover,
+button:contains("Effacer"):hover,
+.search-container button:hover,
+.pagination-controls button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #45a049, #3e8e41);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
 }
 
-/* ===== RESPONSIVE PAGINATION ===== */
+/* ===== PAGINATION (Style original) ===== */
 .pagination-controls {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-lg);
-    padding: var(--spacing-md);
+    gap: 15px;
+    margin-top: 20px;
+    padding: 10px;
     flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {
     .pagination-controls {
         flex-direction: column;
-        gap: var(--spacing-sm);
     }
 }
 
 .pagination-controls button {
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: 8px 16px;
     background: linear-gradient(135deg, #4caf50, #388e3c);
     color: white;
     border: none;
-    border-radius: clamp(6px, 1vw, 10px);
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.3s ease;
     font-weight: 600;
-    min-width: 100px;
+    min-width: 80px;
 }
 
-.pagination-controls button:hover {
+.pagination-controls button:hover:not(:disabled) {
     background: linear-gradient(135deg, #388e3c, #2e7d32);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
 }
 
 .pagination-controls button:disabled {
-    background: linear-gradient(135deg, #666, #555);
+    background: #ccc;
     cursor: not-allowed;
     opacity: 0.6;
     transform: none;
@@ -518,18 +443,18 @@ button:not([style*="background"]):hover {
 }
 
 .pagination-controls span {
-    color: white;
+    color: #ddd;
     font-weight: 600;
-    padding: var(--spacing-sm);
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: clamp(6px, 1vw, 10px);
-    min-width: 100px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    min-width: 120px;
     text-align: center;
 }
 
-/* ===== MESSAGE DISPLAY IMPROVEMENTS ===== */
+/* ===== MESSAGE DISPLAY ===== */
 .message-content {
-    max-width: clamp(200px, 40vw, 500px);
+    max-width: clamp(200px, 40vw, 400px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -542,7 +467,7 @@ button:not([style*="background"]):hover {
     word-break: break-word;
     max-width: none;
     background: rgba(255, 255, 255, 0.05);
-    padding: var(--spacing-xs);
+    padding: 4px 8px;
     border-radius: 4px;
 }
 
@@ -557,45 +482,36 @@ button:not([style*="background"]):hover {
 /* ===== STATUS BADGES ===== */
 .status-badge {
     display: inline-block;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: clamp(4px, 0.5vw, 6px);
-    font-size: var(--font-xs);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .status-pending {
-    background: linear-gradient(135deg, 
-        rgba(255, 152, 0, 0.3), 
-        rgba(255, 152, 0, 0.2)
-    );
+    background: rgba(255, 152, 0, 0.2);
     color: #ff9800;
-    border: 1px solid rgba(255, 152, 0, 0.5);
+    border: 1px solid rgba(255, 152, 0, 0.3);
 }
 
 .status-resolved {
-    background: linear-gradient(135deg, 
-        rgba(76, 175, 80, 0.3), 
-        rgba(76, 175, 80, 0.2)
-    );
+    background: rgba(76, 175, 80, 0.2);
     color: #4caf50;
-    border: 1px solid rgba(76, 175, 80, 0.5);
+    border: 1px solid rgba(76, 175, 80, 0.3);
 }
 
 .status-dismissed {
-    background: linear-gradient(135deg, 
-        rgba(158, 158, 158, 0.3), 
-        rgba(158, 158, 158, 0.2)
-    );
+    background: rgba(158, 158, 158, 0.2);
     color: #9e9e9e;
-    border: 1px solid rgba(158, 158, 158, 0.5);
+    border: 1px solid rgba(158, 158, 158, 0.3);
 }
 
-/* ===== RESPONSIVE TIMESTAMP ===== */
+/* ===== TIMESTAMP ===== */
 .timestamp {
     color: #aaa;
-    font-size: var(--font-xs);
+    font-size: 0.85rem;
     white-space: nowrap;
 }
 
@@ -608,38 +524,22 @@ button:not([style*="background"]):hover {
 
 /* ===== EMAIL STYLING ===== */
 .report-email {
-    font-size: var(--font-xs);
+    font-size: 0.8rem;
     color: #aaa;
     display: block;
-    margin-top: 2px;
 }
 
 td small {
     display: block;
     color: #aaa;
-    font-size: var(--font-xs);
+    font-size: 0.8rem;
     margin-top: 2px;
 }
 
-/* ===== LOADING AND ANIMATION STATES ===== */
+/* ===== LOADING ET ANIMATIONS ===== */
 .deleting {
     opacity: 0.5;
     background-color: rgba(244, 67, 54, 0.1) !important;
-    position: relative;
-}
-
-.deleting::after {
-    content: 'Suppression...';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #f44336;
-    font-weight: bold;
-    font-size: var(--font-xs);
-    background: rgba(244, 67, 54, 0.9);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: 4px;
 }
 
 @keyframes fadeInOut {
@@ -657,13 +557,11 @@ td small {
     background: linear-gradient(135deg, #4caf50, #388e3c);
     color: white;
     padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: clamp(8px, 1vw, 12px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     z-index: 1000;
     animation: slideInNotification 0.5s ease;
     font-weight: 600;
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-notification.error {
@@ -690,7 +588,7 @@ td small {
     }
 }
 
-/* ===== RESPONSIVE IMPROVEMENTS ===== */
+/* ===== RESPONSIVE FINALS ===== */
 @media (max-width: 480px) {
     h1 {
         font-size: 1.8rem;
@@ -703,13 +601,9 @@ td small {
     .stat-card p {
         font-size: 1.8rem;
     }
-    
-    .search-container input {
-        font-size: 16px; /* Prevent zoom on iOS */
-    }
 }
 
-/* ===== ACCESSIBILITY ===== */
+/* ===== ACCESSIBILITÉ ===== */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -720,7 +614,7 @@ td small {
     }
 }
 
-/* High contrast mode */
+/* Contraste élevé */
 @media (prefers-contrast: high) {
     button,
     .search-container input,
@@ -731,53 +625,5 @@ td small {
     
     .status-badge {
         border: 2px solid currentColor;
-    }
-}
-
-/* ===== DARK MODE ENHANCEMENTS ===== */
-@media (prefers-color-scheme: dark) {
-    body {
-        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
-    }
-    
-    .stat-card,
-    #dashboard-stats,
-    #users-section,
-    #chat-messages-section,
-    #reports-section {
-        background: linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.03), 
-            rgba(255, 255, 255, 0.01)
-        );
-    }
-}
-
-/* ===== PRINT STYLES ===== */
-@media print {
-    body {
-        background: white !important;
-        color: black !important;
-    }
-    
-    .pagination-controls,
-    button {
-        display: none !important;
-    }
-    
-    table {
-        background: white !important;
-        box-shadow: none !important;
-        border: 1px solid black !important;
-    }
-    
-    th, td {
-        color: black !important;
-        border: 1px solid black !important;
-    }
-    
-    .stat-card {
-        background: white !important;
-        color: black !important;
-        border: 1px solid black !important;
     }
 }
