@@ -35,6 +35,8 @@ import {
     moveHistory: MoveRecord[];
     scores: GameScores;
     winner: string | null;
+
+    private lastDiscardedPile: string | null = null;    
     
     // Event handlers
     onGameStateChanged: (gameState: any) => void;
@@ -365,6 +367,7 @@ import {
       // Move card from hand to discard pile
       player.hand.splice(cardIndex, 1);
       this.discardPiles[card.color].push(card);
+      this.lastDiscardedPile = card.color;
       
       // Record the move
       this.moveHistory.push({
@@ -406,16 +409,21 @@ import {
         return false;
       }
       
-      // Check if deck is empty
-      if (this.deck.length === 0) {
-        // End of round
-        this.endRound();
-        return true;
-      }
-      
       // Draw a card
       const card = this.deck.pop()!;
       player.hand.push(card);
+
+      // Check if deck is now empty (last card was drawn)
+      if (this.deck.length === 0) {
+        // End of round after the move is recorded
+        this.moveHistory.push({
+          playerId,
+          action: 'draw_card',
+          source: 'deck'
+        });
+        this.endRound();
+        return true;
+      }
       
       // Record the move
       this.moveHistory.push({
@@ -457,6 +465,11 @@ import {
         this.onError('Discard pile is empty');
         return false;
       }
+
+      if (this.lastDiscardedPile === color) {
+        this.onError('Cannot draw from the pile you just discarded to');
+        return false;
+      }
       
       // Draw a card from the discard pile
       const card = this.discardPiles[color].pop()!;
@@ -483,6 +496,7 @@ import {
       // Switch current player
       this.currentPlayerId = this.currentPlayerId === this.player1.id ? this.player2.id : this.player1.id;
       this.turnPhase = 'play';
+      this.lastDiscardedPile = null;
       
       // Notify state change
       this.onGameStateChanged(this.getGameState());

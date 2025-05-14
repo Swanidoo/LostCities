@@ -511,6 +511,11 @@ body {
 .draw-phase .discard-pile.valid-target {
     z-index: 50 !important;
     position: relative;
+    
+}
+
+.discard-pile.valid-target {
+    cursor: pointer !important;
 }
 
 /* ===== RESPONSIVE CARD DESIGN ===== */
@@ -534,13 +539,17 @@ body {
     transform: translateY(-2px);
 }
 
-/* MASQUER: card-content et card::before (comme dans l'ancien CSS) */
+/* MASQUER: card-content et card::before */
 .card-content {
     display: none;
 }
 
 .card::before {
     display: none;
+}
+
+.phase-indicator {
+    display: none !important;
 }
 
 /* ===== RESPONSIVE PLAYER HAND (CORRIGÉ POUR CHROME) ===== */

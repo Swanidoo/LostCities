@@ -1220,10 +1220,12 @@ function showExpeditionTooltip(slot, tooltip) {
         .map(card => parseInt(card.dataset.value) || 0);
     const valueSum = expValues.reduce((sum, val) => sum + val, 0);
     
+  
     // Calculate the actual score with the 20-point cost subtracted
     const expeditionScore = (valueSum - 20) * multiplier;
-    const scoreDisplay = expeditionScore >= 0 ? `+${expeditionScore}` : `${expeditionScore}`;
-    const scoreClass = expeditionScore >= 0 ? 'score-positive' : 'score-negative';
+    // Add bonus separately if 8+ cards (not multiplied)
+    const finalScore = expeditionScore + (cardElements.length >= 8 ? 20 : 0);
+    const scoreDisplay = finalScore >= 0 ? `+${finalScore}` : `${finalScore}`;
     
     // Update tooltip content
     tooltip.innerHTML = `

@@ -23,11 +23,12 @@ export interface Card {
     gameId: string | number;
     usePurpleExpedition?: boolean;
     totalRounds?: number;
-    gameMode?: string;  // AJOUT
+    gameMode?: string;
     player1?: Partial<Player>;
     player2?: Partial<Player>;
     onGameStateChanged?: (gameState: any) => void;
     onError?: (message: string) => void;
+    lastDiscardedPile?: string; // Couleur de la dernière pile défaussée par le joueur actuel
   }
   
   export interface GameScores {
