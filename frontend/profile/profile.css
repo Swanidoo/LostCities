@@ -239,20 +239,21 @@ body {
 /* ===== RESPONSIVE QUICK STATS ===== */
 .quick-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    grid-template-columns: repeat(3, 1fr); /* Force 3 colonnes égales */
     gap: var(--spacing-md);
 }
 
 .stat-item {
     text-align: center;
     background: rgba(255, 255, 255, 0.05);
-    padding: var(--spacing-md);
+    padding: var(--spacing-sm); /* Réduire si nécessaire */
     border-radius: clamp(8px, 1vw, 15px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    min-height: auto; /* Permettre la hauteur flexible */
 }
 
 .stat-item::before {
@@ -287,9 +288,9 @@ body {
 
 .stat-label {
     font-size: var(--font-xs);
-    color: #aaa;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    text-align: center;
+    word-wrap: break-word; /* Permet la coupure si nécessaire */
+    hyphens: auto; /* Ajoute des traits d'union automatiques */
 }
 
 /* ===== RESPONSIVE PROFILE CONTENT ===== */
@@ -386,6 +387,10 @@ body {
         flex: none;
         min-width: 120px;
         padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .quick-stats {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     }
 }
 
