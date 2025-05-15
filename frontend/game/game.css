@@ -1067,7 +1067,7 @@ body {
     border-radius: clamp(12px, 2vw, 20px);
     width: clamp(300px, 90vw, 600px);
     max-height: 90vh;
-    overflow-y: auto;
+    overflow: hidden;
     text-align: center;
     border: 1px solid rgba(255, 255, 255, 0.1);
     animation: modalSlideIn 0.3s ease;
@@ -1087,7 +1087,18 @@ body {
 .modal-title {
     font-size: var(--font-xl);
     margin-bottom: var(--spacing-lg);
-    color: #4CAF50;
+}
+
+.modal-title.victory-title {
+    color: #4CAF50; 
+}
+
+.modal-title.defeat-title {
+    color: #ff6b6b; 
+}
+
+.modal-title.draw-title {
+    color: #e0e0e0;
 }
 
 .modal-buttons {

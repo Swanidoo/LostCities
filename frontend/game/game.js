@@ -137,10 +137,6 @@ function initDOMElements() {
         gameEndModal: document.getElementById('game-end-modal'),
         gameResult: document.getElementById('game-result'),
         winnerText: document.getElementById('winner-text'),
-        playerFinalName: document.getElementById('player-final-name'),
-        opponentFinalName: document.getElementById('opponent-final-name'),
-        playerFinalScore: document.getElementById('player-final-score'),
-        opponentFinalScore: document.getElementById('opponent-final-score'),
         newGameBtn: document.getElementById('new-game-btn'),
         backBtn: document.getElementById('back-btn'),
         
@@ -695,23 +691,6 @@ function showGameEnd(isSurrender = false) {
         elements.gameEndModal.querySelector('#end-game-details').appendChild(gameInfoElement);
     }
     gameInfoElement.innerHTML = gameInfoHtml;
-    
-    // Mettre à jour les noms et scores des joueurs
-    if (elements.playerFinalName) {
-        elements.playerFinalName.textContent = gameState.gameData[gameState.playerSide].username || 'Vous';
-    }
-    
-    if (elements.opponentFinalName) {
-        elements.opponentFinalName.textContent = gameState.gameData[gameState.opponentSide].username || 'Adversaire';
-    }
-    
-    if (elements.playerFinalScore) {
-        elements.playerFinalScore.textContent = playerScore;
-    }
-    
-    if (elements.opponentFinalScore) {
-        elements.opponentFinalScore.textContent = opponentScore;
-    }
     
     // Afficher la modal
     elements.gameEndModal.classList.add('visible');
