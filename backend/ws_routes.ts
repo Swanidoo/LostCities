@@ -224,7 +224,6 @@ wsRouter.get("/ws", async (ctx) => {
                 if (data.data?.gameId && data.data?.action) {
                     switch (data.data.action) {
                         case "request_state":
-                            // Handle game state request
                             handleGameStateRequest(data.data, socket, clientData.username);
                             break;
                         case "play_card":
@@ -235,6 +234,9 @@ wsRouter.get("/ws", async (ctx) => {
                             break;
                         case "draw_card":
                             handleDrawCard(data.data, socket, clientData.username);
+                            break;
+                        case "surrender":
+                            handleSurrender(data.data, socket, clientData.username);
                             break;
                         default:
                             console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
@@ -494,11 +496,19 @@ async function handleSurrender(data: any, socket: WebSocket, username: string) {
       // Get user ID
       const userId = await getUserIdFromUsername(username);
       
-      // Load current game state
-      const game = await loadGameFromDatabase(gameId);
+      // Update game status in database
+      const gameResult = await client.queryObject(`
+          SELECT player1_id, player2_id FROM games WHERE id = $1
+      `, [gameId]);
+      
+      if (gameResult.rows.length === 0) {
+          throw new Error("Game not found");
+      }
+      
+      const game = gameResult.rows[0];
       
       // Determine the winner (opponent)
-      const winnerId = game.player1.id === userId ? game.player2.id : game.player1.id;
+      const winnerId = game.player1_id === userId ? game.player2_id : game.player1_id;
       
       // Update game status in database
       await client.queryObject(`
@@ -509,19 +519,20 @@ async function handleSurrender(data: any, socket: WebSocket, username: string) {
           WHERE id = $2
       `, [winnerId, gameId]);
       
-      // Update the game object
-      game.gameStatus = 'finished';
-      game.winner = winnerId;
+      // Load the full game state to notify players
+      const fullGame = await loadGameState(gameId);
+      const gameState = fullGame.getGameState();
       
-      // Get the final game state
-      const gameState = game.getGameState();
+      // Add surrender info to the game state
       (gameState as any).surrenderInfo = {
-        playerId: userId,
-        type: 'surrender'
+          playerId: userId,
+          type: 'surrender'
       };
       
       // Notify ALL players (including the one who surrendered)
       notifyGamePlayers(gameId, gameState);
+      
+      console.log(`✅ Surrender processed for player ${username} in game ${gameId}`);
       
   } catch (error) {
       console.error(`❌ Error handling surrender: ${error}`);
