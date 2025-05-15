@@ -849,6 +849,58 @@ body {
     margin-left: var(--spacing-xs);
 }
 
+
+.game-summary {
+    background: rgba(255, 255, 255, 0.05);
+    padding: var(--spacing-lg);
+    border-radius: clamp(8px, 1vw, 12px);
+    margin: var(--spacing-lg) 0;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.summary-row:last-child {
+    border-bottom: none;
+}
+
+.summary-label {
+    font-weight: 600;
+    color: #aaa;
+    font-size: var(--font-sm);
+}
+
+.summary-value {
+    font-weight: 700;
+    color: white;
+    font-size: var(--font-md);
+}
+
+.modal-content.victory-modal {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(69, 160, 73, 0.05));
+    border: 2px solid rgba(76, 175, 80, 0.3);
+}
+
+.modal-content.defeat-modal {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(211, 47, 47, 0.05));
+    border: 2px solid rgba(244, 67, 54, 0.3);
+}
+
+.modal-content.draw-modal {
+    background: linear-gradient(135deg, rgba(158, 158, 158, 0.1), rgba(117, 117, 117, 0.05));
+    border: 2px solid rgba(158, 158, 158, 0.3);
+}
+
+.winner-name {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
 /* ===== RESPONSIVE CHAT AREA ===== */
 .chat-area {
     position: fixed;

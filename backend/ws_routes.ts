@@ -267,6 +267,9 @@ wsRouter.get("/ws", async (ctx) => {
                           case "draw_card":
                               handleDrawCard(data.data, socket, clientData.username);
                               break;
+                          case "surrender":
+                              handleSurrender(data.data, socket, clientData.username);
+                              break;
                           default:
                               console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
                       }
@@ -697,6 +700,53 @@ function handleChatMessage(
       }
     });
   });
+}
+
+async function handleSurrender(data: any, socket: WebSocket, username: string) {
+  const { gameId } = data;
+  
+  try {
+      console.log(`🏳️ Player ${username} surrendering game ${gameId}`);
+      
+      // Get user ID
+      const userId = await getUserIdFromUsername(username);
+      
+      // Load current game state
+      const game = await loadGameFromDatabase(gameId);
+      
+      // Determine the winner (opponent)
+      const winnerId = game.player1.id === userId ? game.player2.id : game.player1.id;
+      
+      // Update game status in database
+      await client.queryObject(`
+          UPDATE games 
+          SET status = 'finished', 
+              winner_id = $1,
+              ended_at = CURRENT_TIMESTAMP
+          WHERE id = $2
+      `, [winnerId, gameId]);
+      
+      // Update the game object
+      game.gameStatus = 'finished';
+      game.winner = winnerId;
+      
+      // Get the final game state
+      const gameState = game.getGameState();
+      (gameState as any).surrenderInfo = {
+        playerId: userId,
+        type: 'surrender'
+      };
+      
+      // Notify ALL players (including the one who surrendered)
+      notifyGamePlayers(gameId, gameState);
+      
+  } catch (error) {
+      console.error(`❌ Error handling surrender: ${error}`);
+      socket.send(JSON.stringify({
+          event: 'error',
+          data: { message: 'Failed to surrender game' }
+      }));
+  }
 }
 
 // Handle moves played in the game

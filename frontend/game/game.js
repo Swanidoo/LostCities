@@ -323,8 +323,10 @@ function surrenderGame() {
     // Close the surrender modal
     elements.surrenderModal.classList.remove('visible');
     
-    updateGameStatus("Vous avez abandonné la partie.");
+    // Show end game modal immediately for surrender
+    showGameEnd(true); // Pass true to indicate surrender
 }
+
 
 // Function to send a chat message
 function sendChatMessage() {
@@ -359,8 +361,15 @@ function handleChatMessage(data) {
     // Add the message to the chat area
     const chatMessages = elements.chatMessages;
     const messageElement = document.createElement('div');
-    messageElement.className = 'chat-message other';
-    messageElement.innerHTML = `<div class="chat-sender">${data.username}</div><div class="chat-text">${data.message}</div>`;
+    
+    // VÉRIFIER SI C'EST NOTRE MESSAGE
+    const isOwnMessage = data.username === gameState.username;
+    messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
+    
+    // Adapter le contenu selon qui a envoyé
+    const senderName = isOwnMessage ? 'Vous' : data.username;
+    messageElement.innerHTML = `<div class="chat-sender">${senderName}</div><div class="chat-text">${data.message}</div>`;
+    
     chatMessages.appendChild(messageElement);
     
     // Scroll to the bottom
@@ -538,22 +547,170 @@ function handleDeckClick() {
 }
 
 // Show game end screen
-function showGameEnd() {
-    // Fill in the game end modal with results
-    const playerScore = gameState.gameData.scores[gameState.playerSide].total;
-    const opponentScore = gameState.gameData.scores[gameState.opponentSide].total;
-    const isWinner = gameState.gameData.winner === Number(gameState.userId);
+function showGameEnd(isSurrender = false) {
+    if (!elements.gameEndModal || !gameState.gameData) return;
     
-    elements.gameResult.textContent = isWinner ? "Victoire !" : "Défaite";
-    elements.winnerText.textContent = isWinner ? "Vous avez gagné la partie !" : "Votre adversaire a gagné la partie.";
+    const playerScore = gameState.gameData.scores[gameState.playerSide]?.total || 0;
+    const opponentScore = gameState.gameData.scores[gameState.opponentSide]?.total || 0;
     
-    elements.playerFinalName.textContent = gameState.username;
-    elements.opponentFinalName.textContent = elements.opponentName.textContent;
+    // Déterminer le résultat
+    let isWinner = false;
+    let isDraw = false;
+    let resultType = '';
     
-    elements.playerFinalScore.textContent = playerScore;
-    elements.opponentFinalScore.textContent = opponentScore;
+    if (gameState.gameData.status === 'finished') {
+        isWinner = gameState.gameData.winner == gameState.userId;
+        isDraw = gameState.gameData.winner === null;
+        
+        // AJOUTEZ CETTE VÉRIFICATION
+        // Vérifier s'il y a eu un abandon et par qui
+        if (gameState.gameData.surrenderInfo) {
+            const surrenderPlayerId = gameState.gameData.surrenderInfo.playerId;
+            if (surrenderPlayerId == gameState.userId) {
+                resultType = 'abandon-self';
+            } else {
+                resultType = 'abandon-opponent';
+            }
+        } else if (isDraw) {
+            resultType = 'draw';
+        } else if (isWinner) {
+            resultType = 'win-points';
+        } else {
+            resultType = 'loss-points';
+        }
+    } else if (isSurrender) {
+            resultType = 'abandon-self';
+        } else if (isWinner && gameState.gameData.winner !== null) {
+            // Vérifier si l'adversaire a abandonné
+            if (/* condition pour détecter abandon adversaire */) {
+                resultType = 'abandon-opponent';
+            } else {
+                resultType = 'win-points';
+            }
+    } else if (!isWinner && !isDraw) {
+        resultType = 'loss-points';
+    } else {
+        resultType = 'draw';
+    }
+
+    // Couleur de la modal selon le résultat
+    const modalContent = elements.gameEndModal.querySelector('.modal-content');
+    modalContent.classList.remove('victory-modal', 'defeat-modal', 'draw-modal');
     
-    // Show the modal
+    if (isWinner && !isDraw) {
+        modalContent.classList.add('victory-modal');
+    } else if (!isWinner && !isDraw) {
+        modalContent.classList.add('defeat-modal');
+    } else {
+        modalContent.classList.add('draw-modal');
+    }
+    
+    // Titre et message selon le type
+    const messages = {
+        'abandon-self': {
+            title: 'Abandon',
+            subtitle: 'Vous avez abandonné la partie.'
+        },
+        'abandon-opponent': {
+            title: 'Victoire',
+            subtitle: 'Votre adversaire a abandonné la partie.'
+        },
+        'win-points': {
+            title: 'Victoire',
+            subtitle: 'Vous avez marqué plus de points que votre adversaire !'
+        },
+        'loss-points': {
+            title: 'Défaite',
+            subtitle: 'Votre adversaire a marqué plus de points.'
+        },
+        'draw': {
+            title: 'Égalité',
+            subtitle: 'Scores identiques des deux côtés.'
+        }
+    };
+    
+    const message = messages[resultType] || messages['loss-points'];
+    
+    // Mettre à jour le titre
+    if (elements.gameResult) {
+        elements.gameResult.textContent = message.title;
+    }
+    
+    // Mettre à jour le message
+    if (elements.winnerText) {
+        elements.winnerText.textContent = message.subtitle;
+    }
+    
+    // Calculer la durée
+    const startTime = gameState.gameData.started_at ? new Date(gameState.gameData.started_at) : new Date();
+    const endTime = new Date();
+    const durationMinutes = Math.round((endTime - startTime) / (1000 * 60));
+    
+    // Calculer la marge de victoire
+    const margin = Math.abs(playerScore - opponentScore);
+    
+    // Informations détaillées avec emojis
+    const gameInfoHtml = `
+        <div class="game-summary">
+            <div class="summary-row">
+                <span class="summary-label">🏆 ${isWinner ? 'Vainqueur' : 'Résultat'} :</span>
+                <span class="summary-value ${isWinner ? 'winner-name' : ''}">${message.title}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">📊 Score final :</span>
+                <span class="summary-value">${playerScore} - ${opponentScore}</span>
+            </div>
+            ${!isDraw ? `
+            <div class="summary-row">
+                <span class="summary-label">🎯 Marge de victoire :</span>
+                <span class="summary-value">${margin} points</span>
+            </div>
+            ` : ''}
+            <div class="summary-row">
+                <span class="summary-label">⏱️ Durée :</span>
+                <span class="summary-value">${durationMinutes}m</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">🎮 Mode :</span>
+                <span class="summary-value">
+                    ${gameState.gameData.totalRounds === 1 ? 'Rapide' : 'Classique'}
+                    ${gameState.gameData.usePurpleExpedition ? ' + Extension' : ''}
+                </span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">🎯 Manche :</span>
+                <span class="summary-value">${gameState.gameData.currentRound}/${gameState.gameData.totalRounds}</span>
+            </div>
+        </div>
+    `;
+    
+    // Injecter les informations
+    let gameInfoElement = elements.gameEndModal.querySelector('#game-info');
+    if (!gameInfoElement) {
+        gameInfoElement = document.createElement('div');
+        gameInfoElement.id = 'game-info';
+        elements.gameEndModal.querySelector('#end-game-details').appendChild(gameInfoElement);
+    }
+    gameInfoElement.innerHTML = gameInfoHtml;
+    
+    // Mettre à jour les noms et scores des joueurs
+    if (elements.playerFinalName) {
+        elements.playerFinalName.textContent = gameState.gameData[gameState.playerSide].username || 'Vous';
+    }
+    
+    if (elements.opponentFinalName) {
+        elements.opponentFinalName.textContent = gameState.gameData[gameState.opponentSide].username || 'Adversaire';
+    }
+    
+    if (elements.playerFinalScore) {
+        elements.playerFinalScore.textContent = playerScore;
+    }
+    
+    if (elements.opponentFinalScore) {
+        elements.opponentFinalScore.textContent = opponentScore;
+    }
+    
+    // Afficher la modal
     elements.gameEndModal.classList.add('visible');
 }
 
