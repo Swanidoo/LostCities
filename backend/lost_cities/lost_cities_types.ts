@@ -64,7 +64,7 @@ export interface GameState {
   turnPhase: 'play' | 'draw';
   usePurpleExpedition: boolean;
   cardsInDeck: number;
-  lastDiscardedPile: string | null; // Ajouté pour la règle de défausse
+  lastDiscardedPile: string | null;
   player1: {
     id: string;
     expeditions: {
@@ -72,6 +72,9 @@ export interface GameState {
     };
     handSize: number;
     hand?: Card[];
+    // Ajouter ces champs
+    username?: string;
+    avatar_url?: string;
   };
   player2: {
     id: string;
@@ -80,6 +83,9 @@ export interface GameState {
     };
     handSize: number;
     hand?: Card[];
+    // Ajouter ces champs
+    username?: string;
+    avatar_url?: string;
   };
   discardPiles: {
     [key: string]: Card[];

@@ -716,21 +716,22 @@ function requestGameState() {
 function handleGameUpdate(data) {
     if (!data.gameState) return;
     
-    console.log('Données reçues:', {
-        player1: data.gameState.player1,
-        player2: data.gameState.player2
-    });
+    console.log('🔍 Raw game state received:', data.gameState);
+    console.log('🔍 Player1 data:', data.gameState.player1);
+    console.log('🔍 Player2 data:', data.gameState.player2);
     
     // Store the game state
     gameState.gameData = data.gameState;
-    
-    console.log('Game state received:', data.gameState);
     
     // Determine player side
     const playerSide = data.gameState.player1.id === Number(gameState.userId) ? 'player1' : 'player2';
     const opponentSide = playerSide === 'player1' ? 'player2' : 'player1';
     gameState.playerSide = playerSide;
     gameState.opponentSide = opponentSide;
+    
+    console.log('🔍 Player side:', playerSide, 'Opponent side:', opponentSide);
+    console.log('🔍 Player data:', gameState.gameData[playerSide]);
+    console.log('🔍 Opponent data:', gameState.gameData[opponentSide]);
     
     // Update current phase and turn
     gameState.currentPhase = data.gameState.turnPhase;
@@ -794,9 +795,19 @@ function updateGameInfo() {
     const playerData = gameState.gameData[gameState.playerSide];
     const opponentData = gameState.gameData[gameState.opponentSide];
     
+    console.log('🔍 updateGameInfo - Player data:', playerData);
+    console.log('🔍 updateGameInfo - Opponent data:', opponentData);
+    
     // Mettre à jour les noms
     elements.playerName.textContent = playerData.username || 'Vous';
     elements.opponentName.textContent = opponentData.username || 'Adversaire';
+    
+    // Mettre à jour les avatars - AVEC LOGS
+    console.log('🔍 Updating player avatar with:', playerData.avatar_url);
+    updatePlayerAvatar('player', playerData.avatar_url);
+    
+    console.log('🔍 Updating opponent avatar with:', opponentData.avatar_url);
+    updatePlayerAvatar('opponent', opponentData.avatar_url);
     
     // Mettre à jour les avatars
     updatePlayerAvatar('player', playerData.avatar_url);
@@ -815,26 +826,41 @@ function updateGameInfo() {
 }
 
 function updatePlayerAvatar(type, avatarUrl) {
-    const avatarElement = document.querySelector(`.${type}-section .player-avatar`);
-    if (!avatarElement) return;
+    const avatarElement = document.getElementById(`${type}-avatar`);
     
-    // Déterminer l'image à utiliser
-    const imageUrl = avatarUrl || '/assets/default-avatar.png';
+    if (!avatarElement) {
+        console.log(`❌ Avatar element not found for ${type}`);
+        return;
+    }
     
-    // Afficher l'image (personnalisée ou par défaut)
+    console.log(`🔍 Updating ${type} avatar with:`, avatarUrl);
+    
+    // Vider d'abord tout contenu
+    avatarElement.textContent = '';
+    
+    // Si avatarUrl est null, undefined ou vide, utiliser l'avatar par défaut
+    const imageUrl = (avatarUrl && avatarUrl !== 'null') ? avatarUrl : '/assets/default-avatar.png';
+    
+    console.log(`🔍 Using image URL for ${type}:`, imageUrl);
+    
+    // Afficher l'image
     avatarElement.style.backgroundImage = `url(${imageUrl})`;
     avatarElement.style.backgroundSize = 'cover';
     avatarElement.style.backgroundPosition = 'center';
-    avatarElement.textContent = ''; // Toujours enlever le texte P1/P2
+    avatarElement.style.backgroundRepeat = 'no-repeat';
     
-    // Gestion d'erreur si l'image ne charge pas
-    avatarElement.onerror = () => {
-        // Si l'image personnalisée échoue, charger l'avatar par défaut
-        if (avatarUrl && imageUrl !== '/assets/default-avatar.png') {
+    // Test si l'image charge
+    const img = new Image();
+    img.onload = () => console.log(`✅ Avatar loaded successfully for ${type}`);
+    img.onerror = () => {
+        console.log(`❌ Failed to load avatar for ${type}`);
+        if (imageUrl !== '/assets/default-avatar.png') {
             avatarElement.style.backgroundImage = `url(/assets/default-avatar.png)`;
         }
     };
+    img.src = imageUrl;
 }
+
 
 // Mettre à jour la main du joueur
 function updatePlayerHand() {

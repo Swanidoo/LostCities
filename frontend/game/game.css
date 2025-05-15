@@ -68,7 +68,7 @@ body {
 .player-avatar {
     width: clamp(32px, 3.5vw, 40px);
     height: clamp(32px, 3.5vw, 40px);
-    background: linear-gradient(135deg, #667eea, #764ba2); /* Fallback si aucune image */
+    background: linear-gradient(135deg, #667eea, #764ba2);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -78,7 +78,6 @@ body {
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.2);
     transition: all 0.3s ease;
-    /* Optimisation pour les images */
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

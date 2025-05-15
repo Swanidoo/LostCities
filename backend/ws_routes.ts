@@ -760,6 +760,38 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
 
   // Load the full game state from database to ensure we have all data
   try {
+    // AJOUT: Récupérer les informations utilisateur
+    const userInfoResult = await client.queryObject(`
+      SELECT 
+        g.player1_id,
+        g.player2_id,
+        u1.username as player1_username,
+        u1.avatar_url as player1_avatar,
+        u2.username as player2_username,
+        u2.avatar_url as player2_avatar
+      FROM games g
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
+      WHERE g.id = $1
+    `, [gameId]);
+
+    console.log("🔍 User info from DB for notifyGamePlayers:", userInfoResult.rows[0]);
+    
+    if (userInfoResult.rows.length === 0) {
+      console.error("❌ No user info found for game", gameId);
+      // Fallback to original behavior
+      subscribers.forEach(socket => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({
+            event: "gameUpdated",
+            data: { gameId, gameState }
+          }));
+        }
+      });
+      return;
+    }
+
+    const userInfo = userInfoResult.rows[0];
     const fullGame = await loadGameState(gameId);
     
     // For each connected player
@@ -785,6 +817,18 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
         // Get player-specific game state with hand data included
         const playerState = fullGame.getGameState(userId);
         
+        // MODIFICATION: Enrichir avec les informations utilisateur
+        playerState.player1.username = userInfo.player1_username;
+        playerState.player1.avatar_url = userInfo.player1_avatar;
+        playerState.player2.username = userInfo.player2_username;
+        playerState.player2.avatar_url = userInfo.player2_avatar;
+        
+        // Debug log to check enriched data
+        console.log(`🔍 Enriched state for ${username}:`, {
+          player1: { username: playerState.player1.username, avatar: playerState.player1.avatar_url },
+          player2: { username: playerState.player2.username, avatar: playerState.player2.avatar_url }
+        });
+        
         // Debug log to check hand data presence
         console.log(`Hand data for ${username}: ${playerState.player1.hand ? playerState.player1.hand.length : 'none'} P1 cards, ${playerState.player2.hand ? playerState.player2.hand.length : 'none'} P2 cards`);
         
@@ -794,15 +838,15 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
           data: { gameId, gameState: playerState }
         }));
         
-        console.log(`Sent personalized update to ${username}`);
+        console.log(`✅ Sent personalized update to ${username}`);
       } catch (error) {
         console.error(`Error sending update to player: ${error}`);
       }
     }
   } catch (error) {
-    console.error(`Failed to load full game data: ${error}`);
+    console.error(`Failed to load user info or full game data: ${error}`);
     
-    // Fall back to sending the original state if loading full game fails
+    // Fall back to sending the original state if loading fails
     subscribers.forEach(socket => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({
@@ -1357,7 +1401,6 @@ async function getUserIdFromUsername(username: string): Promise<string | null> {
 
 // Handle requests for game state
 async function handleGameStateRequest(data: any, socket: WebSocket, username: string) {
-
   if (socket.readyState !== WebSocket.OPEN) {
     console.log(`WebSocket not open for ${username}, skipping game state send`);
     return;
@@ -1368,6 +1411,24 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
   console.log(`🎮 User ${username} requested game state for game ${gameId}`);
   
   try {
+    // AJOUT: Récupérer les informations utilisateur
+    const userInfoResult = await client.queryObject(`
+      SELECT 
+        g.player1_id,
+        g.player2_id,
+        u1.username as player1_username,
+        u1.avatar_url as player1_avatar,
+        u2.username as player2_username,
+        u2.avatar_url as player2_avatar
+      FROM games g
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
+      WHERE g.id = $1
+    `, [gameId]);
+
+    console.log("🔍 User info from DB:", userInfoResult.rows[0]);
+    const userInfo = userInfoResult.rows[0];
+    
     // Load game from database
     const game = await loadGameFromDatabase(gameId);
     
@@ -1388,6 +1449,17 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
     const userId = await getUserIdFromUsername(username);
     const gameState = game.getGameState(userId);
     
+    // MODIFICATION: Enrichir avec les informations utilisateur
+    gameState.player1.username = userInfo.player1_username;
+    gameState.player1.avatar_url = userInfo.player1_avatar;
+    gameState.player2.username = userInfo.player2_username;
+    gameState.player2.avatar_url = userInfo.player2_avatar;
+    
+    console.log("🔍 Enriched state with user info:", {
+      player1: { username: gameState.player1.username, avatar: gameState.player1.avatar_url },
+      player2: { username: gameState.player2.username, avatar: gameState.player2.avatar_url }
+    });
+    
     console.log(`📤 Sending game state to ${username}:`, JSON.stringify(gameState, null, 2));
     
     try {
@@ -1402,10 +1474,7 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
     
   } catch (error) {
     console.error(`❌ Error getting game state for ${gameId}:`, error);
-    socket.send(JSON.stringify({
-      event: 'error',
-      data: { message: 'Failed to get game state' }
-    }));
+    
     if (socket.readyState === WebSocket.OPEN) {
       try {
         socket.send(JSON.stringify({
