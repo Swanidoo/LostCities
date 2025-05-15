@@ -1039,7 +1039,7 @@ async function createGame(
   try {
     console.log(`🎮 Creating new game ${gameId} between ${player1Id} and ${player2Id}`, options);
 
-    // Déterminer le nombre de manches selon le mode
+    // ✅ AJOUTEZ CETTE LIGNE
     const totalRounds = options.gameMode === 'quick' ? 1 : 3;
     
     // Create the game record with the correct mode and rounds
@@ -1049,6 +1049,8 @@ async function createGame(
     `, [gameId, player1Id, player2Id, options.gameMode]);
     
     console.log(`✅ Game entry created with mode: ${options.gameMode}`);
+    console.log(`🔍 Game mode from DB: ${game.game_mode}`);
+    console.log(`🔍 Calculated totalRounds: ${totalRounds}`);
     
     // Create the board record with extension settings
     const boardResult = await client.queryObject<{id: number}>(

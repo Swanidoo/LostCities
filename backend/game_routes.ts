@@ -295,6 +295,7 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
              g.started_at,
              g.ended_at,
              g.last_discarded_pile,
+             g.game_mode,
              b.use_purple_expedition, 
              b.current_round as board_current_round,
              b.remaining_cards_in_deck,
@@ -365,13 +366,16 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     
     // Get discard piles
     const discardPiles = await getDiscardPiles(gameId);
+
+    // Calculer totalRounds dynamiquement à partir du game_mode
+    const totalRounds = game.game_mode === 'quick' ? 1 : 3;
     
     // Construct game state
     const gameState = {
       gameId: game.id,
       status: game.status,
       currentRound: Number(game.current_round), // Convert to number
-      totalRounds: 3,
+      totalRounds: totalRounds,
       currentPlayerId: Number(game.current_turn_player_id), // Convert to number
       turnPhase: game.turn_phase || 'play',
       usePurpleExpedition: game.use_purple_expedition,
