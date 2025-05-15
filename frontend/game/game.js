@@ -716,6 +716,11 @@ function requestGameState() {
 function handleGameUpdate(data) {
     if (!data.gameState) return;
     
+    console.log('Données reçues:', {
+        player1: data.gameState.player1,
+        player2: data.gameState.player2
+    });
+    
     // Store the game state
     gameState.gameData = data.gameState;
     
@@ -785,7 +790,7 @@ function clearAllTargetHighlighting() {
 function updateGameInfo() {
     if (!gameState.gameData) return;
     
-    // Utiliser les vrais pseudonymes au lieu de 'Adversaire'
+    // Récupérer les données des joueurs
     const playerData = gameState.gameData[gameState.playerSide];
     const opponentData = gameState.gameData[gameState.opponentSide];
     
@@ -796,16 +801,6 @@ function updateGameInfo() {
     // Mettre à jour les avatars
     updatePlayerAvatar('player', playerData.avatar_url);
     updatePlayerAvatar('opponent', opponentData.avatar_url);
-    // Mettre à jour les noms des joueurs (si disponibles)
-    if (gameState.gameData.player1.name) {
-        elements.playerName.textContent = gameState.playerSide === 'player1' 
-            ? gameState.gameData.player1.name 
-            : gameState.gameData.player2.name;
-            
-        elements.opponentName.textContent = gameState.playerSide === 'player1' 
-            ? gameState.gameData.player2.name 
-            : gameState.gameData.player1.name;
-    }
     
     // Mettre à jour les scores
     elements.playerScore.textContent = `Score: ${gameState.gameData.scores[gameState.playerSide].total}`;
