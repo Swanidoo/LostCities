@@ -412,12 +412,12 @@ body {
 
 /* ===== RESPONSIVE DECK AND DISCARD PILES (POINTILLÉS RESTAURÉS) ===== */
 .deck-pile, .discard-pile {
-    width: var(--card-width);
-    height: var(--card-height);
-    border-radius: clamp(4px, 0.5vw, 8px);
+    width: 70px;
+    height: 100px;
+    border-radius: 5px;
     position: relative;
+    border: 1px dashed rgba(255, 255, 255, 0.3);
     transition: all 0.3s ease;
-    /* SUPPRIMÉ : cursor: pointer; pour les discard piles par défaut */
 }
 
 /* CORRECTION: Deck pile avec compteur restauré */
@@ -477,7 +477,7 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    transition: transform 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 /* RESTAURÉ: Fan effect pour les discard piles */
@@ -494,23 +494,65 @@ body {
 .discard-pile:hover .card:nth-child(4) { transform: rotate(2deg) translateX(5px) translateY(-2px); }
 .discard-pile:hover .card:nth-child(5) { transform: rotate(5deg) translateX(10px) translateY(0px); }
 
-/* RESTAURÉ: Pile counter */
+/* Animation au survol - étalement en éventail pour voir toutes les cartes */
+.discard-pile:hover {
+    z-index: 100; /* Au-dessus de tout pour éviter les coupures */
+}
+
+.discard-pile:hover .card:nth-child(1) { 
+    transform: translateX(-60px) translateY(-10px) rotate(-15deg); 
+    z-index: 1; 
+}
+.discard-pile:hover .card:nth-child(2) { 
+    transform: translateX(-35px) translateY(-8px) rotate(-8deg); 
+    z-index: 2; 
+}
+.discard-pile:hover .card:nth-child(3) { 
+    transform: translateX(-10px) translateY(-5px) rotate(-2deg); 
+    z-index: 3; 
+}
+.discard-pile:hover .card:nth-child(4) { 
+    transform: translateX(15px) translateY(-8px) rotate(5deg); 
+    z-index: 4; 
+}
+.discard-pile:hover .card:nth-child(5) { 
+    transform: translateX(40px) translateY(-10px) rotate(12deg); 
+    z-index: 5; 
+}
+
+/* Pour les piles avec plus de 5 cartes */
+.discard-pile:hover .card:nth-child(6) { 
+    transform: translateX(65px) translateY(-12px) rotate(18deg); 
+    z-index: 6; 
+}
+.discard-pile:hover .card:nth-child(7) { 
+    transform: translateX(90px) translateY(-15px) rotate(25deg); 
+    z-index: 7; 
+}
+
+/* ===== PILE COUNTER WITH HOVER ANIMATION ===== */
 .pile-counter {
-    position: absolute;
-    top: -10px;
-    right: -10px;
     background-color: white;
     color: black;
     border-radius: 50%;
-    width: clamp(16px, 2.5vw, 20px);
-    height: clamp(16px, 2.5vw, 20px);
+    width: 20px;
+    height: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: var(--font-xs);
+    font-size: 12px;
     font-weight: bold;
+    position: absolute;
+    top: -10px;
+    right: -10px;
     z-index: 10;
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: opacity 0.3s ease;
+}
+
+/* Masquer le compteur pendant le hover */
+.discard-pile:hover .pile-counter {
+    opacity: 0;
 }
 
 /* Valid targets pour discard piles */

@@ -795,27 +795,42 @@ function updateGameInfo() {
     const playerData = gameState.gameData[gameState.playerSide];
     const opponentData = gameState.gameData[gameState.opponentSide];
     
-    console.log('🔍 updateGameInfo - Player data:', playerData);
-    console.log('🔍 updateGameInfo - Opponent data:', opponentData);
-    
-    // Mettre à jour les noms
+    // Mettre à jour les noms et avatars
     elements.playerName.textContent = playerData.username || 'Vous';
     elements.opponentName.textContent = opponentData.username || 'Adversaire';
-    
-    // Mettre à jour les avatars - AVEC LOGS
-    console.log('🔍 Updating player avatar with:', playerData.avatar_url);
-    updatePlayerAvatar('player', playerData.avatar_url);
-    
-    console.log('🔍 Updating opponent avatar with:', opponentData.avatar_url);
-    updatePlayerAvatar('opponent', opponentData.avatar_url);
-    
-    // Mettre à jour les avatars
     updatePlayerAvatar('player', playerData.avatar_url);
     updatePlayerAvatar('opponent', opponentData.avatar_url);
     
-    // Mettre à jour les scores
-    elements.playerScore.textContent = `Score: ${gameState.gameData.scores[gameState.playerSide].total}`;
-    elements.opponentScore.textContent = `Score: ${gameState.gameData.scores[gameState.opponentSide].total}`;
+    // Calculer les scores
+    const currentRoundScores = gameState.gameData.scores;
+    const currentRound = gameState.gameData.currentRound;
+    
+    // Score des manches précédentes (seulement les manches déjà finalisées)
+    let playerPreviousRounds = 0;
+    let opponentPreviousRounds = 0;
+    
+    // Additionner les scores des manches précédentes terminées
+    for (let round = 1; round < currentRound; round++) {
+        const roundKey = `round${round}`;
+        playerPreviousRounds += currentRoundScores[gameState.playerSide][roundKey] || 0;
+        opponentPreviousRounds += currentRoundScores[gameState.opponentSide][roundKey] || 0;
+    }
+    
+    // Score de la manche actuelle (calculé en temps réel)
+    const playerCurrentRoundScore = calculateTotalScore(playerData.expeditions);
+    const opponentCurrentRoundScore = calculateTotalScore(opponentData.expeditions);
+    
+    // Score total affiché
+    const playerTotalScore = playerPreviousRounds + playerCurrentRoundScore;
+    const opponentTotalScore = opponentPreviousRounds + opponentCurrentRoundScore;
+    
+    // Formatage des scores avec signe pour la manche actuelle
+    const playerCurrentFormatted = playerCurrentRoundScore > 0 ? `+${playerCurrentRoundScore}` : `${playerCurrentRoundScore}`;
+    const opponentCurrentFormatted = opponentCurrentRoundScore > 0 ? `+${opponentCurrentRoundScore}` : `${opponentCurrentRoundScore}`;
+    
+    // Mettre à jour l'affichage des scores avec indication de la manche actuelle
+    elements.playerScore.textContent = `Score: ${playerTotalScore} (${playerCurrentFormatted})`;
+    elements.opponentScore.textContent = `Score: ${opponentTotalScore} (${opponentCurrentFormatted})`;
     
     // Mettre à jour la manche et le nombre de cartes
     elements.gameRound.textContent = `Manche: ${gameState.gameData.currentRound}/${gameState.gameData.totalRounds}`;
@@ -948,6 +963,41 @@ function updatePlayerHand() {
         
         elements.playerHand.appendChild(cardElement);
     });
+}
+
+// Calculer le score d'une expédition
+function calculateExpeditionScore(cards) {
+    if (cards.length === 0) return 0;
+    
+    // Compter les cartes wager
+    const wagerCount = cards.filter(card => card.type === 'wager').length;
+    const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+    
+    // Sommer les valeurs des cartes expédition
+    const expeditionCards = cards.filter(card => card.type === 'expedition');
+    const totalValue = expeditionCards.reduce((sum, card) => sum + (card.value || 0), 0);
+    
+    // Calculer le score de base (valeur totale - 20 points de démarrage)
+    let baseScore = totalValue - 20;
+    
+    // Appliquer le multiplicateur
+    baseScore *= multiplier;
+    
+    // Bonus pour 8+ cartes (ajouté après multiplication)
+    if (cards.length >= 8) {
+        baseScore += 20;
+    }
+    
+    return baseScore;
+}
+
+// Calculer le score total d'un joueur
+function calculateTotalScore(expeditions) {
+    let totalScore = 0;
+    Object.values(expeditions).forEach(expedition => {
+        totalScore += calculateExpeditionScore(expedition);
+    });
+    return totalScore;
 }
 
 // Mettre à jour les expéditions
@@ -1134,7 +1184,6 @@ function updateDiscardAndDeck() {
             cardElement.style.top = '0';
             cardElement.style.left = '0';
             cardElement.style.zIndex = index + 1;
-            cardElement.classList.add(`card-position-${index}`);
             
             newPile.appendChild(cardElement);
         });
@@ -1255,26 +1304,29 @@ function showExpeditionTooltip(slot, tooltip, event) {
         return;
     }
     
-    // Calculate expedition stats
-    const wagerCount = cardElements.filter(card => card.dataset.type === 'wager').length;
-    const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
-    const expValues = cardElements
-        .filter(card => card.dataset.type !== 'wager')
-        .map(card => parseInt(card.dataset.value) || 0);
-    const valueSum = expValues.reduce((sum, val) => sum + val, 0);
+    // Convertir les éléments DOM en objets carte pour le calcul
+    const cards = cardElements.map(cardEl => ({
+        type: cardEl.dataset.type,
+        value: cardEl.dataset.type === 'expedition' ? parseInt(cardEl.dataset.value) : null
+    }));
     
-    // Calculate the actual score with the 20-point cost subtracted
-    const expeditionScore = (valueSum - 20) * multiplier;
-    // Add bonus separately if 8+ cards (not multiplied)
-    const finalScore = expeditionScore + (cardElements.length >= 8 ? 20 : 0);
-    const scoreDisplay = finalScore >= 0 ? `+${finalScore}` : `${finalScore}`;
-    const scoreClass = finalScore >= 0 ? 'score-positive' : 'score-negative';
+    // Calculer le score en temps réel
+    const score = calculateExpeditionScore(cards);
+    const scoreDisplay = score >= 0 ? `+${score}` : `${score}`;
+    const scoreClass = score >= 0 ? 'score-positive' : 'score-negative';
+    
+    // Calcul des détails pour le tooltip
+    const wagerCount = cards.filter(c => c.type === 'wager').length;
+    const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+    
+    // Gestion du pluriel
+    const cardText = cards.length === 1 ? 'carte' : 'cartes';
     
     // Update tooltip content
     tooltip.innerHTML = `
-        <div>${cardElements.length} cards</div>
+        <div>${cards.length} ${cardText}</div>
         <div class="${scoreClass}">${scoreDisplay} pts</div>
-        <div>x${multiplier}</div>
+        <div>×${multiplier}</div>
     `;
     
     // Position and show tooltip
