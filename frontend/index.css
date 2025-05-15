@@ -209,9 +209,12 @@ body {
     overflow: hidden;
     box-sizing: border-box;
     
-    /* Hauteurs dynamiques */
-    height: clamp(400px, 50vh, 700px);
-    min-height: 400px;
+    height: clamp(
+        calc(300px + 120px + 60px + 40px), /* = 520px */
+        60vh, 
+        900px
+    );
+    min-height: 520px;
 }
 
 .chat-header {
@@ -222,7 +225,7 @@ body {
 }
 
 .chat-messages {
-    flex: none;
+    flex: 1;
     overflow-y: auto;
     padding: 0.625rem;
     background-color: rgba(0, 0, 0, 0.3);
@@ -230,7 +233,7 @@ body {
     word-wrap: break-word;
     
     /* Hauteur flexible */
-    min-height: 250px;
+    min-height: 300px;
     height: calc(100% - 160px);
 }
 
@@ -659,12 +662,12 @@ body {
     }
     
     .chat-container {
-        height: clamp(350px, 45vh, 500px);
-        min-height: 350px;
+        height: clamp(450px, 50vh, 600px);
+        min-height: 450px;
     }
 
     .chat-messages {
-        min-height: 200px;
+        min-height: 150px;
     }
     
     .right-panel.hidden {
@@ -702,12 +705,12 @@ body {
     }
     
     .chat-container {
-        height: clamp(300px, 40vh, 450px);
-        min-height: 300px;
+        height: clamp(350px, 45vh, 500px);
+        min-height: 350px;
     }
 
     .chat-messages {
-        min-height: 150px;
+        min-height: 180px;
     }
     
     .chat-form {
@@ -799,8 +802,8 @@ body {
     
     /* Chat encore plus compact sur mobile */
     .chat-container {
-        height: 300px;
-        padding: 0.5rem;
+        height: clamp(300px, 40vh, 400px);
+        min-height: 300px;
     }
     
     .chat-form {
@@ -833,5 +836,12 @@ body {
     .dialog-buttons button {
         width: 100%;
         margin-bottom: 0.5rem;
+    }
+}
+
+@media (max-height: 600px) {
+    .chat-container {
+        height: clamp(250px, 60vh, 400px);
+        min-height: 250px;
     }
 }
