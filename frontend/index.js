@@ -629,9 +629,43 @@ function showUserMenu(event, username) {
     
     // Positionner le menu
     document.body.appendChild(menu);
+    
+    // Obtenir les dimensions et position de l'élément cliqué
     const rect = event.target.getBoundingClientRect();
-    menu.style.left = rect.left + 'px';
-    menu.style.top = (rect.bottom + 5) + 'px';
+    const menuRect = menu.getBoundingClientRect();
+    const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight
+    };
+    
+    // Calculer la position initiale (en dessous de l'élément cliqué)
+    let left = rect.left;
+    let top = rect.bottom + 5;
+    
+    // Vérifier si le menu sort de la viewport horizontalement
+    if (left + menuRect.width > viewport.width) {
+        left = viewport.width - menuRect.width - 10; // 10px de marge
+    }
+    
+    // Vérifier si le menu sort de la viewport verticalement
+    if (top + menuRect.height > viewport.height) {
+        // Placer le menu au-dessus de l'élément au lieu d'en dessous
+        top = rect.top - menuRect.height - 5;
+        
+        // Si ça sort encore par le haut, le placer au maximum visible
+        if (top < 0) {
+            top = 10; // 10px de marge du haut
+        }
+    }
+    
+    // Assurer que le menu ne sort pas par la gauche
+    if (left < 0) {
+        left = 10; // 10px de marge de la gauche
+    }
+    
+    // Appliquer la position
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
     
     currentUserMenu = menu;
     
