@@ -345,18 +345,8 @@ function sendChatMessage() {
             }
         }));
         
-        // Add the message to the chat area
-        const chatMessages = elements.chatMessages;
-        const messageElement = document.createElement('div');
-        messageElement.className = 'chat-message self';
-        messageElement.innerHTML = `<div class="chat-sender">Vous</div><div class="chat-text">${message}</div>`;
-        chatMessages.appendChild(messageElement);
-        
         // Clear the input field
         chatInput.value = '';
-        
-        // Scroll to the bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 }
 
