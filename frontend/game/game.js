@@ -558,39 +558,42 @@ function showGameEnd(isSurrender = false) {
     let isDraw = false;
     let resultType = '';
     
-    if (gameState.gameData.status === 'finished') {
+    // Si c'est un abandon local (bouton abandon cliqué)
+    if (isSurrender) {
+        resultType = 'abandon-self';
+        isWinner = false;
+        isDraw = false;
+    }
+    // Si la partie est officiellement terminée
+    else if (gameState.gameData.status === 'finished') {
         isWinner = gameState.gameData.winner == gameState.userId;
         isDraw = gameState.gameData.winner === null;
         
-        // AJOUTEZ CETTE VÉRIFICATION
-        // Vérifier s'il y a eu un abandon et par qui
+        // Vérifier s'il y a eu un abandon (info du serveur)
         if (gameState.gameData.surrenderInfo) {
             const surrenderPlayerId = gameState.gameData.surrenderInfo.playerId;
             if (surrenderPlayerId == gameState.userId) {
                 resultType = 'abandon-self';
+                isWinner = false;
             } else {
                 resultType = 'abandon-opponent';
+                isWinner = true;
             }
-        } else if (isDraw) {
+        } 
+        // Pas d'abandon, résultat par points
+        else if (isDraw) {
             resultType = 'draw';
         } else if (isWinner) {
             resultType = 'win-points';
         } else {
             resultType = 'loss-points';
         }
-    } else if (isSurrender) {
-            resultType = 'abandon-self';
-        } else if (isWinner && gameState.gameData.winner !== null) {
-            // Vérifier si l'adversaire a abandonné
-            if (/* condition pour détecter abandon adversaire */) {
-                resultType = 'abandon-opponent';
-            } else {
-                resultType = 'win-points';
-            }
-    } else if (!isWinner && !isDraw) {
+    }
+    // Cas par défaut (ne devrait pas arriver)
+    else {
         resultType = 'loss-points';
-    } else {
-        resultType = 'draw';
+        isWinner = false;
+        isDraw = false;
     }
 
     // Couleur de la modal selon le résultat
@@ -660,7 +663,7 @@ function showGameEnd(isSurrender = false) {
                 <span class="summary-label">📊 Score final :</span>
                 <span class="summary-value">${playerScore} - ${opponentScore}</span>
             </div>
-            ${!isDraw ? `
+            ${!isDraw && resultType !== 'abandon-self' && resultType !== 'abandon-opponent' ? `
             <div class="summary-row">
                 <span class="summary-label">🎯 Marge de victoire :</span>
                 <span class="summary-value">${margin} points</span>
