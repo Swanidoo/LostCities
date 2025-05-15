@@ -282,7 +282,7 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
 
     // Get game info - convert all BigInts to strings
     const gameResult = await client.queryObject(`
-      SELECT g.id::text as id,  -- Convert BigInt to text
+      SELECT g.id::text as id,
              g.player1_id, 
              g.player2_id,
              g.status,
@@ -294,13 +294,20 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
              g.current_round,
              g.started_at,
              g.ended_at,
-             g.last_discarded_pile,  -- ← Ajoutez cette ligne
+             g.last_discarded_pile,
              b.use_purple_expedition, 
              b.current_round as board_current_round,
              b.remaining_cards_in_deck,
-             b.id::text as board_id  -- Convert board ID to text too
+             b.id::text as board_id,
+             -- Ajout des informations utilisateurs
+             u1.username as player1_username,
+             u1.avatar_url as player1_avatar,
+             u2.username as player2_username,
+             u2.avatar_url as player2_avatar
       FROM games g
       JOIN board b ON g.id = b.game_id
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
       WHERE g.id = $1
     `, [gameId]);
 
@@ -370,13 +377,17 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
       usePurpleExpedition: game.use_purple_expedition,
       cardsInDeck: Number(await getCardsInDeck(gameId)), // Ensure number
       player1: {
-        id: Number(game.player1_id), // Convert to number
+        id: Number(game.player1_id),
+        username: game.player1_username,
+        avatar_url: game.player1_avatar,
         expeditions: expeditions.player1,
         handSize: isPlayer1 ? handResult.rows.length : Number(await getHandSize(gameId, 'player1_hand')),
         hand: isPlayer1 ? handResult.rows : undefined
       },
       player2: {
-        id: Number(game.player2_id), // Convert to number
+        id: Number(game.player2_id),
+        username: game.player2_username,
+        avatar_url: game.player2_avatar,
         expeditions: expeditions.player2,
         handSize: isPlayer2 ? handResult.rows.length : Number(await getHandSize(gameId, 'player2_hand')),
         hand: isPlayer2 ? handResult.rows : undefined

@@ -68,7 +68,7 @@ body {
 .player-avatar {
     width: clamp(32px, 3.5vw, 40px);
     height: clamp(32px, 3.5vw, 40px);
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #667eea, #764ba2); /* Fallback si aucune image */
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -78,6 +78,15 @@ body {
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.2);
     transition: all 0.3s ease;
+    /* Optimisation pour les images */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
+}
+
+.player-avatar[style*="background-image"] {
+    background-color: transparent; /* Enlever le gradient quand une image est présente */
 }
 
 .player-section.right .player-avatar {

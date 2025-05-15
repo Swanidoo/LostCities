@@ -783,6 +783,19 @@ function clearAllTargetHighlighting() {
 
 // Mettre à jour les informations générales du jeu
 function updateGameInfo() {
+    if (!gameState.gameData) return;
+    
+    // Utiliser les vrais pseudonymes au lieu de 'Adversaire'
+    const playerData = gameState.gameData[gameState.playerSide];
+    const opponentData = gameState.gameData[gameState.opponentSide];
+    
+    // Mettre à jour les noms
+    elements.playerName.textContent = playerData.username || 'Vous';
+    elements.opponentName.textContent = opponentData.username || 'Adversaire';
+    
+    // Mettre à jour les avatars
+    updatePlayerAvatar('player', playerData.avatar_url);
+    updatePlayerAvatar('opponent', opponentData.avatar_url);
     // Mettre à jour les noms des joueurs (si disponibles)
     if (gameState.gameData.player1.name) {
         elements.playerName.textContent = gameState.playerSide === 'player1' 
@@ -804,6 +817,28 @@ function updateGameInfo() {
     
     // Mettre à jour l'indicateur de phase
     elements.phaseIndicator.textContent = `Phase: ${gameState.currentPhase === 'play' ? 'Jouer' : 'Piocher'}`;
+}
+
+function updatePlayerAvatar(type, avatarUrl) {
+    const avatarElement = document.querySelector(`.${type}-section .player-avatar`);
+    if (!avatarElement) return;
+    
+    // Déterminer l'image à utiliser
+    const imageUrl = avatarUrl || '/assets/default-avatar.png';
+    
+    // Afficher l'image (personnalisée ou par défaut)
+    avatarElement.style.backgroundImage = `url(${imageUrl})`;
+    avatarElement.style.backgroundSize = 'cover';
+    avatarElement.style.backgroundPosition = 'center';
+    avatarElement.textContent = ''; // Toujours enlever le texte P1/P2
+    
+    // Gestion d'erreur si l'image ne charge pas
+    avatarElement.onerror = () => {
+        // Si l'image personnalisée échoue, charger l'avatar par défaut
+        if (avatarUrl && imageUrl !== '/assets/default-avatar.png') {
+            avatarElement.style.backgroundImage = `url(/assets/default-avatar.png)`;
+        }
+    };
 }
 
 // Mettre à jour la main du joueur
