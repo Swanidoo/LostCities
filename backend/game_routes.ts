@@ -295,21 +295,12 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
              g.started_at,
              g.ended_at,
              g.last_discarded_pile,
-             g.game_mode,
+             g.game_mode,  -- ✅ IMPORTANT: Cette ligne doit être présente
              b.use_purple_expedition, 
-             b.current_round as board_current_round,
-             b.remaining_cards_in_deck,
-             b.id::text as board_id,
-             -- Ajout des informations utilisateurs
-             u1.username as player1_username,
-             u1.avatar_url as player1_avatar,
-             u2.username as player2_username,
-             u2.avatar_url as player2_avatar
-      FROM games g
-      JOIN board b ON g.id = b.game_id
-      JOIN users u1 ON g.player1_id = u1.id
-      JOIN users u2 ON g.player2_id = u2.id
-      WHERE g.id = $1
+             // ... reste de la query
+        FROM games g
+        JOIN board b ON g.id = b.game_id
+        // ... reste de la query
     `, [gameId]);
 
     console.log(`[GET /lost-cities/games/${gameId}] Game query result:`, gameResult.rows.length);
@@ -321,11 +312,11 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     }
     
     const game = gameResult.rows[0];
-    // Calculer totalRounds dynamiquement à partir du game_mode
+    
+    // ✅ AJOUTEZ CES LIGNES
     const totalRounds = game.game_mode === 'quick' ? 1 : 3;
-    console.log(`[GET /lost-cities/games/${gameId}] Game data:`, game);
-    console.log(`🔍 Game mode from DB: ${game.game_mode}`);
-    console.log(`🔍 Calculated totalRounds: ${totalRounds}`);
+    console.log(`🔍 Game mode from DB: ${game.game_mode}, totalRounds: ${totalRounds}`);
+    console.log(`🔍 All game data:`, game);
 
     // In the game state endpoint, after getting the game data
     console.log(`[GET /lost-cities/games/${gameId}] Player IDs - p1: ${game.player1_id} (${typeof game.player1_id}), p2: ${game.player2_id} (${typeof game.player2_id})`);
