@@ -1038,9 +1038,6 @@ async function createGame(
 ): Promise<void> {
   try {
     console.log(`🎮 Creating new game ${gameId} between ${player1Id} and ${player2Id}`, options);
-
-    // ✅ AJOUTEZ CETTE LIGNE
-    const totalRounds = options.gameMode === 'quick' ? 1 : 3;
     
     // Create the game record with the correct mode and rounds
     await client.queryObject(`
@@ -1048,7 +1045,7 @@ async function createGame(
       VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP, $4)
     `, [gameId, player1Id, player2Id, options.gameMode]);
     
-    console.log(`✅ Game entry created with mode: ${options.gameMode}`);
+    console.log(`✅ Game created with mode: ${options.gameMode}`);
     
     // Create the board record with extension settings
     const boardResult = await client.queryObject<{id: number}>(

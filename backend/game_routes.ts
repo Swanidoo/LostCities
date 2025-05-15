@@ -313,8 +313,8 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     
     const game = gameResult.rows[0];
     
-    // ✅ AJOUTEZ CES LIGNES
-    const totalRounds = game.game_mode === 'quick' ? 1 : 3;
+    const gameMode = game.game_mode || 'classic'; // Fallback to classic if undefined
+    const totalRounds = gameMode === 'quick' ? 1 : 3;
     console.log(`🔍 Game mode from DB: ${game.game_mode}, totalRounds: ${totalRounds}`);
     console.log(`🔍 All game data:`, game);
 

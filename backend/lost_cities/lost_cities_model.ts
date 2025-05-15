@@ -163,7 +163,8 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
            g.current_turn_player_id,
            g.turn_phase,
            g.winner_id,
-           g.last_discarded_pile,  -- ← Ajoutez cette ligne
+           g.last_discarded_pile,
+           g.game_mode,
            b.use_purple_expedition, 
            b.current_round as board_current_round,
            b.remaining_cards_in_deck,
@@ -180,8 +181,8 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   const gameData = gameResult.rows[0];
   console.log(`📋 Found game data:`, gameData);
 
-  //Nombre de round en fonction du mode d jeu!
-  const totalRounds = gameData.game_mode === 'quick' ? 1 : 3;
+  const gameMode = gameData.game_mode || 'classic';
+  const totalRounds = gameMode === 'quick' ? 1 : 3;
 
   // Initialize the game object
   const game = new LostCitiesGame({
