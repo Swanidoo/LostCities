@@ -190,7 +190,7 @@ function setupEventListeners() {
     
     // Boutons de fin de partie
     elements.newGameBtn.addEventListener('click', () => {
-        window.location.href = '/matchmaking.html';
+        window.location.href = '/matchmaking/matchmaking.html';
     });
     
     elements.backBtn.addEventListener('click', () => {
@@ -633,6 +633,18 @@ function showGameEnd(isSurrender = false) {
     // Mettre à jour le titre
     if (elements.gameResult) {
         elements.gameResult.textContent = message.title;
+        
+        // Retirer toutes les classes de couleur existantes
+        elements.gameResult.classList.remove('victory-title', 'defeat-title', 'draw-title');
+        
+        // Ajouter la classe appropriée selon le résultat
+        if (isWinner && !isDraw) {
+            elements.gameResult.classList.add('victory-title');
+        } else if (!isWinner && !isDraw) {
+            elements.gameResult.classList.add('defeat-title');
+        } else {
+            elements.gameResult.classList.add('draw-title');
+        }
     }
     
     // Mettre à jour le message
@@ -650,11 +662,11 @@ function showGameEnd(isSurrender = false) {
     
     // Informations détaillées avec emojis
     const gameInfoHtml = `
-        <div class="game-summary">
-            <div class="summary-row">
-                <span class="summary-label">🏆 ${isWinner ? 'Vainqueur' : 'Résultat'} :</span>
-                <span class="summary-value ${isWinner ? 'winner-name' : ''}">${message.title}</span>
-            </div>
+    <div class="game-summary">
+        <div class="summary-row">
+            <span class="summary-label">🏆 Résultat :</span>
+            <span class="summary-value result-${resultType}">${message.title}</span>
+        </div>
             <div class="summary-row">
                 <span class="summary-label">📊 Score final :</span>
                 <span class="summary-value">${playerScore} - ${opponentScore}</span>

@@ -901,6 +901,24 @@ body {
     font-weight: bold;
 }
 
+/* Couleurs pour les résultats dans le résumé */
+.summary-value.result-win-points,
+.summary-value.result-abandon-opponent {
+    color: #4CAF50; /* Vert pour victoire */
+    font-weight: bold;
+}
+
+.summary-value.result-loss-points,
+.summary-value.result-abandon-self {
+    color: #ff6b6b; /* Rouge pour défaite */
+    font-weight: bold;
+}
+
+.summary-value.result-draw {
+    color: #e0e0e0; /* Gris pour égalité */
+    font-weight: bold;
+}
+
 /* ===== RESPONSIVE CHAT AREA ===== */
 .chat-area {
     position: fixed;
@@ -1089,16 +1107,16 @@ body {
     margin-bottom: var(--spacing-lg);
 }
 
-.modal-title.victory-title {
-    color: #4CAF50; 
+.modal-content .modal-title.victory-title {
+    color: #4CAF50 !important;
 }
 
-.modal-title.defeat-title {
-    color: #ff6b6b; 
+.modal-content .modal-title.defeat-title {
+    color: #ff6b6b !important;
 }
 
-.modal-title.draw-title {
-    color: #e0e0e0;
+.modal-content .modal-title.draw-title {
+    color: #e0e0e0 !important;
 }
 
 .modal-buttons {
