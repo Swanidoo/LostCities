@@ -568,6 +568,41 @@ td small {
     background: linear-gradient(135deg, #f44336, #d32f2f);
 }
 
+
+/* ===== BOUTON ACCUEIL ===== */
+.back-button {
+    position: fixed;
+    top: 24px;  /* Équivalent de var(--spacing-lg) */
+    left: 24px; /* Équivalent de var(--spacing-lg) */
+    background: rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white !important;
+    padding: 12px 16px;  /* Équivalent de var(--spacing-sm) var(--spacing-md) */
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    z-index: 50;
+    font-weight: 600;
+    font-size: 1rem;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;  /* Équivalent de var(--spacing-xs) */
+}
+
+.back-button::before {
+    content: "←";
+    font-size: 1.2em;
+}
+
+.back-button:hover {
+    background: rgba(0, 0, 0, 0.9) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    border-color: #4CAF50;
+}
+
 @keyframes slideInNotification {
     from {
         opacity: 0;
@@ -585,6 +620,12 @@ td small {
         right: var(--spacing-sm);
         left: var(--spacing-sm);
         text-align: center;
+    }
+
+    .back-button {
+        position: static;
+        margin: 16px auto 24px;
+        width: fit-content;
     }
 }
 

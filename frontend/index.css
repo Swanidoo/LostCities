@@ -214,6 +214,52 @@ body {
     min-height: 650px;
 }
 
+.chat-message {
+    margin: 0.5rem 0;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    border-left: 4px solid;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+    animation: messageSlideIn 0.3s ease;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
+.chat-message.system {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.05));
+    border-left-color: #FFD700;
+    color: #FFE55C;
+    text-align: center;
+    font-style: italic;
+    border-radius: 8px;
+}
+
+.chat-message.user {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(76, 175, 80, 0.05));
+    border-left-color: #4CAF50;
+}
+
+.chat-message.self {
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.15), rgba(33, 150, 243, 0.05));
+    border-left-color: #2196F3;
+    margin-left: 2rem;
+    text-align: right;
+}
+
+.chat-message:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chat-sender {
+    font-weight: bold;
+    color: #4CAF50;
+    margin-right: 0.5rem;
+}
+
 .chat-header {
     color: var(--primary-color);
     margin: 0;
@@ -473,6 +519,12 @@ body {
 /* Empêcher le clic sur son propre pseudo dans le chat */
 .chat-message.self .chat-sender {
     cursor: default !important;
+    color: #2196F3;
+}
+
+.chat-content {
+    display: inline;
+    color: white;
 }
 
 .chat-message.self .chat-sender:hover {
@@ -582,6 +634,17 @@ body {
     to { 
         opacity: 1; 
         transform: translateY(0); 
+    }
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
