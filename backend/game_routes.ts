@@ -321,7 +321,11 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     }
     
     const game = gameResult.rows[0];
+    // Calculer totalRounds dynamiquement à partir du game_mode
+    const totalRounds = game.game_mode === 'quick' ? 1 : 3;
     console.log(`[GET /lost-cities/games/${gameId}] Game data:`, game);
+    console.log(`🔍 Game mode from DB: ${game.game_mode}`);
+    console.log(`🔍 Calculated totalRounds: ${totalRounds}`);
 
     // In the game state endpoint, after getting the game data
     console.log(`[GET /lost-cities/games/${gameId}] Player IDs - p1: ${game.player1_id} (${typeof game.player1_id}), p2: ${game.player2_id} (${typeof game.player2_id})`);
@@ -366,9 +370,6 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     
     // Get discard piles
     const discardPiles = await getDiscardPiles(gameId);
-
-    // Calculer totalRounds dynamiquement à partir du game_mode
-    const totalRounds = game.game_mode === 'quick' ? 1 : 3;
     
     // Construct game state
     const gameState = {

@@ -1049,8 +1049,6 @@ async function createGame(
     `, [gameId, player1Id, player2Id, options.gameMode]);
     
     console.log(`✅ Game entry created with mode: ${options.gameMode}`);
-    console.log(`🔍 Game mode from DB: ${game.game_mode}`);
-    console.log(`🔍 Calculated totalRounds: ${totalRounds}`);
     
     // Create the board record with extension settings
     const boardResult = await client.queryObject<{id: number}>(
