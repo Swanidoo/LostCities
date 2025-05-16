@@ -18,4 +18,8 @@ welcomeRouter.get("/", (ctx) => {
   };
 });
 
+welcomeRouter.head("/", (ctx) => {
+  ctx.response.status = 200;
+});
+
 export default welcomeRouter;
