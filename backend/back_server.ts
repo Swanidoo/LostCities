@@ -39,11 +39,11 @@ try {
 }
 
 // 🛡️ Middlewares globaux
-app.use(errorMiddleware);
-app.use(loggingMiddleware);       
+app.use(corsMiddleware);
+app.use(loggingMiddleware);
 app.use(securityHeadersMiddleware);
 app.use(rateLimitingMiddleware);
-app.use(corsMiddleware);
+app.use(errorMiddleware);
 
 // 🛣️ Routes publiques
 app.use(welcomeRouter.routes());
