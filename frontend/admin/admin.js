@@ -1,3 +1,6 @@
+import { authService, getAuthHeaders } from '../game/js/auth-service.js';
+import { apiClient, handleResponse } from '../game/js/api-client.js';
+
 const API_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000" // Local backend URL
   : "https://lostcitiesbackend.onrender.com"; // Render backend URL
@@ -56,23 +59,9 @@ function createUserRow(user) {
 // Fonction pour charger les utilisateurs avec pagination
 async function loadUsers(page = 1) {
     try {
-        const response = await fetch(`${API_URL}/api/admin/users?page=${page}&limit=50`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-            },
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const response = await apiClient.get(`/api/admin/users?page=${page}&limit=50`);
+        const data = await handleResponse(response);
         
-        if (!data.users) {
-            throw new Error("Invalid response format: missing users data");
-        }
-
         const usersTableBody = document.querySelector("#usersTable tbody");
         usersTableBody.innerHTML = "";
 
@@ -93,20 +82,14 @@ async function loadUsers(page = 1) {
     }
 }
 
+
 async function unbanUser(userId) {
     try {
-        const response = await fetch(`${API_URL}/api/admin/users/${userId}/unban`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                "Content-Type": "application/json"
-            }
-        });
+        const response = await apiClient.post(`/api/admin/users/${userId}/unban`);
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification("Utilisateur débanni avec succès!");
-            loadUsers();
-        }
+        showNotification("Utilisateur débanni avec succès!");
+        loadUsers();
     } catch (error) {
         console.error("Error unbanning user:", error);
         showNotification("Erreur lors du débannissement", false);
@@ -115,18 +98,11 @@ async function unbanUser(userId) {
 
 async function unmuteUser(userId) {
     try {
-        const response = await fetch(`${API_URL}/api/admin/users/${userId}/unmute`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                "Content-Type": "application/json"
-            }
-        });
+        const response = await apiClient.post(`/api/admin/users/${userId}/unmute`);
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification("Utilisateur démuté avec succès!");
-            loadUsers(currentUsersPage);
-        }
+        showNotification("Utilisateur démuté avec succès!");
+        loadUsers(currentUsersPage);
     } catch (error) {
         console.error("Error unmuting user:", error);
         showNotification("Erreur lors du démute", false);
@@ -163,7 +139,7 @@ async function deleteMessage(messageId) {
     
     console.log('Attempting to delete message with ID:', messageId, 'Type:', typeof messageId);
     
-    // Trouver la ligne du message - déclaration avec let au lieu de const
+    // Trouver la ligne du message
     let messageRow = document.querySelector(`#chatMessagesTable tbody tr[data-message-id="${messageId}"]`);
     
     // Si pas trouvé avec data-attribute, chercher par contenu de la première cellule
@@ -181,7 +157,7 @@ async function deleteMessage(messageId) {
                 if (cellText === String(messageId)) {
                     console.log('Found matching row!');
                     messageRow = row;
-                    break; // Sortir de la boucle une fois trouvé
+                    break;
                 }
             }
         }
@@ -200,37 +176,28 @@ async function deleteMessage(messageId) {
     }
     
     try {
-        const response = await fetch(`${API_URL}/api/admin/chat-messages/${messageId}`, {
-            method: "DELETE",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
-        });
+        const response = await apiClient.delete(`/api/admin/chat-messages/${messageId}`);
+        await handleResponse(response);
         
-        if (response.ok) {
-            if (messageRow) {
-                // Animation de disparition
-                messageRow.style.opacity = '0';
-                messageRow.style.transform = 'scale(0.8)';
-                
-                // Supprimer après l'animation
-                setTimeout(() => {
-                    if (messageRow && messageRow.parentNode) {
-                        messageRow.remove();
-                        console.log('Row removed from DOM');
-                    }
-                }, 500);
-            }
+        if (messageRow) {
+            // Animation de disparition
+            messageRow.style.opacity = '0';
+            messageRow.style.transform = 'scale(0.8)';
             
-            showNotification('Message supprimé');
-            
-        } else {
-            console.error('Server returned error:', response.status);
-            showNotification('Erreur lors de la suppression du message', false);
+            // Supprimer après l'animation
+            setTimeout(() => {
+                if (messageRow && messageRow.parentNode) {
+                    messageRow.remove();
+                    console.log('Row removed from DOM');
+                }
+            }, 500);
         }
+        
+        showNotification('Message supprimé');
+        
     } catch (error) {
-        console.error("Error deleting message:", error);
-        showNotification("Erreur lors de la suppression du message", false);
+        console.error('Server returned error:', error);
+        showNotification('Erreur lors de la suppression du message', false);
         // Restaurer l'apparence si erreur
         if (messageRow) {
             messageRow.style.opacity = '1';
@@ -239,16 +206,12 @@ async function deleteMessage(messageId) {
     }
 }
 
+
 // Fonction pour charger les statistiques du dashboard
 async function loadDashboardStats() {
     try {
-        const response = await fetch(`${API_URL}/api/admin/dashboard`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
-        });
-        
-        const stats = await response.json();
+        const response = await apiClient.get('/api/admin/dashboard');
+        const stats = await handleResponse(response);
         updateDashboardUI(stats);
     } catch (error) {
         console.error("Error loading dashboard stats:", error);
@@ -270,32 +233,25 @@ async function muteUser(userId, username = null) {
     if (duration === null) return;
     
     try {
-        const response = await fetch(`${API_URL}/api/admin/users/${userId}/mute`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ 
-                duration: duration ? parseInt(duration) : null, 
-                reason 
-            })
+        const response = await apiClient.post(`/api/admin/users/${userId}/mute`, {
+            duration: duration ? parseInt(duration) : null, 
+            reason 
         });
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification(username ? `${username} a été muté avec succès!` : "Utilisateur muté avec succès!");
-            // Recharger la liste appropriée
-            if (username) {
-                loadChatMessages();
-            } else {
-                loadUsers();
-            }
+        showNotification(username ? `${username} a été muté avec succès!` : "Utilisateur muté avec succès!");
+        // Recharger la liste appropriée
+        if (username) {
+            loadChatMessages();
+        } else {
+            loadUsers();
         }
     } catch (error) {
         console.error("Error muting user:", error);
         showNotification("Erreur lors du mute", false);
     }
 }
+
 
 async function muteUserFromChat(userId, username) {
     muteUser(userId, username);
@@ -304,24 +260,8 @@ async function muteUserFromChat(userId, username) {
 // Fonction pour charger les messages de chat avec pagination
 async function loadChatMessages(page = 1) {
     try {
-        const response = await fetch(`${API_URL}/api/admin/chat-messages?page=${page}&limit=50`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
-        });
-        
-        // Check if response is ok
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Defensive check
-        if (!data.messages) {
-            throw new Error("Invalid response format: missing messages data");
-        }
+        const response = await apiClient.get(`/api/admin/chat-messages?page=${page}&limit=50`);
+        const data = await handleResponse(response);
         
         const chatTableBody = document.querySelector("#chatMessagesTable tbody");
         chatTableBody.innerHTML = "";
@@ -354,15 +294,14 @@ async function loadChatMessages(page = 1) {
 }
 
 async function checkAdminAccess() {
-    const token = localStorage.getItem("authToken");
-    
-    if (!token) {
+    if (!authService.isAuthenticated()) {
         window.location.href = '/login/login.html';
         return false;
     }
     
     try {
-        // Parse JWT token to check role
+        // Vérifier le rôle depuis le token
+        const token = authService.getAccessToken();
         const tokenParts = token.split('.');
         if (tokenParts.length !== 3) {
             throw new Error("Invalid token format");
@@ -461,7 +400,7 @@ function animateValue(id, start, end, duration) {
 
 // Fonction pour bannir un utilisateur
 async function banUser(userId) {
-    // First ask for reason (nouveau ordre)
+    // First ask for reason
     const reason = prompt("Raison du ban:");
     if (reason === null) return;
     
@@ -470,19 +409,14 @@ async function banUser(userId) {
     if (duration === null) return;
     
     try {
-        const response = await fetch(`${API_URL}/api/admin/users/${userId}/ban`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ duration: duration ? parseInt(duration) : null, reason })
+        const response = await apiClient.post(`/api/admin/users/${userId}/ban`, {
+            duration: duration ? parseInt(duration) : null, 
+            reason
         });
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification("Utilisateur banni avec succès!");
-            loadUsers();
-        }
+        showNotification("Utilisateur banni avec succès!");
+        loadUsers();
     } catch (error) {
         console.error("Error banning user:", error);
         showNotification("Erreur lors du bannissement", false);
@@ -492,16 +426,8 @@ async function banUser(userId) {
 // Fonction pour supprimer un utilisateur
 async function deleteUser(userId) {
     try {
-        const response = await fetch(`${API_URL}/api/admin/users/${userId}`, {
-            method: "DELETE",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`, // Utilise le JWT stocké
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const response = await apiClient.delete(`/api/admin/users/${userId}`);
+        await handleResponse(response);
 
         showNotification("Utilisateur supprimé avec succès!");
         loadUsers(); // Recharge la liste des utilisateurs
@@ -531,17 +457,8 @@ async function debugAuth() {
 // Fonction pour charger les rapports
 async function loadReports() {
     try {
-        const response = await fetch(`${API_URL}/api/admin/reports?status=pending`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const reports = await response.json();
+        const response = await apiClient.get('/api/admin/reports?status=pending');
+        const reports = await handleResponse(response);
         
         const reportsTableBody = document.querySelector("#reportsTable tbody");
         reportsTableBody.innerHTML = "";
@@ -577,23 +494,18 @@ async function loadReports() {
 async function resolveReport(reportId, resolution) {
     const notes = prompt("Notes de résolution:");
     
-    // ✅ SOLUTION : Vérifier si l'utilisateur a annulé
+    // Vérifier si l'utilisateur a annulé
     if (notes === null) return;
     
     try {
-        const response = await fetch(`${API_URL}/api/admin/reports/${reportId}/resolve`, {
-            method: "PUT",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ resolution, notes })
+        const response = await apiClient.put(`/api/admin/reports/${reportId}/resolve`, {
+            resolution,
+            notes
         });
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification(`Rapport traité avec succès!`);
-            loadReports();
-        }
+        showNotification(`Rapport traité avec succès!`);
+        loadReports();
     } catch (error) {
         console.error("Error resolving report:", error);
     }

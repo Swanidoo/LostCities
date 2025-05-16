@@ -1,3 +1,6 @@
+import { authService, getAuthHeaders } from './game/js/auth-service.js';
+import { apiClient, handleResponse } from './game/js/api-client.js';
+
 const API_URL = window.location.hostname === "localhost"
     ? "http://localhost:3000"
     : "https://lostcitiesbackend.onrender.com";
@@ -15,20 +18,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userAvatar = document.getElementById('user-avatar');
     
     // Vérifier si l'utilisateur est connecté
-    const token = localStorage.getItem('authToken');
-    if (token) {
+    if (authService.isAuthenticated()) {
         try {
-            const tokenParts = token.split('.');
-            if (tokenParts.length === 3) {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                usernameSpan.textContent = payload.username || payload.email;
-                
-                // Stocker l'ID de l'utilisateur pour l'utiliser plus tard
-                const userId = payload.id;
+            // Essayer de récupérer les infos utilisateur depuis le token
+            const userId = authService.getUserId();
+            const username = authService.getUsername();
+            
+            if (userId && username) {
+                usernameSpan.textContent = username;
                 localStorage.setItem('user_id', userId);
                 
                 // Charger l'avatar de l'utilisateur
-                loadUserAvatar(userId);
+                await loadUserAvatar(userId);
                 
                 // Ajouter le gestionnaire de clic sur l'avatar
                 userAvatar.addEventListener('click', () => {
@@ -36,24 +37,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 
                 // Vérifier si l'utilisateur est admin
-                if (payload.role === 'admin') {
-                    const adminBtn = document.getElementById('admin-btn');
-                    if (adminBtn) {
-                        adminBtn.style.display = 'block';
-                        adminBtn.addEventListener('click', () => {
-                            window.location.href = '/admin/admin.html';
-                        });
+                try {
+                    const token = authService.getAccessToken();
+                    if (token) {
+                        const tokenParts = token.split('.');
+                        const payload = JSON.parse(atob(tokenParts[1]));
+                        if (payload.role === 'admin') {
+                            const adminBtn = document.getElementById('admin-btn');
+                            if (adminBtn) {
+                                adminBtn.style.display = 'block';
+                                adminBtn.addEventListener('click', () => {
+                                    window.location.href = '/admin/admin.html';
+                                });
+                            }
+                        }
                     }
+                } catch (error) {
+                    console.error("Erreur lors de la vérification du rôle admin:", error);
                 }
             }
         } catch (error) {
-            console.error("Erreur lors de la lecture du token:", error);
+            console.error("Erreur lors de la lecture des infos utilisateur:", error);
+            // En cas d'erreur, déconnecter l'utilisateur
+            authService.clearTokens();
         }
         
-        // Vérifier le statut de ban AVANT d'initialiser le chat
+        // Vérifier le statut de ban (utiliser le nouveau client API)
         const banInfo = await checkBanStatus();
         
         if (banInfo) {
+            // Code de gestion des bans (reste identique)
             const playBtn = document.getElementById('play-btn');
             if (playBtn) {
                 playBtn.classList.add('banned');
@@ -62,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 playBtn.style.cursor = 'not-allowed';
                 playBtn.style.opacity = '0.8';
                 
-                // Créer le tooltip
+                // Création du tooltip (reste identique)
                 const tooltip = document.createElement('div');
                 tooltip.className = 'ban-tooltip';
                 
@@ -109,7 +122,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
                 
-                // Bloquer le clic sur le bouton
                 playBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -130,7 +142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         userSection.classList.remove('hidden');
     }
     
-    // Gestionnaires d'événements pour les boutons (hors du if(token))
+    // Gestionnaires d'événements pour les boutons (reste identique)
     document.getElementById('login-btn').addEventListener('click', () => {
         window.location.href = '/login/login.html';
     });
@@ -139,9 +151,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = '/login/register.html';
     });
     
-    document.getElementById('logout-btn').addEventListener('click', () => {
-        localStorage.removeItem('authToken');
-        window.location.reload();
+    // MODIFICATION: Nouveau gestionnaire de déconnexion
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        try {
+            await authService.logout();
+            // La redirection sera gérée automatiquement par le callback onUnauthorized
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Forcer la déconnexion locale en cas d'erreur
+            authService.clearTokens();
+            window.location.reload();
+        }
     });
 
     // UN SEUL gestionnaire pour le bouton toggle chat
@@ -238,14 +258,9 @@ function createMobileTabs() {
 
 async function loadLeaderboard(mode, withExtension) {
     try {
-        const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        const url = `/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
+        const response = await apiClient.publicRequest(url);
+        const data = await handleResponse(response);
         displayLeaderboard(data.data);
         
     } catch (error) {
@@ -256,21 +271,14 @@ async function loadLeaderboard(mode, withExtension) {
 
 async function loadUserAvatar(userId) {
     try {
-        const response = await fetch(`${API_URL}/api/profile/${userId}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        const response = await apiClient.get(`/api/profile/${userId}`);
+        const profile = await handleResponse(response);
+        
+        if (profile.avatar_url) {
+            const userAvatar = document.getElementById('user-avatar');
+            if (userAvatar) {
+                userAvatar.src = profile.avatar_url;
             }
-        });
-        if (response.ok) {
-            const profile = await response.json();
-            if (profile.avatar_url) {
-                const userAvatar = document.getElementById('user-avatar');
-                if (userAvatar) {
-                    userAvatar.src = profile.avatar_url;
-                }
-            }
-        } else {
-            console.warn(`Failed to load avatar for user ${userId}: ${response.status}`);
         }
     } catch (error) {
         console.error('Error loading user avatar:', error);
@@ -834,21 +842,14 @@ async function submitReport(username, formData) {
 }
 
 async function checkBanStatus() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return false;
+    if (!authService.isAuthenticated()) return false;
     
     try {
-        const response = await fetch(`${API_URL}/ban-status`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await apiClient.get('/ban-status');
+        const data = await handleResponse(response);
         
-        if (response.ok) {
-            const data = await response.json();
-            if (data.banned) {
-                return data.banInfo;
-            }
+        if (data.banned) {
+            return data.banInfo;
         }
         return false;
     } catch (error) {

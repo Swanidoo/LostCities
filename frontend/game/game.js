@@ -1,3 +1,6 @@
+import { authService, getAuthHeaders } from '../js/auth-service.js';
+import { apiClient, handleResponse } from '../js/api-client.js';
+
 // Configuration des URLs en fonction de l'environnement
 const API_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000" // URL du backend local
@@ -35,26 +38,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cache all DOM elements
     initDOMElements();
     
-    // Vérifier si l'utilisateur est connecté
-    const token = localStorage.getItem('authToken');
-    if (!token) {
+    // Vérifier si l'utilisateur est connecté avec le nouveau service
+    if (!authService.isAuthenticated()) {
         window.location.href = '/login/login.html';
         return;
     }
 
-    // Récupérer les informations de l'utilisateur depuis le token
-    try {
-        const tokenParts = token.split('.');
-        if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            gameState.userId = payload.id;
-            gameState.username = payload.username || payload.email;
-            elements.userId.value = gameState.userId;
-            elements.playerName.textContent = gameState.username;
-        }
-    } catch (error) {
-        console.error("Erreur lors de la lecture du token:", error);
-    }
+    // Récupérer les informations de l'utilisateur depuis le service d'auth
+    gameState.userId = authService.getUserId();
+    gameState.username = authService.getUsername();
+    elements.userId.value = gameState.userId;
+    elements.playerName.textContent = gameState.username;
 
     // Récupérer l'ID de la partie depuis l'URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -147,8 +141,12 @@ function initDOMElements() {
 
 // Connexion au WebSocket
 function connectWebSocket() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
+    // S'assurer d'avoir un token valide
+    const token = authService.getAccessToken();
+    if (!token) {
+        console.error("No auth token available");
+        return;
+    }
 
     // Clean the token
     const cleanToken = token.trim();

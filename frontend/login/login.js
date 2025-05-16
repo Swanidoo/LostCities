@@ -1,3 +1,5 @@
+import { authService } from '../game/js/auth-service.js';
+
 const API_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000" // Local backend URL
   : "https://lostcitiesbackend.onrender.com"; // Render backend URL
@@ -32,7 +34,7 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
-document.getElementById('loginForm').addEventListener('submit', function(event) {
+document.getElementById('loginForm').addEventListener('submit', async function(event) {
     event.preventDefault();
 
     const email = document.getElementById('username').value.trim();
@@ -55,68 +57,37 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
     submitButton.textContent = 'Connexion...';
     submitButton.disabled = true;
 
-    fetch(`${API_URL}/login`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(data => {
-                throw { status: response.status, data };
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log(data);
-        if (data.message === "Login successful") {
-            // Store the JWT token in localStorage
-            localStorage.setItem("authToken", data.token);
-            
-            // Decode the JWT token to extract user information
-            const tokenParts = data.token.split('.');
-            if (tokenParts.length === 3) {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                console.log("Token payload:", payload);
-                
-                // Store user ID and username in localStorage
-                if (payload.id) {
-                    localStorage.setItem("user_id", payload.id);
-                }
-                if (payload.username) {
-                    localStorage.setItem("username", payload.username);
-                }
-            }
-
+    try {
+        // Utiliser le service d'auth
+        const result = await authService.login(email, password);
+        
+        if (result.success) {
             showSuccess("Connexion réussie ! Redirection...");
             
             // Redirection après un court délai
             setTimeout(() => {
                 window.location.href = '/';
             }, 1000);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        
-        // Messages d'erreur spécifiques selon le statut
-        if (error.status === 404) {
-            showError('Utilisateur inconnu. Vérifiez votre adresse email.');
-        } else if (error.status === 401) {
-            showError('Mot de passe incorrect. Vérifiez votre saisie.');
-        } else if (error.data && error.data.error) {
-            showError(error.data.error);
         } else {
-            showError('Erreur de connexion. Veuillez réessayer.');
+            // Gestion des erreurs
+            const { error } = result;
+            
+            if (error.status === 404) {
+                showError('Utilisateur inconnu. Vérifiez votre adresse email.');
+            } else if (error.status === 401) {
+                showError('Mot de passe incorrect. Vérifiez votre saisie.');
+            } else if (error.data && error.data.error) {
+                showError(error.data.error);
+            } else {
+                showError('Erreur de connexion. Veuillez réessayer.');
+            }
         }
-    })
-    .finally(() => {
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        showError('Erreur inattendue. Veuillez réessayer.');
+    } finally {
         // Réactiver le bouton
         submitButton.textContent = originalButtonText;
         submitButton.disabled = false;
-    });
+    }
 });

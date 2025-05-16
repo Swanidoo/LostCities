@@ -1,3 +1,6 @@
+import { authService, getAuthHeaders } from '../game/js/auth-service.js';
+import { apiClient, handleResponse } from '../game/js/api-client.js';
+
 const API_URL = window.location.hostname === "localhost"
     ? "http://localhost:3000"
     : "https://lostcitiesbackend.onrender.com";
@@ -230,17 +233,8 @@ function playTabSound() {
 // Chargement du profil
 async function loadProfile() {
     try {
-        const response = await fetch(`${API_URL}/api/profile/${currentUserId}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Profile not found');
-        }
-        
-        const profile = await response.json();
+        const response = await apiClient.get(`/api/profile/${currentUserId}`);
+        const profile = await handleResponse(response);
         
         // Mettre à jour l'interface
         document.getElementById('user-username').textContent = profile.username;
@@ -297,13 +291,9 @@ async function loadGameHistory(page = 1) {
         }
         
         // Charger l'historique depuis l'API
-        const response = await fetch(`${API_URL}/api/profile/${currentUserId}/games?page=${page}&limit=10`);
+        const response = await apiClient.get(`/api/profile/${currentUserId}/games?page=${page}&limit=10`);
+        const data = await handleResponse(response);
         
-        if (!response.ok) {
-            throw new Error('Failed to load game history');
-        }
-        
-        const data = await response.json();
         currentPage = page;
         totalPages = data.pagination.totalPages;
         
@@ -626,16 +616,8 @@ async function showGameDetail(gameId) {
     
     // Charger les détails depuis l'API
     try {
-        const response = await fetch(`${API_URL}/api/games/${gameId}/details`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        });
-        if (!response.ok) {
-            throw new Error('Failed to load game details');
-        }
-        
-        const details = await response.json();
+        const response = await apiClient.get(`/api/games/${gameId}/details`);
+        const details = await handleResponse(response);
         displayGameDetails(details, modal);
         
     } catch (error) {
@@ -830,17 +812,8 @@ async function loadUserMessages(userId) {
     if (!isAdmin) return;
     
     try {
-        const response = await fetch(`${API_URL}/api/profile/${userId}/messages`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load messages');
-        }
-        
-        const messages = await response.json();
+        const response = await apiClient.get(`/api/profile/${userId}/messages`);
+        const messages = await handleResponse(response);
         displayMessages(messages);
         
     } catch (error) {
@@ -1054,25 +1027,15 @@ function setupFormHandlers() {
 // Fonctions de mise à jour
 async function updateProfile(data) {
     try {
-        const response = await fetch(`${API_URL}/api/profile`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            },
-            body: JSON.stringify(data)
-        });
+        const response = await apiClient.put('/api/profile', data);
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification('Profil mis à jour avec succès', 'success');
-            await loadProfile();
-            
-            // Fermer les modals appropriés
-            if (data.bio !== undefined) closeBioModal();
-            if (data.avatar_url !== undefined) closeAvatarModal();
-        } else {
-            throw new Error('Erreur lors de la mise à jour');
-        }
+        showNotification('Profil mis à jour avec succès', 'success');
+        await loadProfile();
+        
+        // Fermer les modals appropriés
+        if (data.bio !== undefined) closeBioModal();
+        if (data.avatar_url !== undefined) closeAvatarModal();
     } catch (error) {
         console.error('Error updating profile:', error);
         showNotification('Erreur lors de la mise à jour du profil', 'error');
@@ -1081,55 +1044,40 @@ async function updateProfile(data) {
 
 async function updateUsername(username) {
     try {
-        const response = await fetch(`${API_URL}/api/profile/username`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            },
-            body: JSON.stringify({ username })
-        });
+        const response = await apiClient.put('/api/profile/username', { username });
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification('Nom d\'utilisateur mis à jour avec succès', 'success');
-            await loadProfile();
-            closeUsernameModal();
-        } else {
-            const error = await response.json();
-            showNotification(error.message || 'Erreur lors de la mise à jour', 'error');
-        }
+        showNotification('Nom d\'utilisateur mis à jour avec succès', 'success');
+        await loadProfile();
+        closeUsernameModal();
     } catch (error) {
         console.error('Error updating username:', error);
-        showNotification('Erreur lors de la mise à jour du nom d\'utilisateur', 'error');
+        const errorMessage = error.data?.message || 'Erreur lors de la mise à jour';
+        showNotification(errorMessage, 'error');
     }
 }
 
 async function updatePassword(currentPassword, newPassword) {
     try {
-        const response = await fetch(`${API_URL}/api/profile/password`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            },
-            body: JSON.stringify({ currentPassword, newPassword })
+        const response = await apiClient.put('/api/profile/password', {
+            currentPassword,
+            newPassword
         });
+        await handleResponse(response);
         
-        if (response.ok) {
-            showNotification('Mot de passe mis à jour avec succès', 'success');
-            closePasswordModal();
-            
-            // Réinitialiser le formulaire
-            document.getElementById('password-form').reset();
-        } else {
-            const error = await response.json();
-            showNotification(error.message || 'Erreur lors de la mise à jour', 'error');
-        }
+        showNotification('Mot de passe mis à jour avec succès', 'success');
+        closePasswordModal();
+        
+        // Réinitialiser le formulaire
+        document.getElementById('password-form').reset();
     } catch (error) {
         console.error('Error updating password:', error);
-        showNotification('Erreur lors de la mise à jour du mot de passe', 'error');
+        const errorMessage = error.data?.message || 'Erreur lors de la mise à jour';
+        showNotification(errorMessage, 'error');
     }
 }
+
+
 
 // Système de notifications amélioré avec pile
 const notificationStack = [];

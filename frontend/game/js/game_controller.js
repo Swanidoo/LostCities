@@ -1,5 +1,8 @@
 import { NetworkClient } from './network_client.js';
 import { UIController } from './ui_controller.js';
+import { authService, getAuthHeaders } from './auth-service.js';
+import { apiClient, handleResponse } from './api-client.js';
+
 
 export class GameController {
   constructor(gameId) {
@@ -7,8 +10,8 @@ export class GameController {
     
     // Game properties
     this.gameId = gameId;
-    this.userId = localStorage.getItem('user_id');
-    this.token = localStorage.getItem('authToken');
+    this.userId = authService.getUserId();
+    this.token = authService.getAccessToken();
     this.gameState = null;
     
     // Validate required data
@@ -58,76 +61,13 @@ export class GameController {
     this._setupUIHandlers();
   }
   
-  _setupUIHandlers() {
-    // Register UI callbacks
-    this.ui.setMoveHandler(this.makeMove.bind(this));
-    this.ui.setChatHandler(this.sendChatMessage.bind(this));
-    this.ui.setSurrenderHandler(this.surrenderGame.bind(this));
-  }
-  
-  // Network event handlers
-  _handleConnect() {
-    console.log("Connected to game server");
-    this.ui.setGameMessage("Connected to game server. Loading game...");
-    
-    // Load initial game state
-    this._fetchInitialGameState();
-  }
-  
-  _handleMessage(data) {
-    console.log("Received game message:", data);
-    
-    if (!data || !data.event) return;
-    
-    switch (data.event) {
-      case 'gameUpdate':
-      case 'gameUpdated':
-        if (data.data && data.data.gameState) {
-          this.updateGameState(data.data.gameState);
-        }
-        break;
-        
-      case 'chatMessage':
-        if (data.data) {
-          this.ui.addChatMessage(data.data.username, data.data.message);
-        }
-        break;
-        
-      case 'systemMessage':
-        if (data.data && data.data.message) {
-          this.ui.addSystemMessage(data.data.message);
-        }
-        break;
-    }
-  }
-  
-  _handleDisconnect(event) {
-    console.log("Disconnected from game server:", event);
-    this.ui.setGameMessage("Disconnected from game server. Trying to reconnect...");
-  }
-  
-  _handleError(error) {
-    console.error("Game server error:", error);
-    this.ui.setGameMessage("Error connecting to game server");
-  }
-  
   // Game state management
   async _fetchInitialGameState() {
     try {
       // Build the API URL
-      const apiUrl = window.location.hostname === "localhost" 
-        ? "http://localhost:3000" 
-        : "https://lostcitiesbackend.onrender.com";
+      const response = await apiClient.get(`/lost-cities/games/${this.gameId}`);
+      const gameState = await handleResponse(response);
       
-      const response = await fetch(`${apiUrl}/lost-cities/games/${this.gameId}`, {
-        headers: { 'Authorization': `Bearer ${this.token}` }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch game state: ${response.status}`);
-      }
-      
-      const gameState = await response.json();
       console.log("Initial game state loaded:", gameState);
       
       // Update game state

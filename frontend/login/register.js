@@ -1,6 +1,10 @@
+import { authService } from '../game/js/auth-service.js';
+
 const API_URL = window.location.hostname === "localhost"
-  ? "http://localhost:3000" // Local backend URL
-  : "https://lostcitiesbackend.onrender.com"; // Render backend URL
+    ? "http://localhost:3000"
+    : "https://lostcitiesbackend.onrender.com";
+
+console.log("Using API_URL:", API_URL);
 
 // Fonction pour afficher les messages d'erreur
 function showError(message) {
@@ -30,34 +34,32 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
-// Fonction pour valider le nom d'utilisateur
-function isValidUsername(username) {
-    // Au moins 3 caractères, lettres, chiffres et underscore autorisés
-    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-    return usernameRegex.test(username);
-}
-
 // Fonction pour valider le mot de passe
 function isValidPassword(password) {
-    // Au moins 6 caractères
     return password.length >= 6;
 }
 
-document.getElementById('registerForm').addEventListener('submit', function(event) {
+// Fonction pour valider le nom d'utilisateur
+function isValidUsername(username) {
+    return username.length >= 3 && username.length <= 20 && /^[a-zA-Z0-9_]+$/.test(username);
+}
+
+document.getElementById('registerForm').addEventListener('submit', async function(event) {
     event.preventDefault();
 
     const username = document.getElementById('username').value.trim();
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value.trim();
-
+    const confirmPassword = document.getElementById('confirmPassword').value.trim();
+    
     // Validation côté client
-    if (!username || !email || !password) {
+    if (!username || !email || !password || !confirmPassword) {
         showError('Veuillez remplir tous les champs');
         return;
     }
     
     if (!isValidUsername(username)) {
-        showError('Le nom d\'utilisateur doit contenir entre 3 et 20 caractères (lettres, chiffres et _ autorisés)');
+        showError('Le nom d\'utilisateur doit contenir entre 3 et 20 caractères et seulement des lettres, chiffres et _');
         return;
     }
     
@@ -70,59 +72,47 @@ document.getElementById('registerForm').addEventListener('submit', function(even
         showError('Le mot de passe doit contenir au moins 6 caractères');
         return;
     }
+    
+    if (password !== confirmPassword) {
+        showError('Les mots de passe ne correspondent pas');
+        return;
+    }
 
-    // Show loading state
+    // Désactiver le bouton pendant la requête
     const submitButton = this.querySelector('button[type="submit"]');
     const originalButtonText = submitButton.textContent;
     submitButton.textContent = 'Inscription...';
     submitButton.disabled = true;
 
-    fetch(`${API_URL}/register`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, email, password }),
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(data => {
-                throw { status: response.status, data };
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-        // Show success message
-        showSuccess("Inscription réussie ! Redirection vers la connexion...");
+    try {
+        // Utiliser le service d'auth
+        const result = await authService.register(username, email, password);
         
-        // Clear form
-        this.reset();
-        
-        // Redirect to login after delay
-        setTimeout(() => {
-            window.location.href = '/login/login.html';
-        }, 2000);
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        
-        // Messages d'erreur spécifiques
-        if (error.status === 400 && error.data && error.data.error) {
-            if (error.data.error.includes('already exists') || error.data.error.includes('User already exists')) {
-                showError('Cette adresse email est déjà utilisée');
-            } else if (error.data.error.includes('email')) {
-                showError('Format d\'email invalide');
-            } else {
-                showError(error.data.error);
-            }
+        if (result.success) {
+            showSuccess("Inscription réussie ! Redirection...");
+            
+            // Redirection après un court délai
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
         } else {
-            showError('Erreur lors de l\'inscription. Veuillez réessayer.');
+            // Gestion des erreurs
+            const { error } = result;
+            
+            if (error.status === 400 && error.data && error.data.error.includes('already exists')) {
+                showError('Cette adresse email est déjà utilisée');
+            } else if (error.data && error.data.error) {
+                showError(error.data.error);
+            } else {
+                showError('Erreur lors de l\'inscription. Veuillez réessayer.');
+            }
         }
-    })
-    .finally(() => {
-        // Reset button state
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        showError('Erreur inattendue. Veuillez réessayer.');
+    } finally {
+        // Réactiver le bouton
         submitButton.textContent = originalButtonText;
         submitButton.disabled = false;
-    });
+    }
 });

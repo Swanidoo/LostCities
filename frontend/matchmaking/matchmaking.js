@@ -1,3 +1,6 @@
+import { authService, getAuthHeaders } from '../game/js/auth-service.js';
+import { apiClient, handleResponse } from '../game/js/api-client.js';
+
 // Configuration des URLs en fonction de l'environnement
 const API_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000" // URL du backend local
@@ -28,14 +31,13 @@ const elements = {
 
 // Initialisation
 document.addEventListener('DOMContentLoaded', async () => {
-    // Vérifier si l'utilisateur est connecté
-    const token = localStorage.getItem('authToken');
-    if (!token) {
+    // Vérifier si l'utilisateur est connecté avec le nouveau service
+    if (!authService.isAuthenticated()) {
         window.location.href = '../login/login.html';
         return;
     }
 
-    // Vérifier le statut de ban
+    // Vérifier le statut de ban avec le nouveau client API
     const banInfo = await checkBanStatus();
     if (banInfo) {
         alert(`Vous êtes banni. ${banInfo.reason ? 'Raison: ' + banInfo.reason : ''}`);
@@ -43,45 +45,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Clean the token and log it for debugging (like in chat.js)
-    const cleanToken = token.trim();
-    console.log("Using cleaned token length:", cleanToken.length);
-
-    // Récupérer les informations de l'utilisateur depuis le token
-    try {
-        const tokenParts = token.split('.');
-        if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            matchmakingState.userId = payload.id;
-            matchmakingState.username = payload.username || payload.email;
-        }
-    } catch (error) {
-        console.error("Erreur lors de la lecture du token:", error);
-    }
+    // Récupérer les informations de l'utilisateur depuis le service d'auth
+    matchmakingState.userId = authService.getUserId();
+    matchmakingState.username = authService.getUsername();
 
     // Configurer les écouteurs d'événements
     setupEventListeners();
     
-    // Établir la connexion WebSocket
-    connectWebSocket(cleanToken);
+    // Établir la connexion WebSocket avec le nouveau token
+    const token = authService.getAccessToken();
+    if (token) {
+        connectWebSocket(token);
+    }
 });
 
 async function checkBanStatus() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return false;
-    
     try {
-        const response = await fetch(`${API_URL}/profile`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await apiClient.get('/ban-status');
+        const data = await handleResponse(response);
         
-        if (response.status === 403) {
-            const data = await response.json();
-            if (data.banInfo) {
-                return data.banInfo;
-            }
+        if (data.banned) {
+            return data.banInfo;
         }
         return false;
     } catch (error) {
@@ -108,16 +92,16 @@ function setupEventListeners() {
 }
 
 // Connexion au WebSocket
-function connectWebSocket(cleanToken) {
-    if (!cleanToken) return;
+function connectWebSocket(token) {
+    if (!token) return;
 
     // Fermer la connexion existante si elle existe
     if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
         matchmakingState.socket.close();
     }
 
-    // Create WebSocket URL with same pattern as chat.js
-    const wsUrl = `${WS_URL}?token=${encodeURIComponent(cleanToken)}`;
+    // Create WebSocket URL avec le nouveau token
+    const wsUrl = `${WS_URL}?token=${encodeURIComponent(token)}`;
     console.log("Connecting to WebSocket URL:", wsUrl.substring(0, wsUrl.indexOf('?') + 15) + "...");
     
     matchmakingState.socket = new WebSocket(wsUrl);

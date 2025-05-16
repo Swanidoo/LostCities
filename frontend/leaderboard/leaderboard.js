@@ -1,3 +1,5 @@
+import { apiClient, handleResponse } from '../js/api-client.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // Chargement initial
     loadLeaderboard('classic', false);
@@ -30,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const mode = activeMode ? activeMode.dataset.mode : 'classic';
             const withExtension = activeExtension ? activeExtension.dataset.extension === 'true' : false;
             
-            console.log(`Selected: mode=${mode}, withExtension=${withExtension}`); // Pour débugger
+            console.log(`Selected: mode=${mode}, withExtension=${withExtension}`);
             
             loadLeaderboard(mode, withExtension);
         });
@@ -44,19 +46,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadLeaderboard(mode, withExtension) {
     try {
-        console.log(`Loading leaderboard: mode=${mode}, withExtension=${withExtension}`); // Pour débugger
+        console.log(`Loading leaderboard: mode=${mode}, withExtension=${withExtension}`);
         
-        const url = `${API_URL}/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
-        console.log(`Fetching: ${url}`); // Pour débugger
+        const url = `/api/leaderboard?game_mode=${mode}&with_extension=${withExtension}&limit=10`;
+        console.log(`Fetching: ${url}`);
         
-        const response = await fetch(url);
+        const response = await apiClient.publicRequest(url);
+        const data = await handleResponse(response);
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log(`Received ${data.data.length} entries`); // Pour débugger
+        console.log(`Received ${data.data.length} entries`);
         displayLeaderboard(data.data);
         
     } catch (error) {
