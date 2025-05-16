@@ -13,22 +13,6 @@ import {
 
 const authRouter = new Router();
 
-const jwtKey = Deno.env.get("JWT_SECRET"); // Load JWT_SECRET from the environment
-if (!jwtKey) {
-  console.error("JWT_SECRET is not set in the environment variables.");
-  Deno.exit(1); // Exit if the secret is missing
-}
-
-const encoder = new TextEncoder();
-const keyData = encoder.encode(jwtKey);
-const cryptoKey = await crypto.subtle.importKey(
-  "raw",
-  keyData,
-  { name: "HMAC", hash: "SHA-256" },
-  false,
-  ["sign", "verify"]
-);
-
 // Route for user registration
 authRouter.post("/register", async (ctx) => {
   try {
