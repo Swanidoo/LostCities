@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Create games table if it doesn't exist
--- Create games table if it doesn't exist
 CREATE TABLE IF NOT EXISTS games (
     id BIGINT PRIMARY KEY,
     player1_id INTEGER NOT NULL,
@@ -74,6 +73,21 @@ CREATE TABLE IF NOT EXISTS reports (
     resolved_at TIMESTAMP,
     resolution_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for refresh tokens (Access/Refresh token system)
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    device_info TEXT,
+    ip_address INET,
+    is_revoked BOOLEAN DEFAULT FALSE,
+    revoked_at TIMESTAMP,
+    revoked_reason TEXT
 );
 
 -- Board table for game configuration and state
@@ -314,6 +328,11 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reports_resolved_by') THEN
         ALTER TABLE reports ADD CONSTRAINT fk_reports_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id);
     END IF;
+    
+    -- Refresh tokens constraints
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_refresh_tokens_user') THEN
+        ALTER TABLE refresh_tokens ADD CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
 END $$;
 
 -- Populate the Card table with all possible cards
@@ -433,6 +452,12 @@ CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_message_is_deleted ON chat_message(is_deleted);
 
+-- Indexes for refresh tokens
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_active ON refresh_tokens(user_id, is_revoked, expires_at);
+
 -- Create a trigger to automatically set month and year fields
 CREATE OR REPLACE FUNCTION set_leaderboard_date() 
 RETURNS TRIGGER AS $$
@@ -466,6 +491,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to cleanup expired refresh tokens
+CREATE OR REPLACE FUNCTION cleanup_expired_refresh_tokens()
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM refresh_tokens 
+    WHERE expires_at < NOW() OR (is_revoked = TRUE AND revoked_at < NOW() - INTERVAL '30 days');
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create a view for active mutes
 CREATE OR REPLACE VIEW active_mutes AS
 SELECT 
@@ -495,6 +534,17 @@ FROM users
 WHERE is_banned = true 
 AND (banned_until IS NULL OR banned_until > NOW());
 
+-- View for active refresh tokens (useful for admin monitoring)
+CREATE OR REPLACE VIEW active_refresh_tokens AS
+SELECT 
+    rt.*,
+    u.username,
+    u.email
+FROM refresh_tokens rt
+JOIN users u ON rt.user_id = u.id
+WHERE rt.is_revoked = FALSE 
+AND rt.expires_at > NOW();
+
 -- Create a comprehensive admin dashboard view
 CREATE OR REPLACE VIEW admin_dashboard_stats AS
 SELECT 
@@ -505,4 +555,13 @@ SELECT
     (SELECT COUNT(*) FROM users WHERE is_banned = true) as banned_users,
     (SELECT COUNT(*) FROM active_mutes) as muted_users,
     (SELECT COUNT(*) FROM reports WHERE status = 'pending') as pending_reports,
-    (SELECT COUNT(*) FROM chat_message WHERE timestamp > NOW() - INTERVAL '24 hours' AND is_deleted = false) as messages_24h;
+    (SELECT COUNT(*) FROM chat_message WHERE timestamp > NOW() - INTERVAL '24 hours' AND is_deleted = false) as messages_24h,
+    (SELECT COUNT(*) FROM active_refresh_tokens) as active_refresh_tokens;
+
+-- Add comments for documentation
+COMMENT ON TABLE refresh_tokens IS 'Stores refresh tokens for the access/refresh token authentication system';
+COMMENT ON COLUMN refresh_tokens.token_hash IS 'Hashed version of the refresh token for secure storage';
+COMMENT ON COLUMN refresh_tokens.device_info IS 'User agent string or device information';
+COMMENT ON COLUMN refresh_tokens.ip_address IS 'IP address when the token was created';
+COMMENT ON COLUMN refresh_tokens.is_revoked IS 'Whether this token has been revoked (logout)';
+COMMENT ON VIEW active_refresh_tokens IS 'Shows currently valid refresh tokens with user information';

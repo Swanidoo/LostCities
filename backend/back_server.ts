@@ -16,6 +16,7 @@ import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import profileRouter from "./profile_routes.ts";
 import { checkUserStatus } from "./middlewares/check_user_status.ts";
+import { cleanupExpiredTokens } from "./utils/token_utils.ts";
 import gameDetailsRouter from "./game_details_routes.ts";
 import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
@@ -101,6 +102,24 @@ async function cleanupExpiredBansAndMutes() {
     console.error("❌ Error cleaning up expired bans:", error);
   }
 }
+
+async function cleanupExpiredRefreshTokens() {
+  try {
+    const cleanedCount = await cleanupExpiredTokens();
+    if (cleanedCount > 0) {
+      console.log(`✅ Cleaned up ${cleanedCount} expired refresh tokens`);
+    }
+  } catch (error) {
+    console.error("❌ Error cleaning up refresh tokens:", error);
+  }
+}
+
+
+// Nettoyage des refresh tokens (toutes les heures)
+setInterval(cleanupExpiredRefreshTokens, 60 * 60 * 1000);
+
+// Nettoyage au démarrage
+cleanupExpiredRefreshTokens();
 
 // Nettoyer les bans expirés toutes les 5 minutes
 setInterval(cleanupExpiredBansAndMutes, 5 * 60 * 1000);
