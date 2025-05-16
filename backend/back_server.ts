@@ -40,10 +40,10 @@ try {
 
 // 🛡️ Middlewares globaux
 app.use(corsMiddleware);
+app.use(errorMiddleware);
 app.use(loggingMiddleware);
 app.use(securityHeadersMiddleware);
 app.use(rateLimitingMiddleware);
-app.use(errorMiddleware);
 
 // 🛣️ Routes publiques
 app.use(welcomeRouter.routes());
@@ -54,26 +54,12 @@ app.use(leaderboardRouter.routes());
 app.use(leaderboardRouter.allowedMethods());
 app.use(profileRouter.routes());
 app.use(profileRouter.allowedMethods());
+app.use(userRouter.routes());
+app.use(userRouter.allowedMethods());
 
 // 📡 WebSocket routes (avant auth)
 app.use(wsRouter.routes());
 app.use(wsRouter.allowedMethods());
-
-// Add public user routes without authentication requirement
-// ⚠️ IMPORTANT: Add this BEFORE the auth middleware
-const publicUserRouter = new Router();
-publicUserRouter.get("/api/users", async (ctx) => {
-  try {
-    const users = await client.queryObject("SELECT id, username FROM users");
-    ctx.response.body = users.rows;
-  } catch (err) {
-    console.error("Error fetching users:", err);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
-  }
-});
-app.use(publicUserRouter.routes());
-app.use(publicUserRouter.allowedMethods());
 
 // 🔒 Auth middleware pour routes protégées
 app.use(authMiddleware);
@@ -82,8 +68,6 @@ app.use(checkUserStatus);
 // 🔒 Routes protégées
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
-app.use(userRouter.routes());
-app.use(userRouter.allowedMethods());
 app.use(settingsRouter.routes());
 app.use(settingsRouter.allowedMethods());
 app.use(adminRouter.routes());

@@ -13,7 +13,10 @@ export const corsMiddleware = oakCors({
       "http://localhost:80",
       "https://lostcitiesfrontend.onrender.com"
     ];
-    return allowedOrigins.includes(origin || "") ? origin : false;
+    
+    // En production, si pas d'origin (même domaine) ou origin autorisée
+    if (!origin) return true;  // Requêtes du même domaine
+    return allowedOrigins.includes(origin);  // Retourne directement true/false
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
