@@ -6,7 +6,15 @@ import { LostCitiesGame } from "./lost_cities/lost_cities_controller.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
-const playersLookingForMatch: { socket: WebSocket; userId: string; username: string }[] = [];
+const playersLookingForMatch: { 
+  socket: WebSocket; 
+  userId: string; 
+  username: string;
+  preferences: {
+    gameMode: string;
+    useExtension: boolean;
+  };
+}[] = [];
 const gameSubscriptions: Map<string, Set<WebSocket>> = new Map();
 
 const jwtKey = Deno.env.get("JWT_SECRET");
@@ -120,7 +128,7 @@ wsRouter.get("/ws", async (ctx) => {
         console.error(`❌ Failed to upgrade connection for ${username}:`, error);
         ctx.throw(500, "Failed to upgrade connection");
       }
-      
+
       // Check for existing connections with the same username and remove them
       const existingIndex = connectedClients.findIndex(client => client.username === username);
       if (existingIndex !== -1) {
@@ -132,39 +140,30 @@ wsRouter.get("/ws", async (ctx) => {
         }
         connectedClients.splice(existingIndex, 1);
       }
-      
-      socket.onopen = function() {
-        // Ajouter le client à la liste après que la connexion est ouverte
-        connectedClients.push({ socket, username });
-        console.log(`👥 Current connected clients: ${connectedClients.length}`);
-        
-        // Envoyer le message de bienvenue
-        try {
-          socket.send(JSON.stringify({
-            event: "systemMessage",
-            data: { message: `Welcome to the chat, ${username}!` }
-          }));
-        } catch (error) {
-          console.error(`❌ Error sending welcome message to ${username}:`, error);
-        }
-        
-        // Notifier les autres utilisateurs
-        broadcastSystemMessage(`${username} has joined the chat.`, socket);
-      };
-      logConnectedClients();
-      
-      // Send a welcome message to the client
+
+      // La socket est DÉJÀ ouverte après ctx.upgrade(), traiter immédiatement
+      console.log(`🔗 WebSocket ready for ${username}`);
+
+      // Ajouter le client à la liste immédiatement
+      connectedClients.push({ socket, username });
+      console.log(`👥 Current connected clients: ${connectedClients.length}`);
+
+      // Envoyer le message de bienvenue immédiatement
       try {
         socket.send(JSON.stringify({
           event: "systemMessage",
-          data: { message: `Welcome to the chat, ${username}!` }
+          data: { message: `Bienvenue sur le chat, ${username}!` }
         }));
+        console.log(`✅ Welcome message sent to ${username}`);
       } catch (error) {
         console.error(`❌ Error sending welcome message to ${username}:`, error);
       }
+
+      // Notifier les autres utilisateurs immédiatement
+      broadcastSystemMessage(`${username} a rejoint le chat.`, socket);
       
-      // Notify others that a new user has joined
-      broadcastSystemMessage(`${username} has joined the chat.`, socket);
+      // Log des clients connectés
+      logConnectedClients();
       
       // WebSocket message event handler 
       socket.onmessage = function(event) {
@@ -182,7 +181,7 @@ wsRouter.get("/ws", async (ctx) => {
           // Get client data including username
           const clientData = connectedClients[clientIndex];
           
-          // Inside the socket.onmessage function in ws_routes.ts
+          // Handle different message types
           switch (data.event) {
             case "chatMessage":
                 if (data.data?.message) {
@@ -190,17 +189,17 @@ wsRouter.get("/ws", async (ctx) => {
                 }
                 break;
             case "checkMuteStatus":
-              // Vérifier le statut de mute et renvoyer l'info
-              handleCheckMuteStatus(socket, clientData.username);
-              break;
+                // Vérifier le statut de mute et renvoyer l'info
+                handleCheckMuteStatus(socket, clientData.username);
+                break;
             case "movePlayed":
                 if (data.data?.gameId && data.data?.move) {
                     handleMovePlayed(data.data, socket, clientData.username);
                 }
                 break;
             case "findMatch":
-                // Use the userId from the message data, not from unknown scope
-                handleMatchmaking(socket, clientData.username, data.data?.userId);
+                // Use the userId from the message data
+                handleMatchmaking(socket, clientData.username, data.data?.userId, data.data);
                 break;
             case "cancelMatch":
                 removeFromMatchmaking(socket);
@@ -210,38 +209,40 @@ wsRouter.get("/ws", async (ctx) => {
                 handleGetOnlinePlayers(socket);
                 break;
             case "subscribeGame":
-                // Add this new case to handle game subscriptions
+                // Handle game subscriptions
                 if (data.data?.gameId) {
                     handleGameSubscription(data.data, socket, clientData.username);
                 }
                 break;
             case "requestGameState":
-                // Add this case to handle game state requests
+                // Handle game state requests
                 if (data.data?.gameId) {
                     handleGameStateRequest(data.data, socket, clientData.username);
                 }
                 break;
-                case "gameAction":
-                  if (data.data?.gameId && data.data?.action) {
-                      switch (data.data.action) {
-                          case "request_state":
-                              // Handle game state request
-                              handleGameStateRequest(data.data, socket, clientData.username);
-                              break;
-                          case "play_card":
-                              handlePlayCard(data.data, socket, clientData.username);
-                              break;
-                          case "discard_card":
-                              handleDiscardCard(data.data, socket, clientData.username);
-                              break;
-                          case "draw_card":
-                              handleDrawCard(data.data, socket, clientData.username);
-                              break;
-                          default:
-                              console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
-                      }
-                  }
-                  break;
+            case "gameAction":
+                if (data.data?.gameId && data.data?.action) {
+                    switch (data.data.action) {
+                        case "request_state":
+                            handleGameStateRequest(data.data, socket, clientData.username);
+                            break;
+                        case "play_card":
+                            handlePlayCard(data.data, socket, clientData.username);
+                            break;
+                        case "discard_card":
+                            handleDiscardCard(data.data, socket, clientData.username);
+                            break;
+                        case "draw_card":
+                            handleDrawCard(data.data, socket, clientData.username);
+                            break;
+                        case "surrender":
+                            handleSurrender(data.data, socket, clientData.username);
+                            break;
+                        default:
+                            console.warn(`⚠️ Unhandled game action: ${data.data.action}`);
+                    }
+                }
+                break;
             default:
                 console.warn("⚠️ Unknown message type or missing data:", data);
           }
@@ -250,29 +251,28 @@ wsRouter.get("/ws", async (ctx) => {
         }
       };
             
-      
       // WebSocket onclose event handler 
       socket.onclose = function(event) {
-        // Find client data from the array instead of using local variables
+        // Améliorer la gestion de la déconnexion
         const clientIndex = connectedClients.findIndex(client => client.socket === socket);
-        const clientData = clientIndex !== -1 ? connectedClients[clientIndex] : { username: "unknown user" };
         
-        console.log(`👋 Client ${clientData.username} disconnected with code ${event.code} and reason "${event.reason}"`);
-        
-        // Remove the client from the connected clients array
         if (clientIndex !== -1) {
+          const clientData = connectedClients[clientIndex];
+          console.log(`👋 Client ${clientData.username} disconnected with code ${event.code} and reason "${event.reason}"`);
+          
+          // Supprimer de la liste
           connectedClients.splice(clientIndex, 1);
           console.log(`👥 Remaining connected clients: ${connectedClients.length}`);
+          
+          // Notifier les autres
+          broadcastSystemMessage(`${clientData.username} a quitté le chat.`);
         } else {
-          console.warn("⚠️ Could not find client in connected clients array!");
+          console.warn("⚠️ Disconnected client not found in array");
         }
-        
-        // Notify others that the user has left
-        broadcastSystemMessage(`${clientData.username} has left the chat.`);
         
         // Handle player disconnect for matchmaking
         removeFromMatchmaking(socket);
-      }
+      };
       
       // Set up error event listener
       socket.onerror = (error) => {
@@ -487,6 +487,62 @@ function handleChatMessage(
   });
 }
 
+async function handleSurrender(data: any, socket: WebSocket, username: string) {
+  const { gameId } = data;
+  
+  try {
+      console.log(`🏳️ Player ${username} surrendering game ${gameId}`);
+      
+      // Get user ID
+      const userId = await getUserIdFromUsername(username);
+      
+      // Update game status in database
+      const gameResult = await client.queryObject(`
+          SELECT player1_id, player2_id FROM games WHERE id = $1
+      `, [gameId]);
+      
+      if (gameResult.rows.length === 0) {
+          throw new Error("Game not found");
+      }
+      
+      const game = gameResult.rows[0];
+      
+      // Determine the winner (opponent)
+      const winnerId = game.player1_id === userId ? game.player2_id : game.player1_id;
+      
+      // Update game status in database
+      await client.queryObject(`
+          UPDATE games 
+          SET status = 'finished', 
+              winner_id = $1,
+              ended_at = CURRENT_TIMESTAMP
+          WHERE id = $2
+      `, [winnerId, gameId]);
+      
+      // Load the full game state to notify players
+      const fullGame = await loadGameState(gameId);
+      const gameState = fullGame.getGameState();
+      
+      // Add surrender info to the game state
+      (gameState as any).surrenderInfo = {
+          playerId: userId,
+          type: 'surrender'
+      };
+      
+      // Notify ALL players (including the one who surrendered)
+      notifyGamePlayers(gameId, gameState);
+      
+      console.log(`✅ Surrender processed for player ${username} in game ${gameId}`);
+      
+  } catch (error) {
+      console.error(`❌ Error handling surrender: ${error}`);
+      socket.send(JSON.stringify({
+          event: 'error',
+          data: { message: 'Failed to surrender game' }
+      }));
+  }
+}
+
 // Handle moves played in the game
 function handleMovePlayed(
   data: { gameId: string; move: string },
@@ -548,6 +604,38 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
 
   // Load the full game state from database to ensure we have all data
   try {
+    // AJOUT: Récupérer les informations utilisateur
+    const userInfoResult = await client.queryObject(`
+      SELECT 
+        g.player1_id,
+        g.player2_id,
+        u1.username as player1_username,
+        u1.avatar_url as player1_avatar,
+        u2.username as player2_username,
+        u2.avatar_url as player2_avatar
+      FROM games g
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
+      WHERE g.id = $1
+    `, [gameId]);
+
+    console.log("🔍 User info from DB for notifyGamePlayers:", userInfoResult.rows[0]);
+    
+    if (userInfoResult.rows.length === 0) {
+      console.error("❌ No user info found for game", gameId);
+      // Fallback to original behavior
+      subscribers.forEach(socket => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({
+            event: "gameUpdated",
+            data: { gameId, gameState }
+          }));
+        }
+      });
+      return;
+    }
+
+    const userInfo = userInfoResult.rows[0];
     const fullGame = await loadGameState(gameId);
     
     // For each connected player
@@ -573,6 +661,18 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
         // Get player-specific game state with hand data included
         const playerState = fullGame.getGameState(userId);
         
+        // MODIFICATION: Enrichir avec les informations utilisateur
+        playerState.player1.username = userInfo.player1_username;
+        playerState.player1.avatar_url = userInfo.player1_avatar;
+        playerState.player2.username = userInfo.player2_username;
+        playerState.player2.avatar_url = userInfo.player2_avatar;
+        
+        // Debug log to check enriched data
+        console.log(`🔍 Enriched state for ${username}:`, {
+          player1: { username: playerState.player1.username, avatar: playerState.player1.avatar_url },
+          player2: { username: playerState.player2.username, avatar: playerState.player2.avatar_url }
+        });
+        
         // Debug log to check hand data presence
         console.log(`Hand data for ${username}: ${playerState.player1.hand ? playerState.player1.hand.length : 'none'} P1 cards, ${playerState.player2.hand ? playerState.player2.hand.length : 'none'} P2 cards`);
         
@@ -582,15 +682,15 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
           data: { gameId, gameState: playerState }
         }));
         
-        console.log(`Sent personalized update to ${username}`);
+        console.log(`✅ Sent personalized update to ${username}`);
       } catch (error) {
         console.error(`Error sending update to player: ${error}`);
       }
     }
   } catch (error) {
-    console.error(`Failed to load full game data: ${error}`);
+    console.error(`Failed to load user info or full game data: ${error}`);
     
-    // Fall back to sending the original state if loading full game fails
+    // Fall back to sending the original state if loading fails
     subscribers.forEach(socket => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({
@@ -602,8 +702,9 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
   }
 }
 
-async function handleMatchmaking(socket, username, userId) {
+async function handleMatchmaking(socket, username, userId, gameOptions = {}) {
   try {
+    // Vérifier le statut de ban
     const banResult = await client.queryObject(
       `SELECT is_banned, banned_until, ban_reason FROM users WHERE id = $1`,
       [userId]
@@ -613,6 +714,7 @@ async function handleMatchmaking(socket, username, userId) {
       const user = banResult.rows[0];
       
       if (user.is_banned && (!user.banned_until || new Date(user.banned_until) > new Date())) {
+        console.log(`❌ Banned user ${username} (${userId}) tried to find match`);
         socket.send(JSON.stringify({
           event: "error",
           data: { 
@@ -627,26 +729,54 @@ async function handleMatchmaking(socket, username, userId) {
         return;
       }
     }
+    
+    // Log les options de jeu reçues
+    console.log(`🎮 User ${username} (${userId}) is looking for a match with options:`, {
+      gameMode: gameOptions.gameMode || 'classic',
+      useExtension: gameOptions.useExtension || false
+    });
+    
+    // Remove any existing entry for this player (in case they're already searching)
+    removeFromMatchmaking(socket);
+    
+    // Add to matchmaking queue with preferences
+    playersLookingForMatch.push({ 
+      socket, 
+      userId, 
+      username,
+      preferences: {
+        gameMode: gameOptions.gameMode || 'classic',
+        useExtension: gameOptions.useExtension || false
+      }
+    });
+    
+    console.log(`📋 Added ${username} to matchmaking queue. Total players waiting: ${playersLookingForMatch.length}`);
+    console.log(`🎯 Looking for: ${gameOptions.gameMode || 'classic'} mode, extension: ${gameOptions.useExtension || false}`);
+    
+    // Send confirmation to player
+    socket.send(JSON.stringify({
+      event: "matchmakingStatus",
+      data: { 
+        status: "searching", 
+        message: `Searching for ${gameOptions.gameMode || 'classic'} match${gameOptions.useExtension ? ' with extension' : ''}...` 
+      }
+    }));
+    
+    // Try to find a match immediately
+    tryFindMatch();
+    
   } catch (error) {
-    console.error("Error checking ban status:", error);
+    console.error("❌ Error in handleMatchmaking:", error);
+    
+    // Send error to the player
+    socket.send(JSON.stringify({
+      event: "error",
+      data: { 
+        message: "Erreur lors de la recherche de partie",
+        type: "matchmaking_error"
+      }
+    }));
   }
-
-  console.log(`🎮 User ${username} (${userId}) is looking for a match`);
-  
-  // Remove any existing entry for this player (in case they're already searching)
-  removeFromMatchmaking(socket);
-  
-  // Add to matchmaking queue
-  playersLookingForMatch.push({ socket, userId, username });
-  
-  // Send confirmation to player
-  socket.send(JSON.stringify({
-    event: "matchmakingStatus",
-    data: { status: "searching", message: "Looking for an opponent..." }
-  }));
-  
-  // Try to find a match
-  tryFindMatch();
 }
 
 export function broadcastMessageDeletion(messageId: string) {
@@ -806,70 +936,134 @@ function removeFromMatchmaking(socket: WebSocket) {
 function tryFindMatch() {
   // Need at least 2 players to make a match
   if (playersLookingForMatch.length >= 2) {
-    // Take the first two players in the queue
-    const player1 = playersLookingForMatch.shift();
-    const player2 = playersLookingForMatch.shift();
+    console.log(`🎯 Trying to find match with ${playersLookingForMatch.length} players`);
     
-    console.log(`🎮 Match found between ${player1.username} and ${player2.username}`);
-    
-    // Create a simple game ID (just using timestamp for now)
-    const gameId = Date.now().toString();
-    
-    // CREATE THE GAME IN THE DATABASE
-    createGame(gameId, player1.userId, player2.userId)
-      .then(() => {
-        // Notify both players
-        player1.socket.send(JSON.stringify({
-          event: "matchFound",
-          data: { 
-            gameId,
-            opponentId: player2.userId,
-            opponentName: player2.username
-          }
-        }));
+    // Search for compatible players
+    for (let i = 0; i < playersLookingForMatch.length - 1; i++) {
+      const player1 = playersLookingForMatch[i];
+      
+      for (let j = i + 1; j < playersLookingForMatch.length; j++) {
+        const player2 = playersLookingForMatch[j];
         
-        player2.socket.send(JSON.stringify({
-          event: "matchFound",
-          data: { 
-            gameId,
-            opponentId: player1.userId,
-            opponentName: player1.username
-          }
-        }));
-      })
-      .catch(error => {
-        console.error("❌ Error creating game:", error);
-        // Notify players of the error
-        const errorMessage = JSON.stringify({
-          event: "matchmakingError",
-          data: { message: "Failed to create game. Please try again." }
-        });
-        player1.socket.send(errorMessage);
-        player2.socket.send(errorMessage);
-      });
+        // Check if preferences are compatible
+        if (player1.preferences.gameMode === player2.preferences.gameMode &&
+            player1.preferences.useExtension === player2.preferences.useExtension) {
+          
+          console.log(`🎮 Match found between ${player1.username} and ${player2.username}`, {
+            gameMode: player1.preferences.gameMode,
+            useExtension: player1.preferences.useExtension
+          });
+          
+          // Remove players from queue BEFORE creating the game
+          playersLookingForMatch.splice(j, 1);
+          playersLookingForMatch.splice(i, 1);
+          
+          // Create game
+          const gameId = Date.now().toString();
+          
+          // CREATE GAME AND THEN NOTIFY - this is the key fix
+          createGame(gameId, player1.userId, player2.userId, {
+            gameMode: player1.preferences.gameMode,
+            useExtension: player1.preferences.useExtension
+          })
+          .then(() => {
+            console.log(`✅ Game ${gameId} created, notifying players`);
+            
+            // Notify both players - THIS PART WAS MISSING OR FAILING
+            try {
+              if (player1.socket.readyState === WebSocket.OPEN) {
+                player1.socket.send(JSON.stringify({
+                  event: "matchFound",
+                  data: { 
+                    gameId,
+                    opponentId: player2.userId,
+                    opponentName: player2.username
+                  }
+                }));
+                console.log(`🔔 Notified ${player1.username} about match`);
+              } else {
+                console.error(`❌ Player1 socket not open for ${player1.username}`);
+              }
+              
+              if (player2.socket.readyState === WebSocket.OPEN) {
+                player2.socket.send(JSON.stringify({
+                  event: "matchFound",
+                  data: { 
+                    gameId,
+                    opponentId: player1.userId,
+                    opponentName: player1.username
+                  }
+                }));
+                console.log(`🔔 Notified ${player2.username} about match`);
+              } else {
+                console.error(`❌ Player2 socket not open for ${player2.username}`);
+              }
+            } catch (error) {
+              console.error("❌ Error sending match notifications:", error);
+            }
+          })
+          .catch(error => {
+            console.error("❌ Error creating game:", error);
+            // Re-add players to queue if game creation failed
+            playersLookingForMatch.unshift(player1, player2);
+            
+            // Notify players of the error
+            const errorMessage = JSON.stringify({
+              event: "matchmakingError",
+              data: { message: "Failed to create game. Please try again." }
+            });
+            
+            if (player1.socket.readyState === WebSocket.OPEN) {
+              player1.socket.send(errorMessage);
+            }
+            if (player2.socket.readyState === WebSocket.OPEN) {
+              player2.socket.send(errorMessage);
+            }
+          });
+          
+          return; // Exit the function after finding a match
+        }
+      }
+    }
+    
+    console.log('🕐 No matching players found with compatible preferences');
   }
 }
 
-async function createGame(gameId: string, player1Id: string, player2Id: string): Promise<void> {
+async function createGame(
+  gameId: string, 
+  player1Id: string, 
+  player2Id: string,
+  options: { gameMode: string; useExtension: boolean } = { gameMode: 'classic', useExtension: false }
+): Promise<void> {
   try {
-    // Create the game record
-    await client.queryObject(`
-      INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id, turn_phase, started_at)
-      VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP)
-    `, [gameId, player1Id, player2Id]);
+    console.log(`🎮 Creating new game ${gameId} between ${player1Id} and ${player2Id}`, options);
     
-    // Create the board record
+    // Create the game record with the correct mode and rounds
+    await client.queryObject(`
+      INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id, turn_phase, started_at, game_mode)
+      VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP, $4)
+    `, [gameId, player1Id, player2Id, options.gameMode]);
+    
+    console.log(`✅ Game created with mode: ${options.gameMode}`);
+    
+    // Create the board record with extension settings
     const boardResult = await client.queryObject<{id: number}>(
       `INSERT INTO board (game_id, use_purple_expedition, remaining_cards_in_deck, current_round)
-       VALUES ($1, false, 60, 1) RETURNING id`,
-      [gameId]
+       VALUES ($1, $2, 60, 1) RETURNING id`,
+      [gameId, options.useExtension]
     );
     
     const boardId = boardResult.rows[0].id;
-    console.log(`✅ Board created with ID ${boardId}`);
+    console.log(`✅ Board created with ID ${boardId}, purple extension: ${options.useExtension}`);
     
-    // Initialize expedition slots
+    // Initialize expedition slots and colors
     const colors = ['red', 'green', 'white', 'blue', 'yellow'];
+    if (options.useExtension) {
+      colors.push('purple');
+    }
+    
+    console.log(`🎨 Using colors: ${colors.join(', ')}`);
     
     // Create expedition entries for both players
     for (const color of colors) {
@@ -892,6 +1086,8 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
         [boardId, color]
       );
     }
+    
+    console.log(`✅ Expeditions and discard piles created for ${colors.length} colors`);
     
     // Create a deck of cards
     const deck: { id: string; color: string; type: string; value: number | string }[] = [];
@@ -918,15 +1114,22 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
       }
     }
     
+    const expectedCards = options.useExtension ? 72 : 60; // 6 couleurs * 12 cartes ou 5 couleurs * 12 cartes
+    console.log(`✅ Deck created with ${deck.length} cards (expected: ${expectedCards})`);
+    
     // Shuffle the deck
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     
+    console.log(`✅ Deck shuffled`);
+    
     // Deal initial hands (8 cards each)
     const player1Hand = deck.splice(0, 8);
     const player2Hand = deck.splice(0, 8);
+    
+    console.log(`✅ Dealt hands: Player 1: ${player1Hand.length} cards, Player 2: ${player2Hand.length} cards`);
     
     // Add cards to database - Player 1 hand
     for (let i = 0; i < player1Hand.length; i++) {
@@ -938,6 +1141,8 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
       );
     }
     
+    console.log(`✅ Player 1 cards saved to database`);
+    
     // Add cards to database - Player 2 hand
     for (let i = 0; i < player2Hand.length; i++) {
       const card = player2Hand[i];
@@ -947,6 +1152,8 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
         [gameId, card.id, i]
       );
     }
+    
+    console.log(`✅ Player 2 cards saved to database`);
     
     // Add remaining cards to deck
     for (let i = 0; i < deck.length; i++) {
@@ -958,13 +1165,28 @@ async function createGame(gameId: string, player1Id: string, player2Id: string):
       );
     }
     
+    console.log(`✅ Deck cards saved to database`);
+    
     // Update deck count in board
     await client.queryObject(
       `UPDATE board SET remaining_cards_in_deck = $1 WHERE game_id = $2`,
       [deck.length, gameId]
     );
     
-    console.log(`✅ Game ${gameId} created successfully with ${deck.length} cards in deck, 8 cards per player`);
+    console.log(`✅ Board deck count updated to ${deck.length}`);
+    
+    // Verification of total cards
+    const verifyResult = await client.queryObject(`
+      SELECT COUNT(*) as count FROM game_card WHERE game_id = $1
+    `, [gameId]);
+    console.log(`🔍 After creation, game ${gameId} has ${verifyResult.rows[0].count} cards in game_card`);
+    
+    if (Number(verifyResult.rows[0].count) !== expectedCards) {
+      console.error(`❌ Expected ${expectedCards} cards but found ${verifyResult.rows[0].count} for game ${gameId}`);
+    }
+    
+    console.log(`🎯 Game ${gameId} creation completed successfully with options:`, options);
+    
   } catch (error) {
     console.error("❌ Error creating game in database:", error);
     throw error;
@@ -1020,7 +1242,6 @@ async function getUserIdFromUsername(username: string): Promise<string | null> {
 
 // Handle requests for game state
 async function handleGameStateRequest(data: any, socket: WebSocket, username: string) {
-
   if (socket.readyState !== WebSocket.OPEN) {
     console.log(`WebSocket not open for ${username}, skipping game state send`);
     return;
@@ -1031,6 +1252,24 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
   console.log(`🎮 User ${username} requested game state for game ${gameId}`);
   
   try {
+    // AJOUT: Récupérer les informations utilisateur
+    const userInfoResult = await client.queryObject(`
+      SELECT 
+        g.player1_id,
+        g.player2_id,
+        u1.username as player1_username,
+        u1.avatar_url as player1_avatar,
+        u2.username as player2_username,
+        u2.avatar_url as player2_avatar
+      FROM games g
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
+      WHERE g.id = $1
+    `, [gameId]);
+
+    console.log("🔍 User info from DB:", userInfoResult.rows[0]);
+    const userInfo = userInfoResult.rows[0];
+    
     // Load game from database
     const game = await loadGameFromDatabase(gameId);
     
@@ -1051,6 +1290,17 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
     const userId = await getUserIdFromUsername(username);
     const gameState = game.getGameState(userId);
     
+    // MODIFICATION: Enrichir avec les informations utilisateur
+    gameState.player1.username = userInfo.player1_username;
+    gameState.player1.avatar_url = userInfo.player1_avatar;
+    gameState.player2.username = userInfo.player2_username;
+    gameState.player2.avatar_url = userInfo.player2_avatar;
+    
+    console.log("🔍 Enriched state with user info:", {
+      player1: { username: gameState.player1.username, avatar: gameState.player1.avatar_url },
+      player2: { username: gameState.player2.username, avatar: gameState.player2.avatar_url }
+    });
+    
     console.log(`📤 Sending game state to ${username}:`, JSON.stringify(gameState, null, 2));
     
     try {
@@ -1065,10 +1315,7 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
     
   } catch (error) {
     console.error(`❌ Error getting game state for ${gameId}:`, error);
-    socket.send(JSON.stringify({
-      event: 'error',
-      data: { message: 'Failed to get game state' }
-    }));
+    
     if (socket.readyState === WebSocket.OPEN) {
       try {
         socket.send(JSON.stringify({

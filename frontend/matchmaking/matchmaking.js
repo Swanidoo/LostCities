@@ -15,7 +15,6 @@ let matchmakingState = {
     socket: null,
     userId: null,
     username: null,
-    onlinePlayers: [],
     gameId: null
 };
 
@@ -24,8 +23,7 @@ const elements = {
     searchBtn: document.getElementById('search-game-btn'),
     cancelBtn: document.getElementById('cancel-search-btn'),
     statusMessage: document.getElementById('status-message'),
-    spinner: document.getElementById('spinner'),
-    onlinePlayersList: document.getElementById('online-players')
+    spinner: document.getElementById('spinner')
 };
 
 // Initialisation
@@ -136,15 +134,13 @@ function setupWebSocketEventListeners() {
     socket.addEventListener('open', () => {
         console.log("✅ WebSocket connection established");
         updateStatus("Connecté au serveur", false);
-        
-        // Demander la liste des joueurs en ligne
-        requestOnlinePlayers();
     });
     
     // Erreur de connexion
     socket.addEventListener('error', (error) => {
         console.error("❌ WebSocket error:", error);
         updateStatus("Erreur de connexion au serveur", false);
+        showSystemMessage("Erreur de connexion au serveur", "system-message error");
     });
     
     // Fermeture de la connexion
@@ -179,6 +175,7 @@ function handleWebSocketMessage(event) {
                 }
                 // Gérer les autres erreurs
                 updateStatus(data.data?.message || "Une erreur est survenue", false);
+                showSystemMessage(data.data?.message || "Une erreur est survenue", "system-message error");
                 break;
 
             case "matchmakingStatus":
@@ -186,11 +183,17 @@ function handleWebSocketMessage(event) {
                 updateStatus(data.data.message, data.data.status === "searching");
                 matchmakingState.searching = data.data.status === "searching";
                 toggleMatchmakingUI(matchmakingState.searching);
+                
+                // Afficher message système si recherche annulée
+                if (data.data.status !== "searching" && data.data.message.includes("annulé")) {
+                    showSystemMessage(data.data.message, "system-message warning");
+                }
                 break;
 
             case "matchFound":
                 // Match found! Redirect to the game page
                 updateStatus(`Adversaire trouvé: ${data.data.opponentName}. Redirection vers la partie...`, false);
+                showSystemMessage(`Adversaire trouvé: ${data.data.opponentName}`, "system-message");
 
                 // Store game info if needed
                 localStorage.setItem("currentGameId", data.data.gameId);
@@ -201,16 +204,28 @@ function handleWebSocketMessage(event) {
                 }, 1500);
                 break;
 
-            case "onlinePlayers":
-                // Update online players list
-                matchmakingState.onlinePlayers = data.data.players || [];
-                updateOnlinePlayersList();
-                break;
-
             case "systemMessage":
-                // Handle system messages
+                // Handle system messages - filtrer les messages join/leave
                 if (data.data && data.data.message) {
-                    updateStatus(data.data.message, matchmakingState.searching);
+                    // Ne pas afficher les messages join/leave
+                    if (!data.data.message.includes("a rejoint") && 
+                        !data.data.message.includes("a quitté") &&
+                        !data.data.message.includes("Bienvenue"))
+                        {
+                        updateStatus(data.data.message, matchmakingState.searching);
+                        
+                        // Déterminer le type de message système
+                        let messageType = "system-message";
+                        if (data.data.message.includes("erreur") || data.data.message.includes("error")) {
+                            messageType = "system-message error";
+                        } else if (data.data.message.includes("attention") || data.data.message.includes("warning")) {
+                            messageType = "system-message warning";
+                        } else if (data.data.message.includes("info") || data.data.message.includes("connexion")) {
+                            messageType = "system-message info";
+                        }
+                        
+                        showSystemMessage(data.data.message, messageType);
+                    }
                 }
                 break;
 
@@ -236,17 +251,20 @@ function startMatchmaking() {
         matchmakingState.socket.send(JSON.stringify({
             event: "findMatch",
             data: {
-                userId: matchmakingState.userId,
-                username: matchmakingState.username,
-                gameMode: gameMode,         // Ajout du mode de jeu
-                useExtension: useExtension  // Ajout de l'option d'extension
+              userId: matchmakingState.userId,
+              username: matchmakingState.username,
+              gameMode: gameMode,         // 'classic' ou 'quick'
+              useExtension: useExtension  // true ou false
             }
         }));
 
         matchmakingState.searching = true;
         toggleMatchmakingUI(true);
+        
+        showSystemMessage(`Recherche en cours: ${gameMode === 'quick' ? 'Mode Rapide' : 'Mode Classique'}${useExtension ? ' avec extension' : ''}`, "system-message info");
     } else {
         updateStatus("Déconnecté du serveur. Impossible de rechercher une partie.", false);
+        showSystemMessage("Déconnecté du serveur", "system-message error");
     }
 }
 
@@ -264,22 +282,12 @@ function cancelMatchmaking() {
         updateStatus("Recherche annulée", false);
         matchmakingState.searching = false;
         toggleMatchmakingUI(false);
+        
+        showSystemMessage("Recherche de partie annulée", "system-message warning");
     } else {
         updateStatus("Déconnecté du serveur. Impossible d'annuler la recherche.", false);
+        showSystemMessage("Déconnecté du serveur", "system-message error");
     }
-}
-
-// Demander la liste des joueurs en ligne
-function requestOnlinePlayers() {
-    if (!matchmakingState.socket || matchmakingState.socket.readyState !== WebSocket.OPEN) {
-        return;
-    }
-    
-    // Envoyer une demande pour obtenir la liste des joueurs en ligne
-    matchmakingState.socket.send(JSON.stringify({
-        event: "getOnlinePlayers",
-        data: {}
-    }));
 }
 
 // Mettre à jour le message d'état
@@ -299,68 +307,43 @@ function toggleMatchmakingUI(searching) {
     }
 }
 
-// Mettre à jour la liste des joueurs en ligne
-function updateOnlinePlayersList() {
-    const container = elements.onlinePlayersList;
-    container.innerHTML = '';
-    
-    if (matchmakingState.onlinePlayers.length === 0) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'player';
-        emptyMessage.textContent = 'Aucun joueur en ligne pour le moment';
-        container.appendChild(emptyMessage);
-        return;
+// Afficher un message système avec animation
+function showSystemMessage(message, type = "system-message") {
+    // Créer ou récupérer le conteneur des messages
+    let container = document.querySelector('.system-message-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'system-message-container';
+        document.body.appendChild(container);
     }
     
-    matchmakingState.onlinePlayers.forEach(player => {
-        if (player.id === matchmakingState.userId) return; // Ne pas afficher le joueur actuel
-        
-        const playerElement = document.createElement('div');
-        playerElement.className = 'player';
-        
-        const nameElement = document.createElement('span');
-        nameElement.textContent = player.username;
-        
-        const statsElement = document.createElement('div');
-        statsElement.className = 'player-stats';
-        statsElement.textContent = `${player.status}`;
-        
-        playerElement.appendChild(nameElement);
-        playerElement.appendChild(statsElement);
-        
-        // Ajouter un bouton pour défier le joueur si disponible
-        if (player.status === 'available') {
-            const challengeBtn = document.createElement('button');
-            challengeBtn.className = 'btn btn-small';
-            challengeBtn.textContent = 'Défier';
-            challengeBtn.addEventListener('click', () => challengePlayer(player.id));
-            playerElement.appendChild(challengeBtn);
+    // Créer l'élément message
+    const messageElement = document.createElement('div');
+    messageElement.className = type;
+    messageElement.textContent = message;
+    
+    // Ajouter le message au conteneur
+    container.appendChild(messageElement);
+    
+    // Supprimer le message après 5 secondes
+    setTimeout(() => {
+        if (messageElement && messageElement.parentNode) {
+            messageElement.style.opacity = '0';
+            messageElement.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                messageElement.remove();
+            }, 300);
         }
-        
-        container.appendChild(playerElement);
-    });
-}
-
-// Défier un joueur spécifique
-function challengePlayer(playerId) {
-    if (!matchmakingState.socket || matchmakingState.socket.readyState !== WebSocket.OPEN) {
-        updateStatus("Non connecté au serveur", false);
-        return;
+    }, 5000);
+    
+    // Limiter le nombre de messages affichés (max 3)
+    const messages = container.querySelectorAll('.system-message, .system-message.error, .system-message.warning, .system-message.info');
+    if (messages.length > 3) {
+        const oldestMessage = messages[0];
+        oldestMessage.style.opacity = '0';
+        oldestMessage.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            oldestMessage.remove();
+        }, 300);
     }
-    
-    // Envoyer une demande de défi
-    matchmakingState.socket.send(JSON.stringify({
-        event: "challengePlayer",
-        data: { 
-            userId: matchmakingState.userId,
-            opponentId: playerId 
-        }
-    }));
-    
-    updateStatus("Défi envoyé, en attente de réponse...", true);
-    matchmakingState.searching = true;
-    toggleMatchmakingUI(true);
 }
-
-// Actualiser périodiquement la liste des joueurs en ligne
-setInterval(requestOnlinePlayers, 30000); // Toutes les 30 secondes

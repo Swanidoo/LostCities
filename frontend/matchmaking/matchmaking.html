@@ -8,17 +8,15 @@
     <link rel="stylesheet" href="./matchmaking.css">
 </head>
 <body>
-    <div class="header">
-        <h1>LOST CITIES</h1>
-    </div>
-    
+    <!-- Bouton retour à l'accueil -->
+    <button class="back-button" onclick="window.location.href = '/'">🏠 Accueil</button>  
     <div class="container">
         <div class="matchmaking-box">
             <h2>Recherche de partie</h2>
             <p class="status" id="status-message">Prêt à jouer</p>
             <div class="spinner" id="spinner"></div>
             
-            <!-- Nouvelles options de jeu -->
+            <!-- Options de jeu -->
             <div class="game-options">
                 <div class="option-group">
                     <h3>Mode de jeu</h3>
@@ -41,17 +39,10 @@
                 </div>
             </div>
             
-            <button class="btn" id="search-game-btn">Rechercher une partie</button>
-            <button class="btn btn-secondary hidden" id="cancel-search-btn">Annuler</button>
-        </div>
-        
-        <div class="player-list">
-            <h3>Joueurs en ligne</h3>
-            <div id="online-players">
-                <!-- Les joueurs en ligne seront ajoutés ici dynamiquement -->
-                <div class="player">
-                    <span>Aucun joueur en ligne pour le moment</span>
-                </div>
+            <!-- Boutons centrés -->
+            <div class="button-container">
+                <button class="btn" id="search-game-btn">Rechercher une partie</button>
+                <button class="btn btn-secondary hidden" id="cancel-search-btn">Annuler</button>
             </div>
         </div>
     </div>

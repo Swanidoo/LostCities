@@ -282,7 +282,7 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
 
     // Get game info - convert all BigInts to strings
     const gameResult = await client.queryObject(`
-      SELECT g.id::text as id,  -- Convert BigInt to text
+      SELECT g.id::text as id,
              g.player1_id, 
              g.player2_id,
              g.status,
@@ -294,13 +294,13 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
              g.current_round,
              g.started_at,
              g.ended_at,
+             g.last_discarded_pile,
+             g.game_mode,  -- ✅ IMPORTANT: Cette ligne doit être présente
              b.use_purple_expedition, 
-             b.current_round as board_current_round,
-             b.remaining_cards_in_deck,
-             b.id::text as board_id  -- Convert board ID to text too
-      FROM games g
-      JOIN board b ON g.id = b.game_id
-      WHERE g.id = $1
+             // ... reste de la query
+        FROM games g
+        JOIN board b ON g.id = b.game_id
+        // ... reste de la query
     `, [gameId]);
 
     console.log(`[GET /lost-cities/games/${gameId}] Game query result:`, gameResult.rows.length);
@@ -312,7 +312,11 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     }
     
     const game = gameResult.rows[0];
-    console.log(`[GET /lost-cities/games/${gameId}] Game data:`, game);
+    
+    const gameMode = game.game_mode || 'classic'; // Fallback to classic if undefined
+    const totalRounds = gameMode === 'quick' ? 1 : 3;
+    console.log(`🔍 Game mode from DB: ${game.game_mode}, totalRounds: ${totalRounds}`);
+    console.log(`🔍 All game data:`, game);
 
     // In the game state endpoint, after getting the game data
     console.log(`[GET /lost-cities/games/${gameId}] Player IDs - p1: ${game.player1_id} (${typeof game.player1_id}), p2: ${game.player2_id} (${typeof game.player2_id})`);
@@ -363,19 +367,23 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
       gameId: game.id,
       status: game.status,
       currentRound: Number(game.current_round), // Convert to number
-      totalRounds: 3,
+      totalRounds: totalRounds,
       currentPlayerId: Number(game.current_turn_player_id), // Convert to number
       turnPhase: game.turn_phase || 'play',
       usePurpleExpedition: game.use_purple_expedition,
       cardsInDeck: Number(await getCardsInDeck(gameId)), // Ensure number
       player1: {
-        id: Number(game.player1_id), // Convert to number
+        id: Number(game.player1_id),
+        username: game.player1_username,
+        avatar_url: game.player1_avatar,
         expeditions: expeditions.player1,
         handSize: isPlayer1 ? handResult.rows.length : Number(await getHandSize(gameId, 'player1_hand')),
         hand: isPlayer1 ? handResult.rows : undefined
       },
       player2: {
-        id: Number(game.player2_id), // Convert to number
+        id: Number(game.player2_id),
+        username: game.player2_username,
+        avatar_url: game.player2_avatar,
         expeditions: expeditions.player2,
         handSize: isPlayer2 ? handResult.rows.length : Number(await getHandSize(gameId, 'player2_hand')),
         hand: isPlayer2 ? handResult.rows : undefined

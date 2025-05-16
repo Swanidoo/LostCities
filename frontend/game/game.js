@@ -67,24 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     elements.gameId.value = gameState.gameId;
     
-    // Create tooltip element that we'll reuse
-    const tooltip = document.createElement('div');
-    tooltip.id = 'expedition-tooltip'; // Must match your CSS selector 
-    document.body.appendChild(tooltip);
-    
-    // Global mouse tracking to ensure tooltip follows cursor
-    document.addEventListener('mousemove', (e) => {
-        const tooltip = document.getElementById('expedition-tooltip');
-        if (tooltip && tooltip.style.display === 'flex') {
-            tooltip.style.left = (e.clientX + 15) + 'px';
-            tooltip.style.top = (e.clientY + 15) + 'px';
-        }
-    });
-    
-    // Hide tooltip when cursor leaves the window
-    document.addEventListener('mouseout', () => {
-        tooltip.style.display = 'none';
-    });
+    // Create expedition tooltip element
+    const expeditionTooltip = document.createElement('div');
+    expeditionTooltip.id = 'expedition-tooltip';
+    expeditionTooltip.style.display = 'none';
+    document.body.appendChild(expeditionTooltip);
     
     // Configurer les écouteurs d'événements
     setupEventListeners();
@@ -150,10 +137,6 @@ function initDOMElements() {
         gameEndModal: document.getElementById('game-end-modal'),
         gameResult: document.getElementById('game-result'),
         winnerText: document.getElementById('winner-text'),
-        playerFinalName: document.getElementById('player-final-name'),
-        opponentFinalName: document.getElementById('opponent-final-name'),
-        playerFinalScore: document.getElementById('player-final-score'),
-        opponentFinalScore: document.getElementById('opponent-final-score'),
         newGameBtn: document.getElementById('new-game-btn'),
         backBtn: document.getElementById('back-btn'),
         
@@ -186,60 +169,6 @@ function connectWebSocket() {
 
 // Configuration des écouteurs d'événements
 function setupEventListeners() {
-    // Expedition preview on hover (cursor following)
-    document.querySelectorAll('.expedition-slot').forEach(slot => {
-        slot.addEventListener('mouseenter', (e) => {
-            const color = slot.dataset.color;
-            const cards = slot.querySelector('.expedition-stack')?.children || [];
-            
-            if (cards.length === 0) return;
-            
-            // Find or create preview container
-            let preview = document.getElementById('expedition-preview');
-            if (!preview) {
-                preview = document.createElement('div');
-                preview.id = 'expedition-preview';
-                preview.className = 'card-preview-container';
-                document.body.appendChild(preview);
-            }
-            
-            // Calculate stats as before
-            const cardArray = Array.from(cards);
-            const wagerCount = cardArray.filter(c => c.dataset.type === 'wager').length;
-            const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
-            const expValues = cardArray
-                .filter(c => c.dataset.type !== 'wager')
-                .map(c => parseInt(c.dataset.value) || 0);
-            const valueSum = expValues.reduce((sum, val) => sum + val, 0);
-            
-            // Update preview content
-            preview.innerHTML = `<div>${cards.length} cards</div>
-                            <div>${valueSum} pts</div>
-                            <div>x${multiplier}</div>`;
-            
-            // Show preview
-            preview.style.display = 'flex';
-            
-            // Position it near cursor
-            const updatePosition = (e) => {
-                preview.style.left = `${e.clientX + 15}px`;
-                preview.style.top = `${e.clientY - 15}px`;
-            };
-            
-            // Update position immediately
-            updatePosition(e);
-            
-            // Move preview with cursor
-            slot.addEventListener('mousemove', updatePosition);
-            
-            // Hide preview when leaving
-            slot.addEventListener('mouseleave', () => {
-                preview.style.display = 'none';
-                slot.removeEventListener('mousemove', updatePosition);
-            });
-        });
-    });
-    
     // Boutons de contrôle
     elements.rulesBtn.addEventListener('click', () => {
         elements.rulesModal.classList.add('visible');
@@ -261,7 +190,7 @@ function setupEventListeners() {
     
     // Boutons de fin de partie
     elements.newGameBtn.addEventListener('click', () => {
-        window.location.href = '/matchmaking.html';
+        window.location.href = '/matchmaking/matchmaking.html';
     });
     
     elements.backBtn.addEventListener('click', () => {
@@ -390,8 +319,10 @@ function surrenderGame() {
     // Close the surrender modal
     elements.surrenderModal.classList.remove('visible');
     
-    updateGameStatus("Vous avez abandonné la partie.");
+    // Show end game modal immediately for surrender
+    showGameEnd(true); // Pass true to indicate surrender
 }
+
 
 // Function to send a chat message
 function sendChatMessage() {
@@ -412,18 +343,8 @@ function sendChatMessage() {
             }
         }));
         
-        // Add the message to the chat area
-        const chatMessages = elements.chatMessages;
-        const messageElement = document.createElement('div');
-        messageElement.className = 'chat-message self';
-        messageElement.innerHTML = `<div class="chat-sender">Vous</div><div class="chat-text">${message}</div>`;
-        chatMessages.appendChild(messageElement);
-        
         // Clear the input field
         chatInput.value = '';
-        
-        // Scroll to the bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 }
 
@@ -436,8 +357,15 @@ function handleChatMessage(data) {
     // Add the message to the chat area
     const chatMessages = elements.chatMessages;
     const messageElement = document.createElement('div');
-    messageElement.className = 'chat-message other';
-    messageElement.innerHTML = `<div class="chat-sender">${data.username}</div><div class="chat-text">${data.message}</div>`;
+    
+    // VÉRIFIER SI C'EST NOTRE MESSAGE
+    const isOwnMessage = data.username === gameState.username;
+    messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
+    
+    // Adapter le contenu selon qui a envoyé
+    const senderName = isOwnMessage ? 'Vous' : data.username;
+    messageElement.innerHTML = `<div class="chat-sender">${senderName}</div><div class="chat-text">${data.message}</div>`;
+    
     chatMessages.appendChild(messageElement);
     
     // Scroll to the bottom
@@ -615,22 +543,168 @@ function handleDeckClick() {
 }
 
 // Show game end screen
-function showGameEnd() {
-    // Fill in the game end modal with results
-    const playerScore = gameState.gameData.scores[gameState.playerSide].total;
-    const opponentScore = gameState.gameData.scores[gameState.opponentSide].total;
-    const isWinner = gameState.gameData.winner === Number(gameState.userId);
+function showGameEnd(isSurrender = false) {
+    if (!elements.gameEndModal || !gameState.gameData) return;
     
-    elements.gameResult.textContent = isWinner ? "Victoire !" : "Défaite";
-    elements.winnerText.textContent = isWinner ? "Vous avez gagné la partie !" : "Votre adversaire a gagné la partie.";
+    const playerScore = gameState.gameData.scores[gameState.playerSide]?.total || 0;
+    const opponentScore = gameState.gameData.scores[gameState.opponentSide]?.total || 0;
     
-    elements.playerFinalName.textContent = gameState.username;
-    elements.opponentFinalName.textContent = elements.opponentName.textContent;
+    // Déterminer le résultat
+    let isWinner = false;
+    let isDraw = false;
+    let resultType = '';
     
-    elements.playerFinalScore.textContent = playerScore;
-    elements.opponentFinalScore.textContent = opponentScore;
+    // Si c'est un abandon local (bouton abandon cliqué)
+    if (isSurrender) {
+        resultType = 'abandon-self';
+        isWinner = false;
+        isDraw = false;
+    }
+    // Si la partie est officiellement terminée
+    else if (gameState.gameData.status === 'finished') {
+        isWinner = gameState.gameData.winner == gameState.userId;
+        isDraw = gameState.gameData.winner === null;
+        
+        // Vérifier s'il y a eu un abandon (info du serveur)
+        if (gameState.gameData.surrenderInfo) {
+            const surrenderPlayerId = gameState.gameData.surrenderInfo.playerId;
+            if (surrenderPlayerId == gameState.userId) {
+                resultType = 'abandon-self';
+                isWinner = false;
+            } else {
+                resultType = 'abandon-opponent';
+                isWinner = true;
+            }
+        } 
+        // Pas d'abandon, résultat par points
+        else if (isDraw) {
+            resultType = 'draw';
+        } else if (isWinner) {
+            resultType = 'win-points';
+        } else {
+            resultType = 'loss-points';
+        }
+    }
+    // Cas par défaut (ne devrait pas arriver)
+    else {
+        resultType = 'loss-points';
+        isWinner = false;
+        isDraw = false;
+    }
+
+    // Couleur de la modal selon le résultat
+    const modalContent = elements.gameEndModal.querySelector('.modal-content');
+    modalContent.classList.remove('victory-modal', 'defeat-modal', 'draw-modal');
     
-    // Show the modal
+    if (isWinner && !isDraw) {
+        modalContent.classList.add('victory-modal');
+    } else if (!isWinner && !isDraw) {
+        modalContent.classList.add('defeat-modal');
+    } else {
+        modalContent.classList.add('draw-modal');
+    }
+    
+    // Titre et message selon le type
+    const messages = {
+        'abandon-self': {
+            title: 'Abandon',
+            subtitle: 'Vous avez abandonné la partie.'
+        },
+        'abandon-opponent': {
+            title: 'Victoire',
+            subtitle: 'Votre adversaire a abandonné la partie.'
+        },
+        'win-points': {
+            title: 'Victoire',
+            subtitle: 'Vous avez marqué plus de points que votre adversaire !'
+        },
+        'loss-points': {
+            title: 'Défaite',
+            subtitle: 'Votre adversaire a marqué plus de points.'
+        },
+        'draw': {
+            title: 'Égalité',
+            subtitle: 'Scores identiques des deux côtés.'
+        }
+    };
+    
+    const message = messages[resultType] || messages['loss-points'];
+    
+    // Mettre à jour le titre
+    if (elements.gameResult) {
+        elements.gameResult.textContent = message.title;
+        
+        // Retirer toutes les classes de couleur existantes
+        elements.gameResult.classList.remove('victory-title', 'defeat-title', 'draw-title');
+        
+        // Ajouter la classe appropriée selon le résultat
+        if (isWinner && !isDraw) {
+            elements.gameResult.classList.add('victory-title');
+        } else if (!isWinner && !isDraw) {
+            elements.gameResult.classList.add('defeat-title');
+        } else {
+            elements.gameResult.classList.add('draw-title');
+        }
+    }
+    
+    // Mettre à jour le message
+    if (elements.winnerText) {
+        elements.winnerText.textContent = message.subtitle;
+    }
+    
+    // Calculer la durée
+    const startTime = gameState.gameData.started_at ? new Date(gameState.gameData.started_at) : new Date();
+    const endTime = new Date();
+    const durationMinutes = Math.round((endTime - startTime) / (1000 * 60));
+    
+    // Calculer la marge de victoire
+    const margin = Math.abs(playerScore - opponentScore);
+    
+    // Informations détaillées avec emojis
+    const gameInfoHtml = `
+    <div class="game-summary">
+        <div class="summary-row">
+            <span class="summary-label">🏆 Résultat :</span>
+            <span class="summary-value result-${resultType}">${message.title}</span>
+        </div>
+            <div class="summary-row">
+                <span class="summary-label">📊 Score final :</span>
+                <span class="summary-value">${playerScore} - ${opponentScore}</span>
+            </div>
+            ${!isDraw && resultType !== 'abandon-self' && resultType !== 'abandon-opponent' ? `
+            <div class="summary-row">
+                <span class="summary-label">🎯 Marge de victoire :</span>
+                <span class="summary-value">${margin} points</span>
+            </div>
+            ` : ''}
+            <div class="summary-row">
+                <span class="summary-label">⏱️ Durée :</span>
+                <span class="summary-value">${durationMinutes}m</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">🎮 Mode :</span>
+                <span class="summary-value">
+                    ${gameState.gameData.totalRounds === 1 ? 'Rapide' : 'Classique'}
+                    ${gameState.gameData.usePurpleExpedition ? ' + Extension' : ''}
+                </span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">🎯 Manche :</span>
+                <span class="summary-value">${gameState.gameData.currentRound}/${gameState.gameData.totalRounds}</span>
+            </div>
+        </div>
+    `;
+    
+    // Injecter les informations
+    let gameInfoElement = elements.gameEndModal.querySelector('#game-info');
+    if (!gameInfoElement) {
+        gameInfoElement = document.createElement('div');
+        gameInfoElement.id = 'game-info';
+        elements.gameEndModal.querySelector('#end-game-details').appendChild(gameInfoElement);
+    }
+    gameInfoElement.innerHTML = gameInfoHtml;
+    
+    // Afficher la modal
     elements.gameEndModal.classList.add('visible');
 }
 
@@ -783,16 +857,22 @@ function requestGameState() {
 function handleGameUpdate(data) {
     if (!data.gameState) return;
     
+    console.log('🔍 Raw game state received:', data.gameState);
+    console.log('🔍 Player1 data:', data.gameState.player1);
+    console.log('🔍 Player2 data:', data.gameState.player2);
+    
     // Store the game state
     gameState.gameData = data.gameState;
-    
-    console.log('Game state received:', data.gameState);
     
     // Determine player side
     const playerSide = data.gameState.player1.id === Number(gameState.userId) ? 'player1' : 'player2';
     const opponentSide = playerSide === 'player1' ? 'player2' : 'player1';
     gameState.playerSide = playerSide;
     gameState.opponentSide = opponentSide;
+    
+    console.log('🔍 Player side:', playerSide, 'Opponent side:', opponentSide);
+    console.log('🔍 Player data:', gameState.gameData[playerSide]);
+    console.log('🔍 Opponent data:', gameState.gameData[opponentSide]);
     
     // Update current phase and turn
     gameState.currentPhase = data.gameState.turnPhase;
@@ -837,6 +917,9 @@ function updateGameInterface() {
     
     // Mise à jour du message de statut
     updateGameStatusMessage();
+
+    // Setup expedition hover preview after updating the interface
+    setupExpeditionHoverPreview();
 }
 
 function clearAllTargetHighlighting() {
@@ -847,20 +930,48 @@ function clearAllTargetHighlighting() {
 
 // Mettre à jour les informations générales du jeu
 function updateGameInfo() {
-    // Mettre à jour les noms des joueurs (si disponibles)
-    if (gameState.gameData.player1.name) {
-        elements.playerName.textContent = gameState.playerSide === 'player1' 
-            ? gameState.gameData.player1.name 
-            : gameState.gameData.player2.name;
-            
-        elements.opponentName.textContent = gameState.playerSide === 'player1' 
-            ? gameState.gameData.player2.name 
-            : gameState.gameData.player1.name;
+    if (!gameState.gameData) return;
+    
+    // Récupérer les données des joueurs
+    const playerData = gameState.gameData[gameState.playerSide];
+    const opponentData = gameState.gameData[gameState.opponentSide];
+    
+    // Mettre à jour les noms et avatars
+    elements.playerName.textContent = playerData.username || 'Vous';
+    elements.opponentName.textContent = opponentData.username || 'Adversaire';
+    updatePlayerAvatar('player', playerData.avatar_url);
+    updatePlayerAvatar('opponent', opponentData.avatar_url);
+    
+    // Calculer les scores
+    const currentRoundScores = gameState.gameData.scores;
+    const currentRound = gameState.gameData.currentRound;
+    
+    // Score des manches précédentes (seulement les manches déjà finalisées)
+    let playerPreviousRounds = 0;
+    let opponentPreviousRounds = 0;
+    
+    // Additionner les scores des manches précédentes terminées
+    for (let round = 1; round < currentRound; round++) {
+        const roundKey = `round${round}`;
+        playerPreviousRounds += currentRoundScores[gameState.playerSide][roundKey] || 0;
+        opponentPreviousRounds += currentRoundScores[gameState.opponentSide][roundKey] || 0;
     }
     
-    // Mettre à jour les scores
-    elements.playerScore.textContent = `Score: ${gameState.gameData.scores[gameState.playerSide].total}`;
-    elements.opponentScore.textContent = `Score: ${gameState.gameData.scores[gameState.opponentSide].total}`;
+    // Score de la manche actuelle (calculé en temps réel)
+    const playerCurrentRoundScore = calculateTotalScore(playerData.expeditions);
+    const opponentCurrentRoundScore = calculateTotalScore(opponentData.expeditions);
+    
+    // Score total affiché
+    const playerTotalScore = playerPreviousRounds + playerCurrentRoundScore;
+    const opponentTotalScore = opponentPreviousRounds + opponentCurrentRoundScore;
+    
+    // Formatage des scores avec signe pour la manche actuelle
+    const playerCurrentFormatted = playerCurrentRoundScore > 0 ? `+${playerCurrentRoundScore}` : `${playerCurrentRoundScore}`;
+    const opponentCurrentFormatted = opponentCurrentRoundScore > 0 ? `+${opponentCurrentRoundScore}` : `${opponentCurrentRoundScore}`;
+    
+    // Mettre à jour l'affichage des scores avec indication de la manche actuelle
+    elements.playerScore.textContent = `Score: ${playerTotalScore} (${playerCurrentFormatted})`;
+    elements.opponentScore.textContent = `Score: ${opponentTotalScore} (${opponentCurrentFormatted})`;
     
     // Mettre à jour la manche et le nombre de cartes
     elements.gameRound.textContent = `Manche: ${gameState.gameData.currentRound}/${gameState.gameData.totalRounds}`;
@@ -869,6 +980,43 @@ function updateGameInfo() {
     // Mettre à jour l'indicateur de phase
     elements.phaseIndicator.textContent = `Phase: ${gameState.currentPhase === 'play' ? 'Jouer' : 'Piocher'}`;
 }
+
+function updatePlayerAvatar(type, avatarUrl) {
+    const avatarElement = document.getElementById(`${type}-avatar`);
+    
+    if (!avatarElement) {
+        console.log(`❌ Avatar element not found for ${type}`);
+        return;
+    }
+    
+    console.log(`🔍 Updating ${type} avatar with:`, avatarUrl);
+    
+    // Vider d'abord tout contenu
+    avatarElement.textContent = '';
+    
+    // Si avatarUrl est null, undefined ou vide, utiliser l'avatar par défaut
+    const imageUrl = (avatarUrl && avatarUrl !== 'null') ? avatarUrl : '/assets/default-avatar.png';
+    
+    console.log(`🔍 Using image URL for ${type}:`, imageUrl);
+    
+    // Afficher l'image
+    avatarElement.style.backgroundImage = `url(${imageUrl})`;
+    avatarElement.style.backgroundSize = 'cover';
+    avatarElement.style.backgroundPosition = 'center';
+    avatarElement.style.backgroundRepeat = 'no-repeat';
+    
+    // Test si l'image charge
+    const img = new Image();
+    img.onload = () => console.log(`✅ Avatar loaded successfully for ${type}`);
+    img.onerror = () => {
+        console.log(`❌ Failed to load avatar for ${type}`);
+        if (imageUrl !== '/assets/default-avatar.png') {
+            avatarElement.style.backgroundImage = `url(/assets/default-avatar.png)`;
+        }
+    };
+    img.src = imageUrl;
+}
+
 
 // Mettre à jour la main du joueur
 function updatePlayerHand() {
@@ -956,6 +1104,41 @@ function updatePlayerHand() {
         
         elements.playerHand.appendChild(cardElement);
     });
+}
+
+// Calculer le score d'une expédition
+function calculateExpeditionScore(cards) {
+    if (cards.length === 0) return 0;
+    
+    // Compter les cartes wager
+    const wagerCount = cards.filter(card => card.type === 'wager').length;
+    const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+    
+    // Sommer les valeurs des cartes expédition
+    const expeditionCards = cards.filter(card => card.type === 'expedition');
+    const totalValue = expeditionCards.reduce((sum, card) => sum + (card.value || 0), 0);
+    
+    // Calculer le score de base (valeur totale - 20 points de démarrage)
+    let baseScore = totalValue - 20;
+    
+    // Appliquer le multiplicateur
+    baseScore *= multiplier;
+    
+    // Bonus pour 8+ cartes (ajouté après multiplication)
+    if (cards.length >= 8) {
+        baseScore += 20;
+    }
+    
+    return baseScore;
+}
+
+// Calculer le score total d'un joueur
+function calculateTotalScore(expeditions) {
+    let totalScore = 0;
+    Object.values(expeditions).forEach(expedition => {
+        totalScore += calculateExpeditionScore(expedition);
+    });
+    return totalScore;
 }
 
 // Mettre à jour les expéditions
@@ -1056,8 +1239,9 @@ function updateExpeditions() {
                 
                 // Calculate actual score with the 20-point cost subtracted
                 const expeditionScore = (valueSum - 20) * multiplier;
-                const scoreDisplay = expeditionScore >= 0 ? `+${expeditionScore}` : `${expeditionScore}`;
-                const scoreClass = expeditionScore >= 0 ? 'score-positive' : 'score-negative';
+                const finalScore = expeditionScore + (cards.length >= 8 ? 20 : 0);
+                const scoreDisplay = finalScore >= 0 ? `+${finalScore}` : `${finalScore}`;
+                const scoreClass = finalScore >= 0 ? 'score-positive' : 'score-negative';
                 
                 // Add summary element if useful
                 if (cards.length > 1) {
@@ -1090,150 +1274,6 @@ function updateExpeditions() {
             }
         });
     }
-    
-    // Setup expedition hover preview
-    setupExpeditionHoverPreview();
-}
-
-// Update the calculation in both functions
-
-// In updateExpeditions function:
-function fillExpeditionSlots(expeditions, slots, isOpponent = false) {
-    slots.forEach(slot => {
-        const color = slot.dataset.color;
-        let cards = expeditions[color] || [];
-        
-        // Create a stack container
-        const stackElement = document.createElement('div');
-        stackElement.className = 'expedition-stack';
-        
-        if (isOpponent) {
-            stackElement.classList.add('opponent-stack');
-        }
-        
-        slot.appendChild(stackElement);
-        
-        // Sort cards by value (wager cards first, then ascending value)
-        cards.sort((a, b) => {
-            // Wager cards always come first
-            if (a.type === 'wager' && b.type !== 'wager') return -1;
-            if (a.type !== 'wager' && b.type === 'wager') return 1;
-            
-            // For expedition cards, sort by value
-            if (a.type === 'expedition' && b.type === 'expedition') {
-                return a.value - b.value;
-            }
-            
-            return 0;
-        });
-        
-        // Add cards to the stack (in sorted order)
-        cards.forEach(card => {
-            const cardElement = createCardElement(card);
-            if (isOpponent) {
-                cardElement.classList.add('opponent-card');
-            }
-            stackElement.appendChild(cardElement);
-        });
-        
-        // Create summary info if there are cards
-        if (cards.length > 0) {
-            // Calculate total value and wager multiplier
-            const wagerCount = cards.filter(c => c.type === 'wager').length;
-            const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
-            const expValues = cards.filter(c => c.type !== 'wager').map(c => typeof c.value === 'number' ? c.value : 0);
-            const valueSum = expValues.reduce((sum, val) => sum + val, 0);
-            
-            // Calculate actual score with the 20-point cost subtracted
-            const expeditionScore = (valueSum - 20) * multiplier;
-            const scoreDisplay = expeditionScore >= 0 ? `+${expeditionScore}` : `${expeditionScore}`;
-            const scoreClass = expeditionScore >= 0 ? 'score-positive' : 'score-negative';
-            
-            // Add summary element if useful
-            if (cards.length > 1) {
-                const summaryElement = document.createElement('div');
-                summaryElement.className = 'expedition-summary';
-                summaryElement.innerHTML = `${cards.length} cards • <span class="${scoreClass}">${scoreDisplay}</span> pts • x${multiplier}`;
-                stackElement.appendChild(summaryElement);
-            }
-        }
-    });
-}
-
-function setupExpeditionHoverPreview() {
-    // Get tooltip element
-    const tooltip = document.getElementById('expedition-tooltip');
-    if (!tooltip) return;
-    
-    // Remove any existing expedition-preview
-    const existingPreview = document.getElementById('expedition-preview');
-    if (existingPreview) {
-        existingPreview.remove();
-    }
-    
-    // For expedition SLOTS (these contain the stacks)
-    document.querySelectorAll('.expedition-slot').forEach(slot => {
-        const newSlot = slot.cloneNode(true);
-        slot.parentNode.replaceChild(newSlot, slot);
-        
-        // Create mouseover handler for the entire slot
-        newSlot.addEventListener('mouseenter', () => {
-            showExpeditionTooltip(newSlot, tooltip);
-        });
-        
-        newSlot.addEventListener('mouseleave', () => {
-            tooltip.style.display = 'none';
-        });
-    });
-    
-    // IMPORTANT: Add separate listeners for each CARD in the expeditions
-    // This will be called after cards are added to expeditions
-    setTimeout(() => {
-        document.querySelectorAll('.expedition-slot .card').forEach(card => {
-            card.addEventListener('mouseenter', (e) => {
-                // Find the parent slot
-                const slot = card.closest('.expedition-slot');
-                if (slot) {
-                    showExpeditionTooltip(slot, tooltip);
-                    // Stop event propagation to prevent multiple triggers
-                    e.stopPropagation();
-                }
-            });
-        });
-    }, 500); // Small delay to ensure cards are rendered
-}
-
-// Helper function to show tooltip for an expedition
-function showExpeditionTooltip(slot, tooltip) {
-    const stackElement = slot.querySelector('.expedition-stack');
-    if (!stackElement || stackElement.children.length === 0) return;
-    
-    // Get all cards in the expedition
-    const cardElements = Array.from(stackElement.querySelectorAll('.card'));
-    if (cardElements.length === 0) return;
-    
-    // Calculate expedition stats
-    const wagerCount = cardElements.filter(card => card.dataset.type === 'wager').length;
-    const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
-    const expValues = cardElements
-        .filter(card => card.dataset.type !== 'wager')
-        .map(card => parseInt(card.dataset.value) || 0);
-    const valueSum = expValues.reduce((sum, val) => sum + val, 0);
-    
-    // Calculate the actual score with the 20-point cost subtracted
-    const expeditionScore = (valueSum - 20) * multiplier;
-    const scoreDisplay = expeditionScore >= 0 ? `+${expeditionScore}` : `${expeditionScore}`;
-    const scoreClass = expeditionScore >= 0 ? 'score-positive' : 'score-negative';
-    
-    // Update tooltip content
-    tooltip.innerHTML = `
-        <div>${cardElements.length} cards</div>
-        <div class="${scoreClass}">${scoreDisplay} pts</div>
-        <div>x${multiplier}</div>
-    `;
-    
-    // Show tooltip
-    tooltip.style.display = 'flex';
 }
 
 function updateDiscardAndDeck() {
@@ -1254,11 +1294,21 @@ function updateDiscardAndDeck() {
     // Get all discard piles (including potential purple one)
     const discardPiles = document.querySelectorAll('.discard-pile');
     
+    // *** AJOUTEZ CES LIGNES POUR NETTOYER LES CLASSES ***
+    // First, clear all recently-discarded classes from all piles
+    discardPiles.forEach(pile => {
+        pile.classList.remove('recently-discarded');
+    });
+    
     // Process each discard pile
     discardPiles.forEach(pile => {
         // Clone to remove previous event listeners
         const newPile = pile.cloneNode(false);
         pile.parentNode.replaceChild(newPile, pile);
+        
+        // *** AJOUTEZ CETTE LIGNE AUSSI ***
+        // Make sure recently-discarded is removed from the new element too
+        newPile.classList.remove('recently-discarded');
         
         const color = newPile.dataset.color;
         const cards = gameState.gameData.discardPiles[color] || [];
@@ -1275,7 +1325,6 @@ function updateDiscardAndDeck() {
             cardElement.style.top = '0';
             cardElement.style.left = '0';
             cardElement.style.zIndex = index + 1;
-            cardElement.classList.add(`card-position-${index}`);
             
             newPile.appendChild(cardElement);
         });
@@ -1306,13 +1355,28 @@ function updateDiscardAndDeck() {
                     });
                 }
             } else if (gameState.currentPhase === 'draw' && cards.length > 0) {
-                // During draw phase, highlight all non-empty discard piles
-                newPile.classList.add('valid-target', color);
+                // During draw phase, check if this is the pile just discarded to
+                const isLastDiscardedPile = gameState.gameData.lastDiscardedPile === color;
                 
-                // Add click handler for drawing from discard
-                newPile.addEventListener('click', () => {
-                    drawCard('discard_pile', color);
-                });
+                console.log(`Color ${color}: lastDiscardedPile=${gameState.gameData.lastDiscardedPile}, isLastDiscardedPile=${isLastDiscardedPile}`);
+                
+                if (!isLastDiscardedPile) {
+                    // Highlight non-empty discard piles (except the one just discarded to)
+                    newPile.classList.add('valid-target', color);
+                    
+                    // Add click handler for drawing from discard
+                    newPile.addEventListener('click', () => {
+                        drawCard('discard_pile', color);
+                    });
+                } else {
+                    // Add a visual indication that this pile is not available
+                    newPile.classList.add('recently-discarded');
+                    
+                    // Add click handler to show error message
+                    newPile.addEventListener('click', () => {
+                        updateGameStatus("Vous ne pouvez pas reprendre la carte que vous venez de défausser.");
+                    });
+                }
             }
         }
     });
@@ -1334,6 +1398,82 @@ function updateDiscardAndDeck() {
     } else {
         elements.deckPile.classList.remove('valid-target', 'white');
     }
+}
+
+// Setup expedition hover preview
+function setupExpeditionHoverPreview() {
+    const tooltip = document.getElementById('expedition-tooltip');
+    if (!tooltip) return;
+    
+    // For expedition SLOTS (these contain the stacks)
+    document.querySelectorAll('.expedition-slot').forEach(slot => {
+        // Remove any existing listeners by cloning
+        const newSlot = slot.cloneNode(true);
+        slot.parentNode.replaceChild(newSlot, slot);
+        
+        // Create mouseover handler for the entire slot
+        newSlot.addEventListener('mouseenter', (e) => {
+            showExpeditionTooltip(newSlot, tooltip, e);
+        });
+        
+        newSlot.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+        
+        // Track mouse movement to update tooltip position
+        newSlot.addEventListener('mousemove', (e) => {
+            if (tooltip.style.display === 'flex') {
+                tooltip.style.left = `${e.clientX + 15}px`;
+                tooltip.style.top = `${e.clientY - 15}px`;
+            }
+        });
+    });
+}
+
+// Helper function to show tooltip for an expedition
+function showExpeditionTooltip(slot, tooltip, event) {
+    const stackElement = slot.querySelector('.expedition-stack');
+    if (!stackElement || stackElement.children.length === 0) {
+        tooltip.style.display = 'none';
+        return;
+    }
+    
+    // Get all cards in the expedition (exclude summary elements)
+    const cardElements = Array.from(stackElement.querySelectorAll('.card'));
+    if (cardElements.length === 0) {
+        tooltip.style.display = 'none';
+        return;
+    }
+    
+    // Convertir les éléments DOM en objets carte pour le calcul
+    const cards = cardElements.map(cardEl => ({
+        type: cardEl.dataset.type,
+        value: cardEl.dataset.type === 'expedition' ? parseInt(cardEl.dataset.value) : null
+    }));
+    
+    // Calculer le score en temps réel
+    const score = calculateExpeditionScore(cards);
+    const scoreDisplay = score >= 0 ? `+${score}` : `${score}`;
+    const scoreClass = score >= 0 ? 'score-positive' : 'score-negative';
+    
+    // Calcul des détails pour le tooltip
+    const wagerCount = cards.filter(c => c.type === 'wager').length;
+    const multiplier = wagerCount > 0 ? wagerCount + 1 : 1;
+    
+    // Gestion du pluriel
+    const cardText = cards.length === 1 ? 'carte' : 'cartes';
+    
+    // Update tooltip content
+    tooltip.innerHTML = `
+        <div>${cards.length} ${cardText}</div>
+        <div class="${scoreClass}">${scoreDisplay} pts</div>
+        <div>×${multiplier}</div>
+    `;
+    
+    // Position and show tooltip
+    tooltip.style.left = `${event.clientX + 15}px`;
+    tooltip.style.top = `${event.clientY - 15}px`;
+    tooltip.style.display = 'flex';
 }
 
 // Export des fonctions pour l'objet global gameController

@@ -577,6 +577,9 @@ async function loadReports() {
 async function resolveReport(reportId, resolution) {
     const notes = prompt("Notes de résolution:");
     
+    // ✅ SOLUTION : Vérifier si l'utilisateur a annulé
+    if (notes === null) return;
+    
     try {
         const response = await fetch(`${API_URL}/api/admin/reports/${reportId}/resolve`, {
             method: "PUT",
@@ -588,7 +591,7 @@ async function resolveReport(reportId, resolution) {
         });
         
         if (response.ok) {
-            showNotification(`Rapport tarité avec succès!`);
+            showNotification(`Rapport traité avec succès!`);
             loadReports();
         }
     } catch (error) {

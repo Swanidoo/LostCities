@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Create games table if it doesn't exist
+-- Create games table if it doesn't exist
 CREATE TABLE IF NOT EXISTS games (
     id BIGINT PRIMARY KEY,
     player1_id INTEGER NOT NULL,
@@ -34,7 +35,8 @@ CREATE TABLE IF NOT EXISTS games (
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ended_at TIMESTAMP,
     settings_id INTEGER,
-    game_mode VARCHAR(10) DEFAULT 'classic'
+    game_mode VARCHAR(10) DEFAULT 'classic',
+    last_discarded_pile VARCHAR(20) CHECK (last_discarded_pile IN ('red', 'green', 'white', 'blue', 'yellow', 'purple'))
 );
 
 -- New table for user mutes

@@ -1,131 +1,591 @@
-/* Style de base pour le corps de la page */
+/* ==================== LOGIN CSS - RESPONSIVE VERSION ==================== */
+
+/* Base styles */
 body {
     font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
+    background: linear-gradient(135deg, #333333, #222222);
+    color: white;
     margin: 0;
     padding: 0;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
+    overflow-x: hidden;
 }
 
-/* Style pour le conteneur du formulaire */
+/* ===== RESPONSIVE FORM CONTAINER ===== */
+
 form {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    width: 300px;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.08), 
+        rgba(255, 255, 255, 0.05)
+    );
+    backdrop-filter: blur(15px);
+    padding: var(--spacing-xxl);
+    border-radius: clamp(16px, 2vw, 24px);
+    box-shadow: 
+        0 12px 40px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.1);
+    width: clamp(350px, 90vw, 480px);
+    max-width: 95vw;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
 }
 
-/* Style pour les étiquettes et les champs de saisie */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: var(--spacing-lg);
+}
+
+form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+    border-radius: clamp(16px, 2vw, 24px) clamp(16px, 2vw, 24px) 0 0;
+}
+
+
+form:hover {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.12), 
+        rgba(255, 255, 255, 0.08)
+    );
+    transform: translateY(-4px);
+    box-shadow: 
+        0 16px 50px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+@media (max-width: 768px) {
+    form {
+        padding: var(--spacing-xl);
+        width: clamp(320px, 95vw, 420px);
+    }
+
+    .login-container {
+        padding: var(--spacing-md);
+    }
+}
+
+/* ===== RESPONSIVE FORM TITLE ===== */
+form h2 {
+    text-align: center;
+    color: #4CAF50;
+    margin-bottom: var(--spacing-xl);
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 10px rgba(76, 175, 80, 0.3);
+}
+
+/* ===== RESPONSIVE LABELS ===== */
 label {
     display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 600;
+    color: #e0e0e0;
+    font-size: var(--font-md);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: color 0.3s ease;
 }
 
+label:hover {
+    color: #4CAF50;
+}
+
+/* ===== RESPONSIVE INPUT FIELDS ===== */
 input[type="text"],
+input[type="email"],
 input[type="password"] {
     width: 100%;
-    padding: 10px;
-    margin-bottom: 20px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: clamp(8px, 1vw, 12px);
     box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    color: white;
+    font-size: var(--font-md);
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    position: relative;
 }
 
-/* Style pour le bouton de soumission */
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+    transition: all 0.3s ease;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+    outline: none;
+    border-color: #4CAF50;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 
+        0 0 20px rgba(76, 175, 80, 0.3),
+        inset 0 1px 3px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+input[type="text"]:focus::placeholder,
+input[type="email"]:focus::placeholder,
+input[type="password"]:focus::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+/* ===== RESPONSIVE SUBMIT BUTTON ===== */
 button[type="submit"] {
     width: 100%;
-    padding: 10px;
-    background-color: #007BFF;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, #4CAF50, #45a049);
     border: none;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 16px;
+    border-radius: clamp(8px, 1vw, 12px);
+    color: white;
+    font-size: var(--font-lg);
+    font-weight: 700;
     cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-height: 52px;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+}
+
+button[type="submit"]::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+button[type="submit"]:hover::before {
+    left: 100%;
 }
 
 button[type="submit"]:hover {
-    background-color: #0056b3;
+    background: linear-gradient(135deg, #45a049, #3e8e41);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 25px rgba(76, 175, 80, 0.6);
 }
 
+button[type="submit"]:active {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 15px rgba(76, 175, 80, 0.4);
+}
+
+button[type="submit"]:disabled {
+    background: linear-gradient(135deg, #666, #555);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ===== RESPONSIVE BACK BUTTON ===== */
+.back-button {
+    position: fixed;
+    top: var(--spacing-lg);
+    left: var(--spacing-lg);
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: clamp(8px, 1vw, 12px);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    z-index: var(--z-ui);
+    font-weight: 600;
+    font-size: var(--font-md);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    text-decoration: none;
+}
+
+.back-button::before {
+    content: "←";
+    font-size: 1.2em;
+}
+
+.back-button:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    border-color: #4CAF50;
+}
+
+/* ===== RESPONSIVE FORM LINKS ===== */
+.form-link {
+    text-align: center;
+    margin-top: var(--spacing-lg);
+    font-size: var(--font-md);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.form-link a {
+    color: #4CAF50;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: clamp(4px, 0.5vw, 6px);
+}
+
+.form-link a:hover {
+    color: #45a049;
+    background: rgba(76, 175, 80, 0.1);
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+/* ===== RESPONSIVE CHAT CONTAINER (si présent) ===== */
 #chatContainer {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    height: 100vh;
+    height: clamp(400px, 70vh, 600px);
     width: 100%;
-    max-width: 600px;
-    margin: auto;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    background-color: #fff;
+    max-width: var(--container-sm);
+    margin: 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: clamp(12px, 2vw, 16px);
+    padding: var(--spacing-md);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.05), 
+        rgba(255, 255, 255, 0.02)
+    );
+    backdrop-filter: blur(15px);
 }
 
+@media (max-width: 768px) {
+    #chatContainer {
+        height: clamp(350px, 60vh, 500px);
+        margin: var(--spacing-md);
+    }
+
+    .back-button {
+        position: static;
+        margin: var(--spacing-md) auto var(--spacing-lg);
+        width: fit-content;
+    }
+}
+
+/* ===== RESPONSIVE MESSAGES AREA ===== */
 #messages {
     flex-grow: 1;
     overflow-y: auto;
-    margin-bottom: 10px;
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: clamp(8px, 1vw, 12px);
+    scrollbar-width: thin;
+    scrollbar-color: #4CAF50 rgba(255, 255, 255, 0.1);
 }
 
-.message {
-    padding: 10px;
-    margin: 5px 0;
+#messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+#messages::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 4px;
 }
 
+#messages::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 4px;
+}
+
+#messages::-webkit-scrollbar-thumb:hover {
+    background: #45a049;
+}
+
+/* ===== RESPONSIVE MESSAGE STYLING ===== */
+.message {
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-xs) 0;
+    border-radius: clamp(8px, 1vw, 12px);
+    word-break: break-word;
+    animation: messageSlideIn 0.3s ease;
+    position: relative;
+    max-width: 85%;
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .message.self {
-    background-color: #007BFF;
-    color: #fff;
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
     align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .message.other {
-    background-color: #f1f1f1;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
     align-self: flex-start;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom-left-radius: 4px;
 }
 
+/* ===== RESPONSIVE CHAT FORM ===== */
 #chatForm {
     display: flex;
+    gap: var(--spacing-sm);
+    align-items: flex-end;
 }
 
 #messageInput {
     flex-grow: 1;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-right: 10px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: clamp(8px, 1vw, 12px);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    color: white;
+    font-size: var(--font-md);
+    resize: none;
+    max-height: 100px;
+    transition: all 0.3s ease;
+}
+
+#messageInput:focus {
+    outline: none;
+    border-color: #4CAF50;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+}
+
+#messageInput::placeholder {
+    color: rgba(255, 255, 255, 0.6);
 }
 
 #chatForm button {
-    padding: 10px;
-    background-color: #007BFF;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(135deg, #4CAF50, #45a049);
     border: none;
-    border-radius: 4px;
-    color: #fff;
+    border-radius: clamp(8px, 1vw, 12px);
+    color: white;
     cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    min-height: 44px;
+    min-width: 60px;
+    position: relative;
+    overflow: hidden;
+}
+
+#chatForm button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+#chatForm button:hover::before {
+    left: 100%;
 }
 
 #chatForm button:hover {
-    background-color: #0056b3;
+    background: linear-gradient(135deg, #45a049, #3e8e41);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
 }
 
-.form-link {
+/* ===== LOADING STATE ===== */
+.loading-state {
+    position: relative;
+}
+
+.loading-state::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ===== ERROR STATES ===== */
+.error-message {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.9), rgba(211, 47, 47, 0.8));
+    color: white;
+    padding: var(--spacing-md);
+    border-radius: clamp(8px, 1vw, 12px);
+    margin: var(--spacing-md) 0;
     text-align: center;
-    margin-top: 15px;
-    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid rgba(244, 67, 54, 0.6);
+    animation: errorShake 0.5s ease;
 }
 
-.form-link a {
-    color: #007BFF;
-    text-decoration: none;
+@keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+    20%, 40%, 60%, 80% { transform: translateX(3px); }
 }
 
-.form-link a:hover {
-    text-decoration: underline;
+.success-message {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(69, 160, 73, 0.8));
+    color: white;
+    padding: var(--spacing-md);
+    border-radius: clamp(8px, 1vw, 12px);
+    margin: var(--spacing-md) 0;
+    text-align: center;
+    font-weight: 600;
+    border: 1px solid rgba(76, 175, 80, 0.6);
+    animation: successPulse 0.5s ease;
+}
+
+@keyframes successPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+/* ===== RESPONSIVE BREAKPOINTS ===== */
+@media (max-width: 480px) {
+    form {
+        padding: var(--spacing-lg);
+        width: clamp(250px, 95vw, 350px);
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        font-size: 16px; /* Empêche le zoom sur iOS */
+    }
+    
+    button[type="submit"] {
+        font-size: var(--font-md);
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+    
+    .form-link {
+        font-size: var(--font-sm);
+    }
+}
+
+/* ===== ACCESSIBILITY ===== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    form {
+        border: 3px solid white;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        border: 2px solid white;
+    }
+    
+    button[type="submit"] {
+        border: 2px solid white;
+    }
+}
+
+/* ===== FOCUS MANAGEMENT ===== */
+input:focus,
+button:focus {
+    outline: 3px solid rgba(76, 175, 80, 0.5);
+    outline-offset: 2px;
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+@media (prefers-color-scheme: light) {
+    body {
+        background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+        color: #333;
+    }
+    
+    form {
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.95), 
+            rgba(255, 255, 255, 0.9)
+        );
+        color: #333;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        background: rgba(0, 0, 0, 0.05);
+        color: #333;
+    }
+    
+    .message.other {
+        background: rgba(0, 0, 0, 0.05);
+        color: #333;
+    }
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+    #chatContainer,
+    button[type="submit"] {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
 }

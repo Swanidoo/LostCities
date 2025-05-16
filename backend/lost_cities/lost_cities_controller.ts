@@ -35,6 +35,8 @@ import {
     moveHistory: MoveRecord[];
     scores: GameScores;
     winner: string | null;
+
+    private lastDiscardedPile: string | null = null;    
     
     // Event handlers
     onGameStateChanged: (gameState: any) => void;
@@ -44,7 +46,15 @@ import {
       // Game configuration
       this.gameId = options.gameId;
       this.usePurpleExpedition = options.usePurpleExpedition || false;
-      this.totalRounds = options.totalRounds || 3;
+      
+      // CORRECTION : Déterminer totalRounds selon gameMode ou options
+      if (options.totalRounds) {
+        this.totalRounds = options.totalRounds;
+      } else if (options.gameMode) {
+        this.totalRounds = options.gameMode === 'quick' ? 1 : 3;
+      } else {
+        this.totalRounds = 3; // Valeur par défaut
+      }
       
       // Game state
       this.player1 = {
@@ -357,6 +367,7 @@ import {
       // Move card from hand to discard pile
       player.hand.splice(cardIndex, 1);
       this.discardPiles[card.color].push(card);
+      this.lastDiscardedPile = card.color;
       
       // Record the move
       this.moveHistory.push({
@@ -398,16 +409,21 @@ import {
         return false;
       }
       
-      // Check if deck is empty
-      if (this.deck.length === 0) {
-        // End of round
-        this.endRound();
-        return true;
-      }
-      
       // Draw a card
       const card = this.deck.pop()!;
       player.hand.push(card);
+
+      // Check if deck is now empty (last card was drawn)
+      if (this.deck.length === 0) {
+        // End of round after the move is recorded
+        this.moveHistory.push({
+          playerId,
+          action: 'draw_card',
+          source: 'deck'
+        });
+        this.endRound();
+        return true;
+      }
       
       // Record the move
       this.moveHistory.push({
@@ -449,6 +465,11 @@ import {
         this.onError('Discard pile is empty');
         return false;
       }
+
+      if (this.lastDiscardedPile === color) {
+        this.onError('Cannot draw from the pile you just discarded to');
+        return false;
+      }
       
       // Draw a card from the discard pile
       const card = this.discardPiles[color].pop()!;
@@ -475,6 +496,7 @@ import {
       // Switch current player
       this.currentPlayerId = this.currentPlayerId === this.player1.id ? this.player2.id : this.player1.id;
       this.turnPhase = 'play';
+      this.lastDiscardedPile = null;
       
       // Notify state change
       this.onGameStateChanged(this.getGameState());
@@ -499,7 +521,7 @@ import {
       this.scores.player1.total += player1Score;
       this.scores.player2.total += player2Score;
       
-      // Check if game is over
+      // VERIFICATION : Utilise bien this.totalRounds
       if (this.currentRound >= this.totalRounds) {
         this.endGame();
       } else {
@@ -599,6 +621,7 @@ import {
         turnPhase: this.turnPhase,
         usePurpleExpedition: this.usePurpleExpedition,
         cardsInDeck: this.deck.length,
+        lastDiscardedPile: this.lastDiscardedPile, // Ajoutez cette ligne
         player1: {
           id: this.player1.id,
           expeditions: this.player1.expeditions,
