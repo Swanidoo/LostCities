@@ -91,17 +91,22 @@ authRouter.post("/login", async (ctx) => {
       cryptoKey
     );
 
-    // ===== MODIFICATION ICI =====
+    // Dans la route /login, après la création du JWT
+    console.log("🔍 JWT created:", jwt); // DEBUG
+    console.log("🔍 JWT length:", jwt.length); // DEBUG
+
     // Au lieu de retourner le token, le mettre dans un cookie HTTP-only
     const isProduction = Deno.env.get("ENV") === "production";
-    
+
     ctx.cookies.set("authToken", jwt, {
       httpOnly: true,
-      secure: isProduction, // HTTPS uniquement en production
-      sameSite: "strict",
+      secure: false, // TEMPORAIRE: désactiver HTTPS pour le debug local
+      sameSite: "lax", // TEMPORAIRE: changer de "strict" à "lax"
       maxAge: 60 * 60 * 1000, // 1 heure en millisecondes
       path: "/"
     });
+
+    console.log("✅ Cookie set successfully"); // DEBUG
 
     // Retourner seulement le message de succès (pas le token)
     ctx.response.status = 200;

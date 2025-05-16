@@ -55,30 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Vérifier le statut de ban
-    const banInfo = await checkBanStatus();
-    if (banInfo) {
-        alert(`Vous êtes banni. ${banInfo.reason ? 'Raison: ' + banInfo.reason : ''}`);
-        window.location.href = '/';
-        return;
-    }
-
-    // Clean the token and log it for debugging (like in chat.js)
-    const cleanToken = token.trim();
-    console.log("Using cleaned token length:", cleanToken.length);
-
-    // Récupérer les informations de l'utilisateur depuis le token
-    try {
-        const tokenParts = token.split('.');
-        if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            matchmakingState.userId = payload.id;
-            matchmakingState.username = payload.username || payload.email;
-        }
-    } catch (error) {
-        console.error("Erreur lors de la lecture du token:", error);
-    }
-
     // Configurer les écouteurs d'événements
     setupEventListeners();
     
@@ -87,19 +63,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function checkBanStatus() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return false;
-    
     try {
-        const response = await fetch(`${API_URL}/profile`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        const response = await fetch(`${API_URL}/ban-status`, {
+            credentials: 'include'
         });
         
-        if (response.status === 403) {
+        if (response.ok) {
             const data = await response.json();
-            if (data.banInfo) {
+            if (data.banned) {
                 return data.banInfo;
             }
         }

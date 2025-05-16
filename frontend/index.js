@@ -7,6 +7,7 @@ let chatConnected = false;
 let chatInput = null;
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_MESSAGE_LINES = 15;
+let currentUserRole = 'user'; // Temporaire - à améliorer
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loginSection = document.getElementById('login-section');
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Stocker l'ID de l'utilisateur pour l'utiliser plus tard
                 const userId = user.id;
                 localStorage.setItem('user_id', userId);
+                currentUserRole = user.role;
                 
                 // Charger l'avatar de l'utilisateur
                 loadUserAvatar(userId);
@@ -328,8 +330,7 @@ function displayError() {
 }
 
 function initializeChat() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
+
     
     // Si une connexion existe déjà, la fermer proprement
     if (chatWebSocket && chatWebSocket.readyState === WebSocket.OPEN) {
@@ -339,10 +340,12 @@ function initializeChat() {
     
     chatInput = document.getElementById('chat-input');
     
-    // Connexion WebSocket pour le chat
+    // Connexion WebSocket pour le chat - PAS DE TOKEN dans l'URL
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
-    const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${wsProtocol}//${wsHost}/ws`;
+
+    console.log("Connecting to chat WebSocket:", wsUrl);
 
     const sendButton = document.querySelector('.chat-send');
     if (sendButton) {
@@ -558,19 +561,7 @@ function addChatMessage(username, message, messageId = null) {
         messageElement.dataset.messageId = messageId;
     }
     const currentUsername = localStorage.getItem('username');
-    const token = localStorage.getItem('authToken');
-    let isOwnMessage = false;
-    
-    // Déterminer si c'est notre propre message
-    if (token) {
-        try {
-            const tokenParts = token.split('.');
-            const payload = JSON.parse(atob(tokenParts[1]));
-            isOwnMessage = username === payload.username || username === payload.email;
-        } catch (error) {
-            console.error("Error parsing token:", error);
-        }
-    }
+    let isOwnMessage = false; // Temporaire - vous pourrez améliorer cela plus tard
     
     messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
     
@@ -609,18 +600,8 @@ function showUserMenu(event, username) {
     }
     
     // Vérifier si l'utilisateur est admin
-    let isAdmin = false;
-    const token = localStorage.getItem('authToken');
-    if (token) {
-        try {
-            const tokenParts = token.split('.');
-            const payload = JSON.parse(atob(tokenParts[1]));
-            isAdmin = payload.role === 'admin';
-        } catch (error) {
-            console.error("Error parsing token:", error);
-        }
-    }
-    
+    const isAdmin = currentUserRole === 'admin';
+        
     // Créer le menu
     const menu = document.createElement('div');
     menu.className = 'user-menu-popup';

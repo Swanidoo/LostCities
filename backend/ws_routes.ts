@@ -83,7 +83,7 @@ wsRouter.get("/ws", async (ctx) => {
       ctx.throw(400, "WebSocket connection not supported.");
     }
 
-    const token = ctx.cookies.get("authToken");
+    const token = await ctx.cookies.get("authToken");
     console.log("🔍 Received token:", token ? `${token.substring(0, 20)}...` : "null");
     
     if (!token) {
