@@ -1,59 +1,58 @@
-// network_client.js - New consolidated file
 export class NetworkClient {
-    constructor(gameId, token, options = {}) {
+  constructor(gameId, options = {}) { // SUPPRIMÉ: token parameter
       this.gameId = gameId;
-      this.token = token;
+      // SUPPRIMÉ: this.token = token;
       this.socket = null;
       this.isConnected = false;
       this.reconnectAttempts = 0;
       this.maxReconnectAttempts = options.maxReconnectAttempts || 5;
       this.reconnectDelay = options.reconnectDelay || 1000;
       this.callbacks = {
-        onConnect: options.onConnect || (() => {}),
-        onMessage: options.onMessage || (() => {}),
-        onDisconnect: options.onDisconnect || (() => {}),
-        onError: options.onError || (() => {})
+          onConnect: options.onConnect || (() => {}),
+          onMessage: options.onMessage || (() => {}),
+          onDisconnect: options.onDisconnect || (() => {}),
+          onError: options.onError || (() => {})
       };
       
       // Don't auto-connect immediately to prevent multiple connections
       if (options.autoConnect) {
-        this.connect();
+          this.connect();
       }
-    }
-    
-    connect() {
+  }
+  
+  connect() {
       // Important: Close any existing connections first
       if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
-        console.log("Closing existing connection before reconnecting");
-        this.socket.close(1000, "Reconnecting");
-        
-        // Wait a moment before creating new connection
-        setTimeout(() => this._createConnection(), 500);
+          console.log("Closing existing connection before reconnecting");
+          this.socket.close(1000, "Reconnecting");
+          
+          // Wait a moment before creating new connection
+          setTimeout(() => this._createConnection(), 500);
       } else {
-        this._createConnection();
+          this._createConnection();
       }
-    }
-    
-    _createConnection() {
+  }
+  
+  _createConnection() {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsHost = window.location.hostname === 'localhost' ? 
-        'localhost:3000' : 'lostcitiesbackend.onrender.com';
-      const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(this.token)}`;
+          'localhost:3000' : 'lostcitiesbackend.onrender.com';
+      const wsUrl = `${wsProtocol}//${wsHost}/ws`; // SUPPRIMÉ: token dans l'URL
       
-      console.log(`Connecting to WebSocket: ${wsUrl.substring(0, wsUrl.indexOf('?'))}...`);
+      console.log(`Connecting to WebSocket: ${wsUrl}`);
       
       try {
-        this.socket = new WebSocket(wsUrl);
-        
-        this.socket.addEventListener('open', this._handleOpen.bind(this));
-        this.socket.addEventListener('message', this._handleMessage.bind(this));
-        this.socket.addEventListener('close', this._handleClose.bind(this));
-        this.socket.addEventListener('error', this._handleError.bind(this));
+          this.socket = new WebSocket(wsUrl);
+          
+          this.socket.addEventListener('open', this._handleOpen.bind(this));
+          this.socket.addEventListener('message', this._handleMessage.bind(this));
+          this.socket.addEventListener('close', this._handleClose.bind(this));
+          this.socket.addEventListener('error', this._handleError.bind(this));
       } catch (error) {
-        console.error("Error creating WebSocket:", error);
-        this.callbacks.onError(error);
+          console.error("Error creating WebSocket:", error);
+          this.callbacks.onError(error);
       }
-    }
+  }
     
     // Socket event handlers
     _handleOpen(event) {

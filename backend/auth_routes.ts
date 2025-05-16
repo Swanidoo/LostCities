@@ -56,6 +56,7 @@ authRouter.post("/register", async (ctx) => {
 });
 
 // Route for user login
+// Route for user login - MODIFIER cette section
 authRouter.post("/login", async (ctx) => {
   try {
     const { email, password } = await ctx.request.body({ type: "json" }).value;
@@ -68,7 +69,7 @@ authRouter.post("/login", async (ctx) => {
     }
 
     const dbUser = user.rows[0];
-    const isPasswordValid = await compare(password, dbUser.password); // bcrypt for password verification
+    const isPasswordValid = await compare(password, dbUser.password);
     if (!isPasswordValid) {
       ctx.response.status = 401;
       ctx.response.body = { error: "Invalid password" };
@@ -80,18 +81,39 @@ authRouter.post("/login", async (ctx) => {
       id: dbUser.id,
       username: dbUser.username,
       email: dbUser.email,
-      role: dbUser.role, // Inclure le rôle dans le JWT
+      role: dbUser.role,
       exp: Math.floor(Date.now() / 1000) + 60 * 60, // Expiration dans 1 heure
     };
 
     const jwt = await create(
-      { alg: "HS256", typ: "JWT" }, // Header
-      payload, // Payload
-      cryptoKey // CryptoKey
+      { alg: "HS256", typ: "JWT" },
+      payload,
+      cryptoKey
     );
 
+    // ===== MODIFICATION ICI =====
+    // Au lieu de retourner le token, le mettre dans un cookie HTTP-only
+    const isProduction = Deno.env.get("ENV") === "production";
+    
+    ctx.cookies.set("authToken", jwt, {
+      httpOnly: true,
+      secure: isProduction, // HTTPS uniquement en production
+      sameSite: "strict",
+      maxAge: 60 * 60 * 1000, // 1 heure en millisecondes
+      path: "/"
+    });
+
+    // Retourner seulement le message de succès (pas le token)
     ctx.response.status = 200;
-    ctx.response.body = { message: "Login successful", token: jwt };
+    ctx.response.body = { 
+      message: "Login successful",
+      user: {
+        id: dbUser.id,
+        username: dbUser.username,
+        email: dbUser.email,
+        role: dbUser.role
+      }
+    };
   } catch (err) {
     console.error("Error in /login:", err);
     ctx.response.status = 500;
@@ -146,6 +168,23 @@ authRouter.get("/ban-status", authMiddleware, async (ctx) => {
     ctx.response.status = 500;
     ctx.response.body = { error: "Internal server error" };
   }
+});
+
+
+// Route pour logout - supprimer le cookie
+authRouter.post("/logout", (ctx) => {
+  ctx.cookies.delete("authToken");
+  ctx.response.status = 200;
+  ctx.response.body = { message: "Logged out successfully" };
+});
+
+// Route pour vérifier l'authentification
+authRouter.get("/check-auth", authMiddleware, (ctx) => {
+  // Si on arrive ici, c'est que l'utilisateur est authentifié
+  ctx.response.body = { 
+    authenticated: true,
+    user: ctx.state.user 
+  };
 });
 
 export default authRouter;

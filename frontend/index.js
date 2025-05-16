@@ -14,17 +14,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const usernameSpan = document.getElementById('username');
     const userAvatar = document.getElementById('user-avatar');
     
-    // Vérifier si l'utilisateur est connecté
-    const token = localStorage.getItem('authToken');
-    if (token) {
-        try {
-            const tokenParts = token.split('.');
-            if (tokenParts.length === 3) {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                usernameSpan.textContent = payload.username || payload.email;
+    // Vérifier si l'utilisateur est connecté via l'API
+    try {
+        const authStatus = await fetch(`${API_URL}/check-auth`, {
+            credentials: 'include'
+        });
+        
+        if (authStatus.ok) {
+            const data = await authStatus.json();
+            if (data.authenticated && data.user) {
+                const user = data.user;
+                usernameSpan.textContent = user.username || user.email;
                 
                 // Stocker l'ID de l'utilisateur pour l'utiliser plus tard
-                const userId = payload.id;
+                const userId = user.id;
                 localStorage.setItem('user_id', userId);
                 
                 // Charger l'avatar de l'utilisateur
@@ -36,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 
                 // Vérifier si l'utilisateur est admin
-                if (payload.role === 'admin') {
+                if (user.role === 'admin') {
                     const adminBtn = document.getElementById('admin-btn');
                     if (adminBtn) {
                         adminBtn.style.display = 'block';
@@ -45,89 +48,99 @@ document.addEventListener('DOMContentLoaded', async () => {
                         });
                     }
                 }
-            }
-        } catch (error) {
-            console.error("Erreur lors de la lecture du token:", error);
-        }
-        
-        // Vérifier le statut de ban AVANT d'initialiser le chat
-        const banInfo = await checkBanStatus();
-        
-        if (banInfo) {
-            const playBtn = document.getElementById('play-btn');
-            if (playBtn) {
-                playBtn.classList.add('banned');
-                playBtn.disabled = true;
-                playBtn.style.backgroundColor = '#d32f2f';
-                playBtn.style.cursor = 'not-allowed';
-                playBtn.style.opacity = '0.8';
                 
-                // Créer le tooltip
-                const tooltip = document.createElement('div');
-                tooltip.className = 'ban-tooltip';
+                // Vérifier le statut de ban
+                const banInfo = await checkBanStatus();
                 
-                let tooltipContent = '<p><strong>Vous êtes banni</strong></p>';
-                if (banInfo.until) {
-                    const untilDate = new Date(banInfo.until);
-                    const timeLeft = untilDate.getTime() - new Date().getTime();
-                    if (timeLeft > 0) {
-                        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-                        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                if (banInfo) {
+                    const playBtn = document.getElementById('play-btn');
+                    if (playBtn) {
+                        playBtn.classList.add('banned');
+                        playBtn.disabled = true;
+                        playBtn.style.backgroundColor = '#d32f2f';
+                        playBtn.style.cursor = 'not-allowed';
+                        playBtn.style.opacity = '0.8';
                         
-                        let timeString = '';
-                        if (days > 0) timeString += `${days}j `;
-                        if (hours > 0) timeString += `${hours}h `;
-                        if (minutes > 0 && days === 0) timeString += `${minutes}min`;
+                        // Créer le tooltip
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'ban-tooltip';
                         
-                        tooltipContent += `<p>Temps restant: ${timeString}</p>`;
-                        tooltipContent += `<p>Jusqu'à: ${untilDate.toLocaleString()}</p>`;
+                        let tooltipContent = '<p><strong>Vous êtes banni</strong></p>';
+                        if (banInfo.until) {
+                            const untilDate = new Date(banInfo.until);
+                            const timeLeft = untilDate.getTime() - new Date().getTime();
+                            if (timeLeft > 0) {
+                                const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                                const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                                
+                                let timeString = '';
+                                if (days > 0) timeString += `${days}j `;
+                                if (hours > 0) timeString += `${hours}h `;
+                                if (minutes > 0 && days === 0) timeString += `${minutes}min`;
+                                
+                                tooltipContent += `<p>Temps restant: ${timeString}</p>`;
+                                tooltipContent += `<p>Jusqu'à: ${untilDate.toLocaleString()}</p>`;
+                            }
+                        } else {
+                            tooltipContent += '<p>Durée: Permanent</p>';
+                        }
+                        
+                        if (banInfo.reason) {
+                            tooltipContent += `<p>Raison: ${banInfo.reason}</p>`;
+                        }
+                        
+                        tooltip.innerHTML = tooltipContent;
+                        
+                        playBtn.addEventListener('mouseenter', (e) => {
+                            document.body.appendChild(tooltip);
+                            const rect = playBtn.getBoundingClientRect();
+                            tooltip.style.display = 'block';
+                            tooltip.style.position = 'absolute';
+                            tooltip.style.left = rect.left + 'px';
+                            tooltip.style.top = (rect.bottom + 5) + 'px';
+                            tooltip.style.zIndex = '1000';
+                        });
+                        
+                        playBtn.addEventListener('mouseleave', () => {
+                            if (tooltip.parentNode) {
+                                tooltip.parentNode.removeChild(tooltip);
+                            }
+                        });
+                        
+                        // Bloquer le clic sur le bouton
+                        playBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        });
                     }
                 } else {
-                    tooltipContent += '<p>Durée: Permanent</p>';
+                    // Si l'utilisateur n'est pas banni, ajouter le gestionnaire normal
+                    document.getElementById('play-btn').addEventListener('click', () => {
+                        window.location.href = '/matchmaking/matchmaking.html';
+                    });
                 }
                 
-                if (banInfo.reason) {
-                    tooltipContent += `<p>Raison: ${banInfo.reason}</p>`;
-                }
+                // Initialiser le chat automatiquement pour les utilisateurs connectés
+                initializeChat();
                 
-                tooltip.innerHTML = tooltipContent;
-                
-                playBtn.addEventListener('mouseenter', (e) => {
-                    document.body.appendChild(tooltip);
-                    const rect = playBtn.getBoundingClientRect();
-                    tooltip.style.display = 'block';
-                    tooltip.style.position = 'absolute';
-                    tooltip.style.left = rect.left + 'px';
-                    tooltip.style.top = (rect.bottom + 5) + 'px';
-                    tooltip.style.zIndex = '1000';
-                });
-                
-                playBtn.addEventListener('mouseleave', () => {
-                    if (tooltip.parentNode) {
-                        tooltip.parentNode.removeChild(tooltip);
-                    }
-                });
-                
-                // Bloquer le clic sur le bouton
-                playBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                });
+                loginSection.classList.add('hidden');
+                userSection.classList.remove('hidden');
+            } else {
+                // Non connecté - afficher la section de login
+                loginSection.classList.remove('hidden');
+                userSection.classList.add('hidden');
             }
         } else {
-            // Si l'utilisateur n'est pas banni, ajouter le gestionnaire normal
-            document.getElementById('play-btn').addEventListener('click', () => {
-                window.location.href = '/matchmaking/matchmaking.html';
-            });
+            // Erreur lors de la vérification - afficher la section de login
+            loginSection.classList.remove('hidden');
+            userSection.classList.add('hidden');
         }
-    
-        // Initialiser le chat automatiquement pour les utilisateurs connectés
-        initializeChat();
-        
-        // Afficher la section utilisateur
-        loginSection.classList.add('hidden');
-        userSection.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error checking auth status:', error);
+        // Erreur - afficher la section de login
+        loginSection.classList.remove('hidden');
+        userSection.classList.add('hidden');
     }
     
     // Gestionnaires d'événements pour les boutons (hors du if(token))
@@ -139,8 +152,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = '/login/register.html';
     });
     
-    document.getElementById('logout-btn').addEventListener('click', () => {
-        localStorage.removeItem('authToken');
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        try {
+            await fetch(`${API_URL}/logout`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+        } catch (error) {
+            console.error('Error during logout:', error);
+        }
         window.location.reload();
     });
 
@@ -257,9 +277,7 @@ async function loadLeaderboard(mode, withExtension) {
 async function loadUserAvatar(userId) {
     try {
         const response = await fetch(`${API_URL}/api/profile/${userId}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         if (response.ok) {
             const profile = await response.json();
@@ -834,14 +852,9 @@ async function submitReport(username, formData) {
 }
 
 async function checkBanStatus() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return false;
-    
     try {
         const response = await fetch(`${API_URL}/ban-status`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         if (response.ok) {

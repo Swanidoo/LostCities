@@ -57,9 +57,7 @@ function createUserRow(user) {
 async function loadUsers(page = 1) {
     try {
         const response = await fetch(`${API_URL}/api/admin/users?page=${page}&limit=50`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-            },
+            credentials: 'include' // AJOUTÉ
         });
 
         if (!response.ok) {
@@ -97,10 +95,7 @@ async function unbanUser(userId) {
     try {
         const response = await fetch(`${API_URL}/api/admin/users/${userId}/unban`, {
             method: "POST",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                "Content-Type": "application/json"
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         if (response.ok) {
@@ -117,10 +112,7 @@ async function unmuteUser(userId) {
     try {
         const response = await fetch(`${API_URL}/api/admin/users/${userId}/unmute`, {
             method: "POST",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
-                "Content-Type": "application/json"
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         if (response.ok) {
@@ -202,9 +194,7 @@ async function deleteMessage(messageId) {
     try {
         const response = await fetch(`${API_URL}/api/admin/chat-messages/${messageId}`, {
             method: "DELETE",
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         if (response.ok) {
@@ -243,9 +233,7 @@ async function deleteMessage(messageId) {
 async function loadDashboardStats() {
     try {
         const response = await fetch(`${API_URL}/api/admin/dashboard`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         const stats = await response.json();
@@ -257,30 +245,25 @@ async function loadDashboardStats() {
 
 
 async function muteUser(userId, username = null) {
-    // D'abord demander la raison
     const reason = prompt(username ? `Raison du mute pour ${username}:` : "Raison du mute:");
-    
-    // Si l'utilisateur annule, on arrête tout
     if (reason === null) return;
     
-    // Ensuite demander la durée
     const duration = prompt("Durée en secondes (laisser vide pour permanent):");
-    
-    // Si l'utilisateur annule à ce stade, on arrête aussi
     if (duration === null) return;
     
     try {
         const response = await fetch(`${API_URL}/api/admin/users/${userId}/mute`, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
                 "Content-Type": "application/json"
             },
+            credentials: 'include', // AJOUTÉ
             body: JSON.stringify({ 
                 duration: duration ? parseInt(duration) : null, 
                 reason 
             })
         });
+
         
         if (response.ok) {
             showNotification(username ? `${username} a été muté avec succès!` : "Utilisateur muté avec succès!");
@@ -305,9 +288,7 @@ async function muteUserFromChat(userId, username) {
 async function loadChatMessages(page = 1) {
     try {
         const response = await fetch(`${API_URL}/api/admin/chat-messages?page=${page}&limit=50`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         // Check if response is ok
@@ -354,23 +335,24 @@ async function loadChatMessages(page = 1) {
 }
 
 async function checkAdminAccess() {
-    const token = localStorage.getItem("authToken");
-    
-    if (!token) {
-        window.location.href = '/login/login.html';
-        return false;
-    }
-    
     try {
-        // Parse JWT token to check role
-        const tokenParts = token.split('.');
-        if (tokenParts.length !== 3) {
-            throw new Error("Invalid token format");
+        // Vérifier l'authentification via l'API
+        const response = await fetch(`${API_URL}/check-auth`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            window.location.href = '/login/login.html';
+            return false;
         }
         
-        const payload = JSON.parse(atob(tokenParts[1]));
+        const data = await response.json();
+        if (!data.authenticated || !data.user) {
+            window.location.href = '/login/login.html';
+            return false;
+        }
         
-        if (payload.role !== 'admin') {
+        if (data.user.role !== 'admin') {
             alert("Access denied: Admin privileges required");
             window.location.href = '/';
             return false;
@@ -461,11 +443,9 @@ function animateValue(id, start, end, duration) {
 
 // Fonction pour bannir un utilisateur
 async function banUser(userId) {
-    // First ask for reason (nouveau ordre)
     const reason = prompt("Raison du ban:");
     if (reason === null) return;
     
-    // Then ask for duration
     const duration = prompt("Durée en secondes (laisser vide pour permanent):");
     if (duration === null) return;
     
@@ -473,9 +453,9 @@ async function banUser(userId) {
         const response = await fetch(`${API_URL}/api/admin/users/${userId}/ban`, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
                 "Content-Type": "application/json"
             },
+            credentials: 'include', // AJOUTÉ
             body: JSON.stringify({ duration: duration ? parseInt(duration) : null, reason })
         });
         
@@ -532,9 +512,7 @@ async function debugAuth() {
 async function loadReports() {
     try {
         const response = await fetch(`${API_URL}/api/admin/reports?status=pending`, {
-            headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         if (!response.ok) {
@@ -576,17 +554,15 @@ async function loadReports() {
 // Fonction pour résoudre un rapport
 async function resolveReport(reportId, resolution) {
     const notes = prompt("Notes de résolution:");
-    
-    // ✅ SOLUTION : Vérifier si l'utilisateur a annulé
     if (notes === null) return;
     
     try {
         const response = await fetch(`${API_URL}/api/admin/reports/${reportId}/resolve`, {
             method: "PUT",
             headers: {
-                "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
                 "Content-Type": "application/json"
             },
+            credentials: 'include', // AJOUTÉ
             body: JSON.stringify({ resolution, notes })
         });
         

@@ -31,29 +31,37 @@ const gameState = {
 let elements = {};
 
 // Initialisation principale
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Cache all DOM elements
     initDOMElements();
     
     // Vérifier si l'utilisateur est connecté
-    const token = localStorage.getItem('authToken');
-    if (!token) {
+    try {
+        const authResponse = await fetch(`${API_URL}/check-auth`, {
+            credentials: 'include'
+        });
+        
+        if (!authResponse.ok) {
+            window.location.href = '/login/login.html';
+            return;
+        }
+        
+        const authData = await authResponse.json();
+        if (!authData.authenticated || !authData.user) {
+            window.location.href = '/login/login.html';
+            return;
+        }
+        
+        // Récupérer les informations de l'utilisateur depuis la réponse API
+        const user = authData.user;
+        gameState.userId = user.id;
+        gameState.username = user.username || user.email;
+        elements.userId.value = gameState.userId;
+        elements.playerName.textContent = gameState.username;
+    } catch (error) {
+        console.error("Erreur lors de la vérification d'auth:", error);
         window.location.href = '/login/login.html';
         return;
-    }
-
-    // Récupérer les informations de l'utilisateur depuis le token
-    try {
-        const tokenParts = token.split('.');
-        if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            gameState.userId = payload.id;
-            gameState.username = payload.username || payload.email;
-            elements.userId.value = gameState.userId;
-            elements.playerName.textContent = gameState.username;
-        }
-    } catch (error) {
-        console.error("Erreur lors de la lecture du token:", error);
     }
 
     // Récupérer l'ID de la partie depuis l'URL
@@ -147,19 +155,14 @@ function initDOMElements() {
 
 // Connexion au WebSocket
 function connectWebSocket() {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
-
-    // Clean the token
-    const cleanToken = token.trim();
     
-    // Use the same WebSocket protocol detection
+    // WebSocket se connectera automatiquement avec les cookies
     const isLocalhost = window.location.hostname === "localhost";
     const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
     const wsHost = isLocalhost ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
-    const wsUrl = `${wsProtocol}//${wsHost}/ws?token=${encodeURIComponent(cleanToken)}`;
+    const wsUrl = `${wsProtocol}//${wsHost}/ws`; // Plus de token dans l'URL
     
-    console.log("Connecting to WebSocket URL:", wsUrl.substring(0, wsUrl.indexOf('?') + 15) + "...");
+    console.log("Connecting to WebSocket URL:", wsUrl);
     
     gameState.socket = new WebSocket(wsUrl);
     

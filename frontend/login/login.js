@@ -61,7 +61,7 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
-        credentials: 'include',
+        credentials: 'include', // IMPORTANT: pour envoyer/recevoir les cookies
     })
     .then(response => {
         if (!response.ok) {
@@ -74,24 +74,7 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
     .then(data => {
         console.log(data);
         if (data.message === "Login successful") {
-            // Store the JWT token in localStorage
-            localStorage.setItem("authToken", data.token);
             
-            // Decode the JWT token to extract user information
-            const tokenParts = data.token.split('.');
-            if (tokenParts.length === 3) {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                console.log("Token payload:", payload);
-                
-                // Store user ID and username in localStorage
-                if (payload.id) {
-                    localStorage.setItem("user_id", payload.id);
-                }
-                if (payload.username) {
-                    localStorage.setItem("username", payload.username);
-                }
-            }
-
             showSuccess("Connexion réussie ! Redirection...");
             
             // Redirection après un court délai

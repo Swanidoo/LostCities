@@ -7,51 +7,34 @@ export class GameController {
     
     // Game properties
     this.gameId = gameId;
-    this.userId = localStorage.getItem('user_id');
-    this.token = localStorage.getItem('authToken');
+    this.userId = localStorage.getItem('user_id'); // GARDÉ - juste l'ID pour le cache
+    // SUPPRIMÉ: this.token = localStorage.getItem('authToken');
     this.gameState = null;
     
-    // Validate required data
-    if (!this.token) {
-      console.error("No auth token found, redirecting to login");
-      setTimeout(() => window.location.href = '/login/login.html', 1000);
-      return;
-    }
+    // SUPPRIMÉ: la validation du token
     
     if (!this.userId) {
       console.error("No user ID found");
-      // Try to extract from token
-      this._extractUserIdFromToken();
+      // SUPPRIMÉ: Try to extract from token
     }
     
     // Initialize components
     this._initComponents();
   }
   
-  _extractUserIdFromToken() {
-    try {
-      const tokenParts = this.token.split('.');
-      if (tokenParts.length === 3) {
-        const payload = JSON.parse(atob(tokenParts[1]));
-        this.userId = payload.id;
-        console.log("Extracted user ID from token:", this.userId);
-      }
-    } catch (error) {
-      console.error("Failed to extract user ID from token:", error);
-    }
-  }
+  // SUPPRIMÉ: _extractUserIdFromToken method
   
   _initComponents() {
     // Create UI controller
     this.ui = new UIController(this);
     
-    // Initialize network client with callbacks
-    this.network = new NetworkClient(this.gameId, this.token, {
+    // Initialize network client with callbacks - PLUS DE TOKEN
+    this.network = new NetworkClient(this.gameId, {
       onConnect: this._handleConnect.bind(this),
       onMessage: this._handleMessage.bind(this),
       onDisconnect: this._handleDisconnect.bind(this),
       onError: this._handleError.bind(this),
-      autoConnect: true // Explicitly enable auto-connect
+      autoConnect: true
     });
     
     // Set up UI event handlers
@@ -114,28 +97,28 @@ export class GameController {
   // Game state management
   async _fetchInitialGameState() {
     try {
-      // Build the API URL
-      const apiUrl = window.location.hostname === "localhost" 
-        ? "http://localhost:3000" 
-        : "https://lostcitiesbackend.onrender.com";
-      
-      const response = await fetch(`${apiUrl}/lost-cities/games/${this.gameId}`, {
-        headers: { 'Authorization': `Bearer ${this.token}` }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch game state: ${response.status}`);
-      }
-      
-      const gameState = await response.json();
-      console.log("Initial game state loaded:", gameState);
-      
-      // Update game state
-      this.updateGameState(gameState);
-      
+        // Build the API URL
+        const apiUrl = window.location.hostname === "localhost" 
+            ? "http://localhost:3000" 
+            : "https://lostcitiesbackend.onrender.com";
+        
+        const response = await fetch(`${apiUrl}/lost-cities/games/${this.gameId}`, {
+            credentials: 'include' // AJOUTÉ
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch game state: ${response.status}`);
+        }
+        
+        const gameState = await response.json();
+        console.log("Initial game state loaded:", gameState);
+        
+        // Update game state
+        this.updateGameState(gameState);
+        
     } catch (error) {
-      console.error("Error fetching initial game state:", error);
-      this.ui.setGameMessage("Error loading game state. Please refresh the page.");
+        console.error("Error fetching initial game state:", error);
+        this.ui.setGameMessage("Error loading game state. Please refresh the page.");
     }
   }
   

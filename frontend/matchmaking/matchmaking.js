@@ -29,8 +29,28 @@ const elements = {
 // Initialisation
 document.addEventListener('DOMContentLoaded', async () => {
     // Vérifier si l'utilisateur est connecté
-    const token = localStorage.getItem('authToken');
-    if (!token) {
+    try {
+        const authResponse = await fetch(`${API_URL}/check-auth`, {
+            credentials: 'include'
+        });
+        
+        if (!authResponse.ok) {
+            window.location.href = '../login/login.html';
+            return;
+        }
+        
+        const authData = await authResponse.json();
+        if (!authData.authenticated) {
+            window.location.href = '../login/login.html';
+            return;
+        }
+        
+        // Récupérer les informations de l'utilisateur depuis la réponse
+        const user = authData.user;
+        matchmakingState.userId = user.id;
+        matchmakingState.username = user.username || user.email;
+    } catch (error) {
+        console.error("Erreur lors de la vérification d'auth:", error);
         window.location.href = '../login/login.html';
         return;
     }
@@ -108,22 +128,28 @@ function setupEventListeners() {
 }
 
 // Connexion au WebSocket
-function connectWebSocket(cleanToken) {
-    if (!cleanToken) return;
-
+function connectWebSocket() {
     // Fermer la connexion existante si elle existe
     if (matchmakingState.socket && matchmakingState.socket.readyState === WebSocket.OPEN) {
         matchmakingState.socket.close();
     }
 
-    // Create WebSocket URL with same pattern as chat.js
-    const wsUrl = `${WS_URL}?token=${encodeURIComponent(cleanToken)}`;
-    console.log("Connecting to WebSocket URL:", wsUrl.substring(0, wsUrl.indexOf('?') + 15) + "...");
+    // Create WebSocket URL - ATTENTION: PAS DE TOKEN dans l'URL
+    const wsProtocol = API_URL.startsWith('https') ? 'wss:' : 'ws:';
+    const wsHost = isLocalhost ? 'localhost:3000' : 'lostcitiesbackend.onrender.com';
+    const wsUrl = `${wsProtocol}//${wsHost}/ws`; // Plus de token dans l'URL
     
-    matchmakingState.socket = new WebSocket(wsUrl);
+    console.log("Connecting to WebSocket URL:", wsUrl);
     
-    // Gestion des événements WebSocket
-    setupWebSocketEventListeners();
+    try {
+        matchmakingState.socket = new WebSocket(wsUrl);
+        
+        // Gestion des événements WebSocket
+        setupWebSocketEventListeners();
+    } catch (error) {
+        console.error("Error creating WebSocket:", error);
+        // Ajout d'un callback ou gestion d'erreur si nécessaire
+    }
 }
 
 // Configuration des écouteurs d'événements WebSocket

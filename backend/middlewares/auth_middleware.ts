@@ -2,16 +2,14 @@ import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 export const authMiddleware = async (ctx: any, next: any) => {
   try {
-    const authHeader = ctx.request.headers.get("Authorization");
-    console.log("🔍 Authorization header:", authHeader);
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // Récupérer le token depuis le cookie au lieu du header
+    const token = ctx.cookies.get("authToken");
+    
+    if (!token) {
       ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized: Invalid Authorization header format" };
+      ctx.response.body = { error: "Unauthorized: No authentication token" };
       return;
     }
-
-    const token = authHeader.split(" ")[1];
     
     // Get the JWT_SECRET
     const jwtKey = Deno.env.get("JWT_SECRET");

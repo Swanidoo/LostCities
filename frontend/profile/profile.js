@@ -26,17 +26,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Ajouter un loader élégant
     showPageLoader();
     
-    // Vérifier les permissions utilisateur
-    const token = localStorage.getItem('authToken');
-    if (token) {
-        try {
-            const tokenParts = token.split('.');
-            const payload = JSON.parse(atob(tokenParts[1]));
-            isOwnProfile = payload.id === parseInt(userId);
-            isAdmin = payload.role === 'admin';
-        } catch (error) {
-            console.error('Error parsing token:', error);
+    // Vérifier les permissions utilisateur via l'API
+    try {
+        const authResponse = await fetch(`${API_URL}/check-auth`, {
+            credentials: 'include'
+        });
+        
+        if (authResponse.ok) {
+            const authData = await authResponse.json();
+            if (authData.authenticated && authData.user) {
+                const user = authData.user;
+                isOwnProfile = user.id === parseInt(userId);
+                isAdmin = user.role === 'admin';
+            }
         }
+    } catch (error) {
+        console.error('Error checking auth:', error);
     }
     
     try {
@@ -231,9 +236,7 @@ function playTabSound() {
 async function loadProfile() {
     try {
         const response = await fetch(`${API_URL}/api/profile/${currentUserId}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         if (!response.ok) {
@@ -297,7 +300,9 @@ async function loadGameHistory(page = 1) {
         }
         
         // Charger l'historique depuis l'API
-        const response = await fetch(`${API_URL}/api/profile/${currentUserId}/games?page=${page}&limit=10`);
+        const response = await fetch(`${API_URL}/api/profile/${currentUserId}/games?page=${page}&limit=10`, {
+            credentials: 'include' // AJOUTÉ
+        });
         
         if (!response.ok) {
             throw new Error('Failed to load game history');
@@ -627,9 +632,7 @@ async function showGameDetail(gameId) {
     // Charger les détails depuis l'API
     try {
         const response = await fetch(`${API_URL}/api/games/${gameId}/details`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         if (!response.ok) {
             throw new Error('Failed to load game details');
@@ -831,9 +834,7 @@ async function loadUserMessages(userId) {
     
     try {
         const response = await fetch(`${API_URL}/api/profile/${userId}/messages`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
+            credentials: 'include' // AJOUTÉ
         });
         
         if (!response.ok) {
@@ -1057,9 +1058,9 @@ async function updateProfile(data) {
         const response = await fetch(`${API_URL}/api/profile`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include', // AJOUTÉ
             body: JSON.stringify(data)
         });
         
@@ -1084,9 +1085,9 @@ async function updateUsername(username) {
         const response = await fetch(`${API_URL}/api/profile/username`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include', // AJOUTÉ
             body: JSON.stringify({ username })
         });
         
@@ -1109,9 +1110,9 @@ async function updatePassword(currentPassword, newPassword) {
         const response = await fetch(`${API_URL}/api/profile/password`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include', // AJOUTÉ
             body: JSON.stringify({ currentPassword, newPassword })
         });
         
