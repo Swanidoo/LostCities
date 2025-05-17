@@ -826,28 +826,56 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
 
     console.log(`📊 Sauvegarde des scores: P1=${player1Score}, P2=${player2Score}, gagnant=${game.winner || 'égalité'}`);
 
-    // S'assurer que les scores sont inclus dans la requête UPDATE
-    await client.queryObject(`
-      UPDATE games 
-      SET current_turn_player_id = $1,
-          status = $2,
-          winner_id = $3,
-          turn_phase = $4,
-          score_player1 = $5, -- Important: inclu les scores
-          score_player2 = $6, -- Important: inclu les scores
-          last_discarded_pile = $7
-      WHERE id = $8`,
-      [
-        game.currentPlayerId,
-        game.gameStatus,
-        game.winner || null,
-        game.turnPhase,
-        player1Score,
-        player2Score,
-        game.lastDiscardedPile || null,
-        gameId
-      ]
-    );
+    // MODIFICATION: Si le jeu est terminé, utiliser une requête spécifique pour éviter les pertes de données
+    if (game.gameStatus === 'finished') {
+      await client.queryObject(`
+        UPDATE games 
+        SET current_turn_player_id = $1,
+            status = $2,
+            winner_id = $3,
+            turn_phase = $4,
+            score_player1 = $5,
+            score_player2 = $6,
+            last_discarded_pile = $7,
+            ended_at = COALESCE(ended_at, CURRENT_TIMESTAMP)
+        WHERE id = $8`,
+        [
+          game.currentPlayerId,
+          game.gameStatus,
+          game.winner || null,
+          game.turnPhase,
+          player1Score,
+          player2Score,
+          game.lastDiscardedPile || null,
+          gameId
+        ]
+      );
+      
+      console.log(`✅ Game marked as finished with scores: P1=${player1Score}, P2=${player2Score}, winner=${game.winner}`);
+    } else {
+      // S'assurer que les scores sont inclus dans la requête UPDATE
+      await client.queryObject(`
+        UPDATE games 
+        SET current_turn_player_id = $1,
+            status = $2,
+            winner_id = $3,
+            turn_phase = $4,
+            score_player1 = $5, -- Important: inclu les scores
+            score_player2 = $6, -- Important: inclu les scores
+            last_discarded_pile = $7
+        WHERE id = $8`,
+        [
+          game.currentPlayerId,
+          game.gameStatus,
+          game.winner || null,
+          game.turnPhase,
+          player1Score,
+          player2Score,
+          game.lastDiscardedPile || null,
+          gameId
+        ]
+      );
+    }
     
     console.log(`✅ Updated basic game info and scores: P1=${player1Score}, P2=${player2Score}`);
     

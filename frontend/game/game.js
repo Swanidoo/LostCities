@@ -734,19 +734,12 @@ function showGameEnd(isSurrender = false) {
         } else {
             durationDisplay = `${minutes}m`;
         }
-            
-            console.log(`⏱️ Calculated duration: ${durationDisplay} (${durationMinutes} minutes)`);
-        } else {
-            console.error("Invalid dates for duration calculation:", {
-                startTime: gameState.gameData.started_at,
-                endTime: gameState.gameData.ended_at,
-                parsedStart: startTime,
-                parsedEnd: endTime
-            });
-            // Définir une durée par défaut de 3 minutes pour les parties
-            durationMinutes = 3;
-            durationDisplay = '3m';
-        }
+    } else {
+        console.error("Données temporelles manquantes pour le calcul de la durée");
+        // Définir une durée par défaut de 3 minutes pour les parties
+        durationMinutes = 3;
+        durationDisplay = '3m';
+    }
     
     // Calculer la marge de victoire
     const margin = Math.abs(playerScore - opponentScore);
