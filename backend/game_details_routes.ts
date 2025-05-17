@@ -30,7 +30,7 @@ gameDetailsRouter.get("/api/games/:gameId/details", async (ctx) => {
       JOIN users u1 ON g.player1_id = u1.id
       JOIN users u2 ON g.player2_id = u2.id
       LEFT JOIN board b ON g.id = b.game_id
-      WHERE g.id = $1 AND g.status = 'finished'
+      WHERE g.id = $1
     `, [gameId]);
     
     if (gameInfo.rows.length === 0) {

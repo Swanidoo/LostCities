@@ -811,14 +811,20 @@ gameRouter.post("/lost-cities/games/:id/chat", authMiddleware, async (ctx) => {
 });
 
 
-// Helper function to save game state to database
+// Helper function to save game state to database with improved reliability
 async function saveGameState(game: LostCitiesGame): Promise<void> {
   const gameId = game.gameId;
   
-  console.log(`🎮 Saving game state for game ${gameId}, status: ${game.gameStatus}`);
+  console.log(`🎮 Saving game state for game ${gameId}, status: ${game.gameStatus}, round: ${game.currentRound}/${game.totalRounds}`);
   
   try {
-    // Update game table with ALL necessary fields including scores
+    // Validation des données scores - vérifier qu'elles sont numériques
+    const player1Score = typeof game.scores.player1.total === 'number' ? game.scores.player1.total : 0;
+    const player2Score = typeof game.scores.player2.total === 'number' ? game.scores.player2.total : 0;
+    
+    console.log(`📊 Validated scores: P1=${player1Score}, P2=${player2Score}, winner=${game.winner || 'tie'}`);
+    
+    // Update game table with critical information
     await client.queryObject(`
       UPDATE games 
       SET current_turn_player_id = $1,
@@ -834,16 +840,16 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
         game.gameStatus,
         game.winner || null,
         game.turnPhase,
-        game.scores.player1.total,
-        game.scores.player2.total,
+        player1Score,
+        player2Score,
         game.lastDiscardedPile || null,
         gameId
       ]
     );
     
-    console.log(`✅ Updated basic game info and scores: P1=${game.scores.player1.total}, P2=${game.scores.player2.total}`);
+    console.log(`✅ Updated basic game info and scores: P1=${player1Score}, P2=${player2Score}`);
     
-    // Update board table
+    // Update board table with proper deck count and current round
     await client.queryObject(`
       UPDATE board
       SET current_round = $1,
@@ -856,10 +862,16 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
       gameId
     ]);
     
-    // Handle score updates if needed
+    // Handle score updates per round
     if (game.gameStatus === 'finished' || game.currentRound > 1) {
       const roundScoreField1 = `round${game.currentRound}_score_player1`;
       const roundScoreField2 = `round${game.currentRound}_score_player2`;
+      
+      // Valider les scores de round
+      const roundScore1 = game.scores.player1[`round${game.currentRound}`] || 0;
+      const roundScore2 = game.scores.player2[`round${game.currentRound}`] || 0;
+      
+      console.log(`📊 Saving round ${game.currentRound} scores: P1=${roundScore1}, P2=${roundScore2}`);
       
       await client.queryObject(`
         UPDATE board
@@ -867,65 +879,77 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
             ${roundScoreField2} = $2
         WHERE game_id = $3
       `, [
-        game.scores.player1[`round${game.currentRound}`],
-        game.scores.player2[`round${game.currentRound}`],
+        roundScore1,
+        roundScore2,
         gameId
       ]);
     }
     
-    // Si le jeu est terminé, s'assurer que ended_at est défini 
-    // et enregistrer les scores dans le leaderboard
+    // Si le jeu est terminé, TOUJOURS définir ended_at et enregistrer les scores
     if (game.gameStatus === 'finished') {
-      console.log(`🏁 Game ${gameId} is finished, updating ended_at`);
+      console.log(`🏁 Game ${gameId} is finished, ensuring ended_at is set`);
       
-      // Vérifier si ended_at est déjà défini
-      const endedCheck = await client.queryObject(
-        `SELECT ended_at FROM games WHERE id = $1`,
+      // Définir ended_at IMMÉDIATEMENT - pas de vérification pour éviter toute race condition
+      await client.queryObject(
+        `UPDATE games SET ended_at = CURRENT_TIMESTAMP WHERE id = $1 AND (ended_at IS NULL)`,
         [gameId]
       );
       
-      // Si ended_at n'est pas défini, le définir maintenant
-      if (!endedCheck.rows[0].ended_at) {
-        await client.queryObject(
-          `UPDATE games SET ended_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          [gameId]
-        );
-        console.log(`⏱️ Set ended_at timestamp for game ${gameId}`);
-      }
+      console.log(`⏱️ Ensured ended_at timestamp is set for game ${gameId}`);
       
-      // Enregistrer les scores dans le leaderboard
+      // Enregistrer les scores dans le leaderboard, en gérant les cas où le jeu est abandonné
       const gameMode = game.totalRounds === 1 ? 'quick' : 'classic';
       const withExtension = game.usePurpleExpedition;
       
-      // Récupérer les noms d'utilisateurs
-      const player1Result = await client.queryObject<{ username: string }>(
-        `SELECT username FROM users WHERE id = $1`,
-        [game.player1.id]
-      );
-      const player1Name = player1Result.rows[0]?.username || "Unknown Player";
-      
-      // Enregistrer le score du joueur 1
-      await client.queryObject(
-        `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
-        VALUES ($1, $2, $3, $4, $5)`,
-        [game.player1.id, player1Name, game.scores.player1.total, gameMode, withExtension]
+      // D'abord vérifier si des entrées existantes sont présentes pour éviter les doublons
+      const existingEntries = await client.queryObject(
+        `SELECT id FROM leaderboard WHERE player_id IN ($1, $2) AND date >= NOW() - INTERVAL '10 minutes'`,
+        [game.player1.id, game.player2.id]
       );
       
-      // Récupérer le nom du joueur 2
-      const player2Result = await client.queryObject<{ username: string }>(
-        `SELECT username FROM users WHERE id = $1`,
-        [game.player2.id]
-      );
-      const player2Name = player2Result.rows[0]?.username || "Unknown Player";
-      
-      // Enregistrer le score du joueur 2
-      await client.queryObject(
-        `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
-        VALUES ($1, $2, $3, $4, $5)`,
-        [game.player2.id, player2Name, game.scores.player2.total, gameMode, withExtension]
-      );
-      
-      console.log(`✅ Scores recorded in leaderboard for game ${gameId}`);
+      if (existingEntries.rows.length === 0) {
+        console.log(`🏆 Recording leaderboard entries for game ${gameId}`);
+        
+        // Récupérer les noms d'utilisateurs en une seule requête
+        const playersResult = await client.queryObject<{ id: string, username: string }>(
+          `SELECT id, username FROM users WHERE id IN ($1, $2)`,
+          [game.player1.id, game.player2.id]
+        );
+        
+        const players = new Map();
+        playersResult.rows.forEach(row => {
+          players.set(row.id, row.username);
+        });
+        
+        const player1Name = players.get(game.player1.id) || "Unknown Player";
+        const player2Name = players.get(game.player2.id) || "Unknown Player";
+        
+        // Insérer les deux scores en une transaction
+        await client.queryObject(`BEGIN`);
+        try {
+          // Enregistrer le score du joueur 1
+          await client.queryObject(
+            `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
+            VALUES ($1, $2, $3, $4, $5)`,
+            [game.player1.id, player1Name, player1Score, gameMode, withExtension]
+          );
+          
+          // Enregistrer le score du joueur 2
+          await client.queryObject(
+            `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
+            VALUES ($1, $2, $3, $4, $5)`,
+            [game.player2.id, player2Name, player2Score, gameMode, withExtension]
+          );
+          
+          await client.queryObject(`COMMIT`);
+          console.log(`✅ Scores recorded in leaderboard for game ${gameId}`);
+        } catch (error) {
+          await client.queryObject(`ROLLBACK`);
+          console.error(`❌ Failed to record leaderboard entries:`, error);
+        }
+      } else {
+        console.log(`ℹ️ Leaderboard entries already exist for players in game ${gameId}`);
+      }
     }
     
     // Get board ID
@@ -935,7 +959,7 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
     );
     
     if (boardResult.rows.length === 0) {
-      throw new Error("Board not found for game");
+      throw new Error(`Board not found for game ${gameId}`);
     }
     
     const boardId = boardResult.rows[0].id;
@@ -993,132 +1017,175 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
       );
     }
   
-  // Re-insert expeditions
-  const colors = Object.keys(game.player1.expeditions);
-  
-  for (const color of colors) {
-    // Get expedition IDs for this color
-    const expResult = await client.queryObject(`
-      SELECT id, player_id FROM expedition 
-      WHERE board_id = (SELECT id FROM board WHERE game_id = $1)
-      AND color = $2
-    `, [gameId, color]);
+    // Re-insert expeditions
+    const colors = Object.keys(game.player1.expeditions);
     
-    const expeditions = expResult.rows;
-    const player1ExpId = expeditions.find(exp => exp.player_id === game.player1.id)?.id;
-    const player2ExpId = expeditions.find(exp => exp.player_id === game.player2.id)?.id;
-    
-    // Update expedition properties
-    if (player1ExpId) {
-      const wagerCount = game.player1.expeditions[color].filter(c => c.type === 'wager').length;
+    for (const color of colors) {
+      // Get expedition IDs for this color
+      const expResult = await client.queryObject(`
+        SELECT id, player_id FROM expedition 
+        WHERE board_id = (SELECT id FROM board WHERE game_id = $1)
+        AND color = $2
+      `, [gameId, color]);
       
-      await client.queryObject(`
-        UPDATE expedition
-        SET card_count = $1,
-            wager_count = $2,
-            total_value = $3,
-            has_started = $4
-        WHERE id = $5
-      `, [
-        game.player1.expeditions[color].length,
-        wagerCount,
-        game.player1.expeditions[color]
-          .filter(c => c.type === 'expedition')
-          .reduce((sum, card) => sum + (typeof card.value === 'number' ? card.value : 0), 0),
-        game.player1.expeditions[color].length > 0,
-        player1ExpId
-      ]);
+      const expeditions = expResult.rows;
+      const player1ExpId = expeditions.find(exp => exp.player_id === game.player1.id)?.id;
+      const player2ExpId = expeditions.find(exp => exp.player_id === game.player2.id)?.id;
       
-      // Update card positions
-      for (let i = 0; i < game.player1.expeditions[color].length; i++) {
-        const card = game.player1.expeditions[color][i];
+      // Update expedition properties
+      if (player1ExpId) {
+        const wagerCount = game.player1.expeditions[color].filter(c => c.type === 'wager').length;
+        
         await client.queryObject(`
-          UPDATE game_card
-          SET location = 'player1_expedition',
-              expedition_id = $1,
-              position = $2
-          WHERE game_id = $3 AND card_id = $4
-        `, [player1ExpId, i, gameId, card.id]);
+          UPDATE expedition
+          SET card_count = $1,
+              wager_count = $2,
+              total_value = $3,
+              has_started = $4
+          WHERE id = $5
+        `, [
+          game.player1.expeditions[color].length,
+          wagerCount,
+          game.player1.expeditions[color]
+            .filter(c => c.type === 'expedition')
+            .reduce((sum, card) => sum + (typeof card.value === 'number' ? card.value : 0), 0),
+          game.player1.expeditions[color].length > 0,
+          player1ExpId
+        ]);
+        
+        // Update card positions
+        for (let i = 0; i < game.player1.expeditions[color].length; i++) {
+          const card = game.player1.expeditions[color][i];
+          await client.queryObject(`
+            UPDATE game_card
+            SET location = 'player1_expedition',
+                expedition_id = $1,
+                position = $2
+            WHERE game_id = $3 AND card_id = $4
+          `, [player1ExpId, i, gameId, card.id]);
+        }
+      }
+      
+      // Do the same for player 2
+      if (player2ExpId) {
+        const wagerCount = game.player2.expeditions[color].filter(c => c.type === 'wager').length;
+        
+        await client.queryObject(`
+          UPDATE expedition
+          SET card_count = $1,
+              wager_count = $2,
+              total_value = $3,
+              has_started = $4
+          WHERE id = $5
+        `, [
+          game.player2.expeditions[color].length,
+          wagerCount,
+          game.player2.expeditions[color]
+            .filter(c => c.type === 'expedition')
+            .reduce((sum, card) => sum + (typeof card.value === 'number' ? card.value : 0), 0),
+          game.player2.expeditions[color].length > 0,
+          player2ExpId
+        ]);
+        
+        // Update card positions
+        for (let i = 0; i < game.player2.expeditions[color].length; i++) {
+          const card = game.player2.expeditions[color][i];
+          await client.queryObject(`
+            UPDATE game_card
+            SET location = 'player2_expedition',
+                expedition_id = $1,
+                position = $2
+            WHERE game_id = $3 AND card_id = $4
+          `, [player2ExpId, i, gameId, card.id]);
+        }
+      }
+      
+      // Update discard pile
+      const pileResult = await client.queryObject(`
+        SELECT id FROM discard_pile 
+        WHERE board_id = (SELECT id FROM board WHERE game_id = $1)
+        AND color = $2
+      `, [gameId, color]);
+      
+      if (pileResult.rows.length > 0) {
+        const pileId = pileResult.rows[0].id;
+        
+        // Update cards in discard pile
+        for (let i = 0; i < game.discardPiles[color].length; i++) {
+          const card = game.discardPiles[color][i];
+          await client.queryObject(`
+            UPDATE game_card
+            SET location = 'discard_pile',
+                pile_id = $1,
+                position = $2
+            WHERE game_id = $3 AND card_id = $4
+          `, [pileId, i, gameId, card.id]);
+        }
+        
+        // Update discard pile top card reference
+        if (game.discardPiles[color].length > 0) {
+          const topCard = game.discardPiles[color][game.discardPiles[color].length - 1];
+          await client.queryObject(`
+            UPDATE discard_pile
+            SET top_card_id = $1
+            WHERE id = $2
+          `, [topCard.id, pileId]);
+        } else {
+          await client.queryObject(`
+            UPDATE discard_pile
+            SET top_card_id = NULL
+            WHERE id = $1
+          `, [pileId]);
+        }
       }
     }
     
-    // Do the same for player 2
-    if (player2ExpId) {
-      const wagerCount = game.player2.expeditions[color].filter(c => c.type === 'wager').length;
+    // Vérification finale - s'assurer que les scores sont correctement enregistrés
+    if (game.gameStatus === 'finished') {
+      const verifyResult = await client.queryObject(`
+        SELECT 
+          score_player1, 
+          score_player2, 
+          winner_id, 
+          ended_at 
+        FROM games WHERE id = $1
+      `, [gameId]);
       
-      await client.queryObject(`
-        UPDATE expedition
-        SET card_count = $1,
-            wager_count = $2,
-            total_value = $3,
-            has_started = $4
-        WHERE id = $5
-      `, [
-        game.player2.expeditions[color].length,
-        wagerCount,
-        game.player2.expeditions[color]
-          .filter(c => c.type === 'expedition')
-          .reduce((sum, card) => sum + (typeof card.value === 'number' ? card.value : 0), 0),
-        game.player2.expeditions[color].length > 0,
-        player2ExpId
-      ]);
-      
-      // Update card positions
-      for (let i = 0; i < game.player2.expeditions[color].length; i++) {
-        const card = game.player2.expeditions[color][i];
-        await client.queryObject(`
-          UPDATE game_card
-          SET location = 'player2_expedition',
-              expedition_id = $1,
-              position = $2
-          WHERE game_id = $3 AND card_id = $4
-        `, [player2ExpId, i, gameId, card.id]);
+      if (verifyResult.rows.length > 0) {
+        const data = verifyResult.rows[0];
+        console.log(`🔍 Final verification for game ${gameId}:`);
+        console.log(`- Scores in DB: P1=${data.score_player1}, P2=${data.score_player2}`);
+        console.log(`- Winner in DB: ${data.winner_id}`);
+        console.log(`- ended_at set: ${data.ended_at ? 'Yes' : 'No'}`);
+        
+        // Si données incohérentes, refaire la mise à jour
+        if (data.score_player1 !== player1Score || 
+            data.score_player2 !== player2Score || 
+            data.winner_id != game.winner || 
+            !data.ended_at) {
+          
+          console.warn(`⚠️ Data inconsistency detected for game ${gameId}, fixing...`);
+          await client.queryObject(`
+            UPDATE games 
+            SET score_player1 = $1,
+                score_player2 = $2,
+                winner_id = $3,
+                ended_at = COALESCE(ended_at, CURRENT_TIMESTAMP)
+            WHERE id = $4`,
+            [player1Score, player2Score, game.winner || null, gameId]
+          );
+          console.log(`✅ Fixed data inconsistencies`);
+        }
       }
     }
     
-    // Update discard pile
-    const pileResult = await client.queryObject(`
-      SELECT id FROM discard_pile 
-      WHERE board_id = (SELECT id FROM board WHERE game_id = $1)
-      AND color = $2
-    `, [gameId, color]);
-    
-    if (pileResult.rows.length > 0) {
-      const pileId = pileResult.rows[0].id;
-      
-      // Update cards in discard pile
-      for (let i = 0; i < game.discardPiles[color].length; i++) {
-        const card = game.discardPiles[color][i];
-        await client.queryObject(`
-          UPDATE game_card
-          SET location = 'discard_pile',
-              pile_id = $1,
-              position = $2
-          WHERE game_id = $3 AND card_id = $4
-        `, [pileId, i, gameId, card.id]);
-      }
-      
-      // Update discard pile top card reference
-      if (game.discardPiles[color].length > 0) {
-        const topCard = game.discardPiles[color][game.discardPiles[color].length - 1];
-        await client.queryObject(`
-          UPDATE discard_pile
-          SET top_card_id = $1
-          WHERE id = $2
-        `, [topCard.id, pileId]);
-      } else {
-        await client.queryObject(`
-          UPDATE discard_pile
-          SET top_card_id = NULL
-          WHERE id = $1
-        `, [pileId]);
-      }
-    }
-  } // Fermeture de la boucle for (color of colors)
-    
-  console.log(`✅ Game state saved successfully for game ${gameId}`);
+    console.log(`✅ Game state saved successfully for game ${gameId}`);
   } catch (error) {
     console.error(`❌ Error saving game state for game ${gameId}:`, error);
+    // Log the full error stack for better debugging
+    if (error.stack) {
+      console.error(`Stack trace: ${error.stack}`);
+    }
     throw error; // Propager l'erreur pour la gestion en amont
   }
 }

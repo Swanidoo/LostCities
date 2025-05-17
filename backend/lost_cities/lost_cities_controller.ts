@@ -583,17 +583,30 @@ import {
     endGame(): void {
       this.gameStatus = 'finished';
       
-      // Determine winner
+      // Recalculer tous les scores pour être sûr
+      const player1Score = this.calculatePlayerScore(this.player1);
+      const player2Score = this.calculatePlayerScore(this.player2);
+      
+      // S'assurer que les scores sont bien enregistrés
+      this.scores.player1.total = player1Score;
+      this.scores.player2.total = player2Score;
+      
+      // Déterminer le gagnant
       if (this.scores.player1.total > this.scores.player2.total) {
         this.winner = this.player1.id;
       } else if (this.scores.player2.total > this.scores.player1.total) {
         this.winner = this.player2.id;
       } else {
-        this.winner = null; // Tie
+        this.winner = null; // Égalité
       }
       
-      // Notify state change
+      console.log(`🏁 Jeu terminé: Scores P1=${this.scores.player1.total}, P2=${this.scores.player2.total}, Gagnant=${this.winner}`);
+      
+      // Notifier changement d'état
       this.onGameStateChanged(this.getGameState());
+      
+      // IMPORTANT: Sauvegarder immédiatement pour s'assurer que tout est persisté
+      this.save().catch(err => console.error('Erreur lors de la sauvegarde de fin de partie:', err));
     }
     
     /**

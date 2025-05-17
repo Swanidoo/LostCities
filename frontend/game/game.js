@@ -564,6 +564,20 @@ function showGameEnd(isSurrender = false) {
         return;
     }
     
+    // Ajouter ces logs pour déboguer
+    console.log(`🔍 Données jeu fin de partie:`, {
+        startTime: gameState.gameData.started_at,
+        endTime: gameState.gameData.ended_at,
+        status: gameState.gameData.status,
+        scores: {
+            player1: gameState.gameData.scores?.player1?.total || 0,
+            player2: gameState.gameData.scores?.player2?.total || 0
+        },
+        currentRound: gameState.gameData.currentRound,
+        totalRounds: gameState.gameData.totalRounds,
+        winner: gameState.gameData.winner
+    });
+    
     console.log('🔍 Game data available:', gameState.gameData);
     
     // Extraire les scores s'ils existent
