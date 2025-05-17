@@ -74,8 +74,18 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
       // Calculate duration in minutes if both dates exist
       let duration = null;
       if (row.started_at && row.ended_at) {
-        const durationMs = new Date(row.ended_at).getTime() - new Date(row.started_at).getTime();
-        duration = Math.round(durationMs / (1000 * 60)); // Convert to minutes
+        try {
+          const startTime = new Date(row.started_at);
+          const endTime = new Date(row.ended_at);
+          
+          if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
+            const durationMs = endTime.getTime() - startTime.getTime();
+            duration = Math.max(1, Math.round(durationMs / (1000 * 60))); // Au moins 1 minute
+            console.log(`⏱️ Calculated duration for game ${row.id}: ${duration} minutes`);
+          }
+        } catch (error) {
+          console.error(`❌ Error calculating duration:`, error);
+        }
       }
       
       return {

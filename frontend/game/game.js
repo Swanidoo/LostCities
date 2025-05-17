@@ -549,10 +549,33 @@ function handleDeckClick() {
 
 // Show game end screen
 function showGameEnd(isSurrender = false) {
-    if (!elements.gameEndModal || !gameState.gameData) return;
+    console.log('🔍 Starting showGameEnd function');
     
-    const playerScore = gameState.gameData.scores[gameState.playerSide]?.total || 0;
-    const opponentScore = gameState.gameData.scores[gameState.opponentSide]?.total || 0;
+    // Vérifier que les éléments DOM existent
+    if (!elements.gameEndModal) {
+        console.error('❌ End game modal element not found!');
+        updateGameStatus("Partie terminée. Veuillez retourner à l'accueil.");
+        return;
+    }
+    
+    if (!gameState.gameData) {
+        console.error('❌ Game data is missing!');
+        updateGameStatus("Partie terminée. Données indisponibles.");
+        return;
+    }
+    
+    console.log('🔍 Game data available:', gameState.gameData);
+    
+    // Extraire les scores s'ils existent
+    const playerScore = gameState.gameData.scores && gameState.gameData.scores[gameState.playerSide] 
+        ? gameState.gameData.scores[gameState.playerSide].total || 0 
+        : 0;
+    
+    const opponentScore = gameState.gameData.scores && gameState.gameData.scores[gameState.opponentSide] 
+        ? gameState.gameData.scores[gameState.opponentSide].total || 0 
+        : 0;
+    
+    console.log(`📊 Scores - Player: ${playerScore}, Opponent: ${opponentScore}`);
     
     // Déterminer le résultat
     let isWinner = false;
@@ -657,7 +680,10 @@ function showGameEnd(isSurrender = false) {
         elements.winnerText.textContent = message.subtitle;
     }
     
+    // Calcul de la durée
     let durationDisplay = '0m';
+    let durationMinutes = 0;
+    
     if (gameState.gameData && gameState.gameData.started_at) {
         const startTime = new Date(gameState.gameData.started_at);
         
@@ -672,7 +698,7 @@ function showGameEnd(isSurrender = false) {
             const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
             
             // Convertir en minutes et s'assurer que c'est au moins 1 minute pour une partie complète
-            const durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
+            durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
             
             // Formatage avec heures si nécessaire
             const hours = Math.floor(durationMinutes / 60);
@@ -683,6 +709,8 @@ function showGameEnd(isSurrender = false) {
             } else {
                 durationDisplay = `${minutes}m`;
             }
+            
+            console.log(`⏱️ Calculated duration: ${durationDisplay} (${durationMinutes} minutes)`);
         }
     }
     
@@ -733,7 +761,8 @@ function showGameEnd(isSurrender = false) {
     }
     gameInfoElement.innerHTML = gameInfoHtml;
     
-    // Afficher la modal
+    // S'assurer que la modal est visible
+    console.log('🖼️ Making end game modal visible');
     elements.gameEndModal.classList.add('visible');
 }
 
@@ -949,6 +978,16 @@ function updateGameInterface() {
 
     // Setup expedition hover preview after updating the interface
     setupExpeditionHoverPreview();
+
+    if (gameState.gameData && gameState.gameData.status === 'finished') {
+        console.log('🏁 Game is finished, showing end game modal...');
+        try {
+            showGameEnd();
+            console.log('✅ End game modal displayed successfully');
+        } catch (error) {
+            console.error('❌ Error displaying end game modal:', error);
+        }
+    }
 }
 
 function clearAllTargetHighlighting() {

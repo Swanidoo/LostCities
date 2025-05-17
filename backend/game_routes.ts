@@ -815,10 +815,10 @@ gameRouter.post("/lost-cities/games/:id/chat", authMiddleware, async (ctx) => {
 async function saveGameState(game: LostCitiesGame): Promise<void> {
   const gameId = game.gameId;
   
-  console.log(`💾 Saving game state for game ${gameId}, status: ${game.gameStatus}`);
+  console.log(`🎮 Saving game state for game ${gameId}, status: ${game.gameStatus}`);
   
   try {
-    // Update game table - AJOUT des scores
+    // Update game table with ALL necessary fields including scores
     await client.queryObject(`
       UPDATE games 
       SET current_turn_player_id = $1,
@@ -828,17 +828,20 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
           score_player1 = $5,
           score_player2 = $6,
           last_discarded_pile = $7
-      WHERE id = $8
-    `, [
-      game.currentPlayerId,
-      game.gameStatus,
-      game.winner || null,
-      game.turnPhase,
-      game.scores.player1.total,
-      game.scores.player2.total,
-      game.lastDiscardedPile || null,
-      gameId
-    ]);
+      WHERE id = $8`,
+      [
+        game.currentPlayerId,
+        game.gameStatus,
+        game.winner || null,
+        game.turnPhase,
+        game.scores.player1.total,
+        game.scores.player2.total,
+        game.lastDiscardedPile || null,
+        gameId
+      ]
+    );
+    
+    console.log(`✅ Updated basic game info and scores: P1=${game.scores.player1.total}, P2=${game.scores.player2.total}`);
     
     // Update board table
     await client.queryObject(`
@@ -873,6 +876,8 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
     // Si le jeu est terminé, s'assurer que ended_at est défini 
     // et enregistrer les scores dans le leaderboard
     if (game.gameStatus === 'finished') {
+      console.log(`🏁 Game ${gameId} is finished, updating ended_at`);
+      
       // Vérifier si ended_at est déjà défini
       const endedCheck = await client.queryObject(
         `SELECT ended_at FROM games WHERE id = $1`,
@@ -885,6 +890,7 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
           `UPDATE games SET ended_at = CURRENT_TIMESTAMP WHERE id = $1`,
           [gameId]
         );
+        console.log(`⏱️ Set ended_at timestamp for game ${gameId}`);
       }
       
       // Enregistrer les scores dans le leaderboard
