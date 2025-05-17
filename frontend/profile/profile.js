@@ -657,8 +657,8 @@ function displayGameDetails(details, modal) {
     const content = modal.querySelector('.game-detail-content');
     
     // Calculer les informations additionnelles en tenant compte des différents formats possibles de scores
-    const winner = details.basic.winner;
-    
+    const winner = details.basic.winner ? details.basic.winner.name : 'Égalité';
+
     // Extraction des scores - adaptée pour fonctionner à la fois avec un objet ou un tableau
     let player1Score, player2Score, winnerScore, loserScore;
     
@@ -703,11 +703,11 @@ function displayGameDetails(details, modal) {
     }
     
     // Calculer la marge
-    const margin = Math.abs(winnerScore - loserScore);
-    
+    const margin = Math.abs(details.basic.scores.player1 - details.basic.scores.player2);
+
     // Créer l'affichage du score
-    const scoresDisplay = `${player1Score} - ${player2Score}`;
-    
+    const scoresDisplay = `${details.basic.scores.player1} - ${details.basic.scores.player2}`;
+
     // Formater la durée
     let durationText = 'Durée inconnue';
     if (details.basic.duration) {
