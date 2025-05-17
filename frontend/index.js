@@ -553,15 +553,14 @@ function addChatMessage(username, message, messageId = null) {
     if (!messagesContainer) return;
     
     const messageElement = document.createElement('div');
-    // ALWAYS set a data-message-id attribute, even if it's temporary
     messageElement.dataset.messageId = messageId || `temp-${Date.now()}`
     
-    // Ajouter l'ID du message comme attribut de données
     if (messageId) {
         messageElement.dataset.messageId = messageId;
     }
-    const currentUsername = localStorage.getItem('username');
-    let isOwnMessage = false; // Temporaire - vous pourrez améliorer cela plus tard
+    
+    // Simplification de la détection de message propre
+    let isOwnMessage = false; // À améliorer plus tard si nécessaire
     
     messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
     
@@ -579,9 +578,13 @@ function addChatMessage(username, message, messageId = null) {
         });
     }
     
+    // MODIFICATION ICI - Préserver les retours à la ligne
     const textElement = document.createElement('span');
     textElement.className = 'chat-text';
-    textElement.textContent = message;
+    
+    // Option 1: Convertir les retours à la ligne en balises <br>
+    textElement.innerHTML = message.replace(/\n/g, '<br>');
+    
     
     messageElement.appendChild(senderElement);
     messageElement.appendChild(document.createTextNode(': '));
@@ -601,7 +604,7 @@ function showUserMenu(event, username) {
     
     // Vérifier si l'utilisateur est admin
     const isAdmin = currentUserRole === 'admin';
-        
+
     // Créer le menu
     const menu = document.createElement('div');
     menu.className = 'user-menu-popup';

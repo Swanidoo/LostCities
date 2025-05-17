@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     
     // Établir la connexion WebSocket
-    connectWebSocket(cleanToken);
+    connectWebSocket();
 });
 
 async function checkBanStatus() {
