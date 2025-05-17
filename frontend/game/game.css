@@ -708,6 +708,44 @@ body {
 .card.selected.yellow { box-shadow: 0 0 20px 4px rgba(255, 235, 59, 0.8) !important; }
 .card.selected.purple { box-shadow: 0 0 20px 4px rgba(111, 66, 193, 0.8) !important; }
 
+/* First, define color-specific animations for each card color */
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 15px 3px rgba(255, 59, 59, 0.4); }
+    50% { box-shadow: 0 0 25px 5px rgba(255, 59, 59, 0.8); }
+    100% { box-shadow: 0 0 15px 3px rgba(255, 59, 59, 0.4); }
+}
+
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 15px 3px rgba(76, 175, 80, 0.4); }
+    50% { box-shadow: 0 0 25px 5px rgba(76, 175, 80, 0.8); }
+    100% { box-shadow: 0 0 15px 3px rgba(76, 175, 80, 0.4); }
+}
+
+@keyframes pulse-white {
+    0% { box-shadow: 0 0 15px 3px rgba(255, 255, 255, 0.4); }
+    50% { box-shadow: 0 0 25px 5px rgba(255, 255, 255, 0.8); }
+    100% { box-shadow: 0 0 15px 3px rgba(255, 255, 255, 0.4); }
+}
+
+@keyframes pulse-blue {
+    0% { box-shadow: 0 0 15px 3px rgba(33, 150, 243, 0.4); }
+    50% { box-shadow: 0 0 25px 5px rgba(33, 150, 243, 0.8); }
+    100% { box-shadow: 0 0 15px 3px rgba(33, 150, 243, 0.4); }
+}
+
+@keyframes pulse-yellow {
+    0% { box-shadow: 0 0 15px 3px rgba(255, 235, 59, 0.4); }
+    50% { box-shadow: 0 0 25px 5px rgba(255, 235, 59, 0.8); }
+    100% { box-shadow: 0 0 15px 3px rgba(255, 235, 59, 0.4); }
+}
+
+@keyframes pulse-purple {
+    0% { box-shadow: 0 0 15px 3px rgba(111, 66, 193, 0.4); }
+    50% { box-shadow: 0 0 25px 5px rgba(111, 66, 193, 0.8); }
+    100% { box-shadow: 0 0 15px 3px rgba(111, 66, 193, 0.4); }
+}
+
+/* Keep the default valid-target styling */
 .valid-target {
     box-shadow: 0 0 20px 4px gold;
     animation: pulse 1.5s infinite;
@@ -715,19 +753,37 @@ body {
     position: relative;
 }
 
-/* Color-specific highlighting pour valid targets */
-.valid-target.red { box-shadow: 0 0 15px 3px rgba(255, 59, 59, 0.8) !important; }
-.valid-target.green { box-shadow: 0 0 15px 3px rgba(76, 175, 80, 0.8) !important; }
-.valid-target.white { box-shadow: 0 0 15px 3px rgba(255, 255, 255, 0.8) !important; }
-.valid-target.blue { box-shadow: 0 0 15px 3px rgba(33, 150, 243, 0.8) !important; }
-.valid-target.yellow { box-shadow: 0 0 15px 3px rgba(255, 235, 59, 0.8) !important; }
-.valid-target.purple { box-shadow: 0 0 15px 3px rgba(111, 66, 193, 0.8) !important; }
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.4); }
-    50% { box-shadow: 0 0 25px 5px rgba(255, 215, 0, 0.8); }
-    100% { box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.4); }
+/* Override both box-shadow AND animation for each color */
+.valid-target.red { 
+    box-shadow: 0 0 15px 3px rgba(255, 59, 59, 0.8) !important;
+    animation: pulse-red 1.5s infinite !important;
 }
+
+.valid-target.green { 
+    box-shadow: 0 0 15px 3px rgba(76, 175, 80, 0.8) !important;
+    animation: pulse-green 1.5s infinite !important;
+}
+
+.valid-target.white { 
+    box-shadow: 0 0 15px 3px rgba(255, 255, 255, 0.8) !important;
+    animation: pulse-white 1.5s infinite !important;
+}
+
+.valid-target.blue { 
+    box-shadow: 0 0 15px 3px rgba(33, 150, 243, 0.8) !important;
+    animation: pulse-blue 1.5s infinite !important;
+}
+
+.valid-target.yellow { 
+    box-shadow: 0 0 15px 3px rgba(255, 235, 59, 0.8) !important;
+    animation: pulse-yellow 1.5s infinite !important;
+}
+
+.valid-target.purple { 
+    box-shadow: 0 0 15px 3px rgba(111, 66, 193, 0.8) !important;
+    animation: pulse-purple 1.5s infinite !important;
+}
+
 
 /* ===== RESPONSIVE GAME CONTROLS (BOUTONS À GAUCHE GARDÉ) ===== */
 .game-controls {
@@ -1084,8 +1140,8 @@ body {
     padding: var(--spacing-xl);
     border-radius: clamp(12px, 2vw, 20px);
     width: clamp(300px, 90vw, 600px);
-    max-height: 90vh;
-    overflow: hidden;
+    max-height: 80vh;
+    overflow-y: auto;
     text-align: center;
     border: 1px solid rgba(255, 255, 255, 0.1);
     animation: modalSlideIn 0.3s ease;
@@ -1121,6 +1177,7 @@ body {
 
 .modal-buttons {
     margin-top: var(--spacing-lg);
+    padding-bottom: 0.5rem;
     display: flex;
     justify-content: center;
     gap: var(--spacing-md);

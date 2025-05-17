@@ -861,6 +861,20 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
   }
 
   if (game.gameStatus === 'finished') {
+    // Vérifier si ended_at est déjà défini
+    const endedCheck = await client.queryObject(
+      `SELECT ended_at FROM games WHERE id = $1`,
+      [gameId]
+    );
+    
+    // Si ended_at n'est pas défini, le définir maintenant
+    if (!endedCheck.rows[0].ended_at) {
+      await client.queryObject(
+        `UPDATE games SET ended_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [gameId]
+      );
+    }
+    
     // Enregistrer les scores dans le leaderboard
     const gameMode = game.totalRounds === 1 ? 'quick' : 'classic';
     const withExtension = game.usePurpleExpedition;

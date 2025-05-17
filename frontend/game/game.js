@@ -482,6 +482,7 @@ function highlightValidTargets(color) {
         const expeditionSlot = document.querySelector(`#player-area .expedition-slot[data-color="${color}"]`);
         if (expeditionSlot) {
             expeditionSlot.classList.add('valid-target');
+            expeditionSlot.classList.add(color);
             
             expeditionSlot.addEventListener('click', () => {
                 if (gameState.selectedCard) {
@@ -495,6 +496,7 @@ function highlightValidTargets(color) {
     const discardPile = document.querySelector(`.discard-pile[data-color="${color}"]`);
     if (discardPile) {
         discardPile.classList.add('valid-target');
+        discardPile.classList.add(color);
         
         discardPile.addEventListener('click', () => {
             if (gameState.selectedCard) {
@@ -655,10 +657,34 @@ function showGameEnd(isSurrender = false) {
         elements.winnerText.textContent = message.subtitle;
     }
     
-    // Calculer la durée
-    const startTime = gameState.gameData.started_at ? new Date(gameState.gameData.started_at) : new Date();
-    const endTime = new Date();
-    const durationMinutes = Math.round((endTime - startTime) / (1000 * 60));
+    let durationDisplay = '0m';
+    if (gameState.gameData && gameState.gameData.started_at) {
+        const startTime = new Date(gameState.gameData.started_at);
+        
+        // Si la partie est finie et qu'on a une date de fin, l'utiliser
+        // Sinon, utiliser l'heure actuelle
+        const endTime = gameState.gameData.ended_at ? 
+            new Date(gameState.gameData.ended_at) : new Date();
+        
+        // S'assurer que les dates sont valides
+        if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
+            // Calculer la différence en millisecondes
+            const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+            
+            // Convertir en minutes et s'assurer que c'est au moins 1 minute pour une partie complète
+            const durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
+            
+            // Formatage avec heures si nécessaire
+            const hours = Math.floor(durationMinutes / 60);
+            const minutes = durationMinutes % 60;
+            
+            if (hours > 0) {
+                durationDisplay = `${hours}h${minutes}m`;
+            } else {
+                durationDisplay = `${minutes}m`;
+            }
+        }
+    }
     
     // Calculer la marge de victoire
     const margin = Math.abs(playerScore - opponentScore);
