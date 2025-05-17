@@ -36,6 +36,10 @@ import {
     scores: GameScores;
     winner: string | null;
 
+    // Timestamps
+    started_at: Date | null = null;
+    ended_at: Date | null = null;
+
     private lastDiscardedPile: string | null = null;    
     
     // Event handlers
@@ -46,6 +50,8 @@ import {
       // Game configuration
       this.gameId = options.gameId;
       this.usePurpleExpedition = options.usePurpleExpedition || false;
+      this.started_at = null;
+      this.ended_at = null;
       
       // CORRECTION : Déterminer totalRounds selon gameMode ou options
       if (options.totalRounds) {
@@ -639,7 +645,9 @@ import {
         turnPhase: this.turnPhase,
         usePurpleExpedition: this.usePurpleExpedition,
         cardsInDeck: this.deck.length,
-        lastDiscardedPile: this.lastDiscardedPile, // Ajoutez cette ligne
+        lastDiscardedPile: this.lastDiscardedPile,
+        started_at: this.started_at ? this.started_at.toISOString() : undefined,
+        ended_at: this.ended_at ? this.ended_at.toISOString() : undefined,
         player1: {
           id: this.player1.id,
           expeditions: this.player1.expeditions,

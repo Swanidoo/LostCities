@@ -65,6 +65,8 @@ export interface GameState {
   usePurpleExpedition: boolean;
   cardsInDeck: number;
   lastDiscardedPile: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
   player1: {
     id: string;
     expeditions: {

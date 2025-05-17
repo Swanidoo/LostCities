@@ -702,47 +702,52 @@ function showGameEnd(isSurrender = false) {
     let durationMinutes = 0;
 
     if (gameState.gameData && gameState.gameData.started_at) {
-    console.log("Timestamps disponibles:", {
-        started_at: gameState.gameData.started_at,
-        ended_at: gameState.gameData.ended_at || "non disponible"
-    });
-    
-    const startTime = new Date(gameState.gameData.started_at);
-    
-    // Si la partie est finie et a une date de fin, l'utiliser
-    // Sinon, utiliser l'heure actuelle
-    const endTime = gameState.gameData.ended_at ? 
-        new Date(gameState.gameData.ended_at) : new Date();
-    
-    // Vérifier que les dates sont valides avant de calculer
-    if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
-        const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
-        durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
-        
-        // Formater l'affichage
-        const hours = Math.floor(durationMinutes / 60);
-        const minutes = durationMinutes % 60;
-        
-        if (hours > 0) {
-        durationDisplay = `${hours}h${minutes}m`;
-        } else {
-        durationDisplay = `${minutes}m`;
-        }
-        
-        console.log(`Durée calculée: ${durationDisplay} (${durationMinutes} minutes)`);
-    } else {
-        console.error("Dates invalides:", { 
-        startTime: startTime.toString(), 
-        endTime: endTime.toString() 
+        console.log("Timestamps disponibles:", {
+            started_at: gameState.gameData.started_at,
+            ended_at: gameState.gameData.ended_at || "non disponible"
         });
-        durationMinutes = 5; // Valeur par défaut plus réaliste
-        durationDisplay = '5m';
-    }
+        
+        try {
+            const startTime = new Date(gameState.gameData.started_at);
+            
+            // Si la partie est finie et a une date de fin, l'utiliser
+            // Sinon, utiliser l'heure actuelle
+            const endTime = gameState.gameData.ended_at ? 
+                new Date(gameState.gameData.ended_at) : new Date();
+            
+            // Vérifier que les dates sont valides
+            if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
+                const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+                durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
+                
+                // Formater l'affichage
+                const hours = Math.floor(durationMinutes / 60);
+                const minutes = durationMinutes % 60;
+                
+                if (hours > 0) {
+                    durationDisplay = `${hours}h${minutes}m`;
+                } else {
+                    durationDisplay = `${minutes}m`;
+                }
+                
+                console.log(`✅ Durée calculée: ${durationDisplay} (${durationMinutes} minutes)`);
+            } else {
+                console.error("⚠️ Dates invalides:", { 
+                    startTime: startTime.toString(), 
+                    endTime: endTime.toString() 
+                });
+                durationMinutes = 5;
+                durationDisplay = '5m';
+            }
+        } catch (error) {
+            console.error("❌ Erreur lors du calcul de la durée:", error);
+            durationMinutes = 5;
+            durationDisplay = '5m';
+        }
     } else {
-    console.error("Données temporelles manquantes:", gameState.gameData);
-    // Définir une durée par défaut raisonnable
-    durationMinutes = 5;
-    durationDisplay = '5m';
+        console.error("⚠️ Données temporelles manquantes:", gameState.gameData);
+        durationMinutes = 5;
+        durationDisplay = '5m';
     }
     
     // Calculer la marge de victoire

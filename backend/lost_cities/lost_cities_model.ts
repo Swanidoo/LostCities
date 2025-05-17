@@ -156,7 +156,7 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   
   // Get basic game info - convert ID to text to handle BigInt
   const gameResult = await client.queryObject<any>(`
-    SELECT g.id::text as id,  -- Convert to text
+    SELECT g.id::text as id,
            g.player1_id, 
            g.player2_id,
            g.status,
@@ -165,6 +165,8 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
            g.winner_id,
            g.last_discarded_pile,
            g.game_mode,
+           TO_CHAR(g.started_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as started_at,
+           TO_CHAR(g.ended_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ended_at,
            b.use_purple_expedition, 
            b.current_round as board_current_round,
            b.remaining_cards_in_deck,
@@ -387,6 +389,8 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
   game.turnPhase = gameData.turn_phase || 'play';
   game.winner = gameData.winner_id;
   game.lastDiscardedPile = gameData.last_discarded_pile; 
+  game.started_at = gameData.started_at;    // Ajoutez cette ligne
+  game.ended_at = gameData.ended_at;        // Ajoutez cette ligne
   
   console.log(`✅ Game state loaded: ${game.player1.hand.length} + ${game.player2.hand.length} cards in hands, ${game.deck.length} in deck`);  
   return game;
