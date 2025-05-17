@@ -282,25 +282,33 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
 
     // Get game info - convert all BigInts to strings
     const gameResult = await client.queryObject(`
-      SELECT g.id::text as id,
-             g.player1_id, 
-             g.player2_id,
-             g.status,
-             g.winner_id,
-             g.score_player1,
-             g.score_player2,
-             g.current_turn_player_id,
-             g.turn_phase,
-             g.current_round,
-             g.started_at,
-             g.ended_at,
-             g.last_discarded_pile,
-             g.game_mode,  -- ✅ IMPORTANT: Cette ligne doit être présente
-             b.use_purple_expedition, 
-             // ... reste de la query
-        FROM games g
-        JOIN board b ON g.id = b.game_id
-        // ... reste de la query
+      SELECT 
+        g.id::text as id,
+        g.player1_id, 
+        g.player2_id,
+        g.status,
+        g.winner_id,
+        g.score_player1,
+        g.score_player2,
+        g.current_turn_player_id,
+        g.turn_phase,
+        g.current_round,
+        TO_CHAR(g.started_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as started_at,
+        TO_CHAR(g.ended_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ended_at,
+        g.last_discarded_pile,
+        g.game_mode,
+        b.use_purple_expedition, 
+        b.remaining_cards_in_deck,
+        b.id as board_id,
+        u1.username as player1_username,
+        u1.avatar_url as player1_avatar,
+        u2.username as player2_username,
+        u2.avatar_url as player2_avatar
+      FROM games g
+      JOIN board b ON g.id = b.game_id
+      LEFT JOIN users u1 ON g.player1_id = u1.id
+      LEFT JOIN users u2 ON g.player2_id = u2.id
+      WHERE g.id = $1
     `, [gameId]);
 
     console.log(`[GET /lost-cities/games/${gameId}] Game query result:`, gameResult.rows.length);

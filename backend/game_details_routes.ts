@@ -147,18 +147,18 @@ gameDetailsRouter.get("/api/games/:gameId/details", async (ctx) => {
     const response = {
       basic: {
         gameId: Number(game.id),
-        players: {
-          player1: { 
+        players: [
+          { 
             id: Number(game.player1_id), 
             name: game.player1_name,
             avatar: game.player1_avatar
           },
-          player2: { 
+          { 
             id: Number(game.player2_id), 
             name: game.player2_name,
             avatar: game.player2_avatar
           }
-        },
+        ],
         scores: {
           player1: Number(game.score_player1) || 0,
           player2: Number(game.score_player2) || 0
