@@ -409,7 +409,8 @@ export async function saveGameState(game: LostCitiesGame): Promise<void> {
         status = $2,
         winner_id = $3,
         turn_phase = $4,
-        last_discarded_pile = $5
+        last_discarded_pile = $5,
+        ended_at = CASE WHEN $2 = 'finished' AND $7 IS NOT NULL THEN $7 ELSE ended_at END
     WHERE id = $6`,
     [
       game.currentPlayerId,
@@ -417,7 +418,8 @@ export async function saveGameState(game: LostCitiesGame): Promise<void> {
       game.winner || null,
       game.turnPhase,
       game.lastDiscardedPile || null,
-      gameId
+      gameId,
+      game.ended_at
     ]
   );
   

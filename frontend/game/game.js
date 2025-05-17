@@ -709,11 +709,27 @@ function showGameEnd(isSurrender = false) {
         
         try {
             const startTime = new Date(gameState.gameData.started_at);
+            let endTime;
             
-            // Si la partie est finie et a une date de fin, l'utiliser
-            // Sinon, utiliser l'heure actuelle
-            const endTime = gameState.gameData.ended_at ? 
-                new Date(gameState.gameData.ended_at) : new Date();
+            // CORRECTION: Gérer intelligemment la détermination de l'heure de fin
+            if (gameState.gameData.status === 'finished') {
+                if (gameState.gameData.ended_at) {
+                    // Utiliser l'horodatage de fin si disponible
+                    endTime = new Date(gameState.gameData.ended_at);
+                    console.log("Utilisation de l'horodatage ended_at pour la durée");
+                } else {
+                    // Si la partie est terminée mais sans horodatage de fin, 
+                    // fixer une durée raisonnable depuis le début
+                    // On ajoute 4 minutes pour cet exemple (ajustez selon la durée typique des parties)
+                    const estimatedGameTime = 4 * 60 * 1000; // 4 minutes en millisecondes
+                    endTime = new Date(startTime.getTime() + estimatedGameTime);
+                    console.warn("Partie marquée comme terminée sans horodatage ended_at. Utilisation d'une durée fixe estimée.");
+                }
+            } else {
+                // Pour les parties en cours, utiliser l'heure actuelle
+                endTime = new Date();
+                console.log("Partie en cours, utilisation de l'heure actuelle pour calculer la durée");
+            }
             
             // Vérifier que les dates sont valides
             if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {

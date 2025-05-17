@@ -593,6 +593,7 @@ import {
      */
     endGame(): void {
       this.gameStatus = 'finished';
+      this.ended_at = new Date();
       
       // Recalculer tous les scores pour être sûr
       const player1Score = this.calculatePlayerScore(this.player1);

@@ -656,12 +656,57 @@ async function showGameDetail(gameId) {
 function displayGameDetails(details, modal) {
     const content = modal.querySelector('.game-detail-content');
     
-    // Calculer les informations additionnelles
+    // Calculer les informations additionnelles en tenant compte des différents formats possibles de scores
     const winner = details.basic.winner;
-    const winnerIndex = details.basic.players.indexOf(winner);
-    const winnerScore = details.basic.scores[winnerIndex];
-    const loserScore = details.basic.scores[1 - winnerIndex];
-    const margin = winnerScore - loserScore;
+    
+    // Extraction des scores - adaptée pour fonctionner à la fois avec un objet ou un tableau
+    let player1Score, player2Score, winnerScore, loserScore;
+    
+    // Vérifier le format des scores et les extraire de manière appropriée
+    if (Array.isArray(details.basic.scores)) {
+        // Le format est un tableau (ancien format)
+        [player1Score, player2Score] = details.basic.scores;
+        const winnerIndex = details.basic.players.indexOf(winner);
+        winnerScore = details.basic.scores[winnerIndex];
+        loserScore = details.basic.scores[1 - winnerIndex];
+    } else if (typeof details.basic.scores === 'object' && details.basic.scores !== null) {
+        // Le format est un objet (nouveau format)
+        // Vérifier si nous avons les propriétés player1/player2 ou des scores totaux
+        if ('player1' in details.basic.scores && 'player2' in details.basic.scores) {
+            // Utiliser directement les propriétés de l'objet
+            player1Score = details.basic.scores.player1;
+            player2Score = details.basic.scores.player2;
+            
+            // Déterminer le score du gagnant et du perdant
+            if (winner === details.basic.players[0]) {
+                winnerScore = player1Score;
+                loserScore = player2Score;
+            } else {
+                winnerScore = player2Score;
+                loserScore = player1Score;
+            }
+        } else {
+            // Format inattendu, utiliser des valeurs par défaut
+            console.warn("Format de scores inattendu:", details.basic.scores);
+            player1Score = 0;
+            player2Score = 0;
+            winnerScore = 0;
+            loserScore = 0;
+        }
+    } else {
+        // Aucune information de score disponible
+        console.warn("Aucune information de score disponible");
+        player1Score = 0;
+        player2Score = 0;
+        winnerScore = 0;
+        loserScore = 0;
+    }
+    
+    // Calculer la marge
+    const margin = Math.abs(winnerScore - loserScore);
+    
+    // Créer l'affichage du score
+    const scoresDisplay = `${player1Score} - ${player2Score}`;
     
     // Formater la durée
     let durationText = 'Durée inconnue';
@@ -688,7 +733,7 @@ function displayGameDetails(details, modal) {
                     </div>
                     <div class="summary-row">
                         <span class="summary-label">📊 Score final :</span>
-                        <span class="summary-value">${details.basic.scores.join(' - ')}</span>
+                        <span class="summary-value">${scoresDisplay}</span>
                     </div>
                     <div class="summary-row">
                         <span class="summary-label">🎯 Marge de victoire :</span>
