@@ -365,9 +365,17 @@ function handleChatMessage(data) {
     const isOwnMessage = data.username === gameState.username;
     messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
     
-    // Adapter le contenu selon qui a envoyé
-    const senderName = isOwnMessage ? 'Vous' : data.username;
-    messageElement.innerHTML = `<div class="chat-sender">${senderName}</div><div class="chat-text">${data.message}</div>`;
+    // Structure beaucoup plus simple : texte plat pour les messages personnels
+    if (isOwnMessage) {
+        // Pour vos propres messages - format simplifié
+        messageElement.textContent = data.message;
+        
+        // Ajouter un attribut personnalisé pour le style
+        messageElement.dataset.sender = "self";
+    } else {
+        // Pour les messages des autres
+        messageElement.innerHTML = `<strong>${data.username}:</strong> ${data.message}`;
+    }
     
     chatMessages.appendChild(messageElement);
     

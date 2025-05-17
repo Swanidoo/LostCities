@@ -7,7 +7,7 @@ let chatConnected = false;
 let chatInput = null;
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_MESSAGE_LINES = 15;
-let currentUserRole = 'user'; // Temporaire - à améliorer
+let currentUserRole = 'user'; // Valeur par défaut, sera mise à jour après authentification
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loginSection = document.getElementById('login-section');
@@ -30,15 +30,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Stocker l'ID de l'utilisateur pour l'utiliser plus tard
                 const userId = user.id;
                 localStorage.setItem('user_id', userId);
-                currentUserRole = user.role;
                 
-                // Charger l'avatar de l'utilisateur
-                loadUserAvatar(userId);
-                
-                // Ajouter le gestionnaire de clic sur l'avatar
-                userAvatar.addEventListener('click', () => {
-                    window.location.href = `/profile/profile.html?id=${userId}`;
-                });
+                // AJOUTEZ CETTE LIGNE : Mettre à jour le rôle utilisateur
+                currentUserRole = user.role || 'user';
                 
                 // Vérifier si l'utilisateur est admin
                 if (user.role === 'admin') {
@@ -553,23 +547,20 @@ function addChatMessage(username, message, messageId = null) {
     if (!messagesContainer) return;
     
     const messageElement = document.createElement('div');
-    messageElement.dataset.messageId = messageId || `temp-${Date.now()}`
+    messageElement.dataset.messageId = messageId || `temp-${Date.now()}`;
     
-    if (messageId) {
-        messageElement.dataset.messageId = messageId;
-    }
-    
-    // Simplification de la détection de message propre
-    let isOwnMessage = false; // À améliorer plus tard si nécessaire
+    // CORRECTION : Comparer avec le nom d'utilisateur stocké
+    const currentUsername = document.getElementById('username')?.textContent;
+    const isOwnMessage = username === currentUsername;
     
     messageElement.className = `chat-message ${isOwnMessage ? 'self' : 'other'}`;
     
-    // Créer un élément pour le pseudo
+    // Créer un élément pour le pseudo en affichant "Vous" pour vos messages
     const senderElement = document.createElement('span');
     senderElement.className = 'chat-sender';
-    senderElement.textContent = username;
+    senderElement.textContent = isOwnMessage ? 'Vous' : username;
     
-    // Ajouter le gestionnaire de clic uniquement si ce n'est pas notre propre message
+    // Ajouter le gestionnaire de clic UNIQUEMENT si ce n'est pas votre message
     if (!isOwnMessage) {
         senderElement.classList.add('clickable-username');
         senderElement.addEventListener('click', (e) => {
@@ -578,13 +569,9 @@ function addChatMessage(username, message, messageId = null) {
         });
     }
     
-    // MODIFICATION ICI - Préserver les retours à la ligne
     const textElement = document.createElement('span');
     textElement.className = 'chat-text';
-    
-    // Option 1: Convertir les retours à la ligne en balises <br>
     textElement.innerHTML = message.replace(/\n/g, '<br>');
-    
     
     messageElement.appendChild(senderElement);
     messageElement.appendChild(document.createTextNode(': '));
