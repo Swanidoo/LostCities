@@ -3,6 +3,7 @@ import { hash, compare } from "https://deno.land/x/bcrypt@v0.2.4/mod.ts";
 import { create } from "https://deno.land/x/djwt@v2.8/mod.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { client } from "./db_client.ts";
+import { cryptoKey, createJWT } from "./jwt_utils.ts";
 
 const authRouter = new Router();
 
@@ -85,11 +86,7 @@ authRouter.post("/login", async (ctx) => {
       exp: Math.floor(Date.now() / 1000) + 60 * 60, // Expiration dans 1 heure
     };
 
-    const jwt = await create(
-      { alg: "HS256", typ: "JWT" },
-      payload,
-      cryptoKey
-    );
+    const jwt = await createJWT(payload);
 
     // Dans la route /login, après la création du JWT
     console.log("🔍 JWT created:", jwt); // DEBUG

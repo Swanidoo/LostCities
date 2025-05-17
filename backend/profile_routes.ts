@@ -2,6 +2,8 @@ import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { client } from "./db_client.ts";
 import { hash, compare } from "https://deno.land/x/bcrypt@v0.2.4/mod.ts";
+import { create } from "https://deno.land/x/djwt@v2.8/mod.ts";
+import { cryptoKey, createJWT } from "./jwt_utils.ts";
 
 const profileRouter = new Router();
 
@@ -356,6 +358,27 @@ profileRouter.put("/api/profile/username", authMiddleware, async (ctx) => {
       "UPDATE users SET username = $1 WHERE id = $2",
       [username, userId]
     );
+
+    // Créer un nouveau JWT avec le nom d'utilisateur mis à jour
+    const payload = {
+      id: userId,
+      username: username,
+      email: ctx.state.user.email,
+      role: ctx.state.user.role,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60, // Expiration dans 1 heure
+    };
+
+    // Créer le JWT avec le même cryptoKey que dans auth_routes.ts
+    const jwt = await createJWT(payload);
+
+    // Remplacer le cookie existant par le nouveau
+    ctx.cookies.set("authToken", jwt, {
+      httpOnly: true,
+      secure: false, // Ajustez selon votre environnement
+      sameSite: "lax",
+      maxAge: 60 * 60 * 1000, // 1 heure
+      path: "/"
+    });
     
     ctx.response.status = 200;
     ctx.response.body = { message: "Nom d'utilisateur mis à jour avec succès" };

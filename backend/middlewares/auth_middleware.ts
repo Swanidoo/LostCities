@@ -1,4 +1,4 @@
-import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
+import { verifyJWT } from "../jwt_utils.ts";
 
 export const authMiddleware = async (ctx: any, next: any) => {
   try {
@@ -14,29 +14,10 @@ export const authMiddleware = async (ctx: any, next: any) => {
       return;
     }
     
-    // Get the JWT_SECRET
-    const jwtKey = Deno.env.get("JWT_SECRET");
-    if (!jwtKey) {
-      ctx.response.status = 500;
-      ctx.response.body = { error: "Server configuration error" };
-      return;
-    }
-    
-    // Create the same CryptoKey used for signing
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(jwtKey);
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"]
-    );
-    
     console.log("🔍 About to verify token...");
     
-    // Verify with the CryptoKey
-    const payload = await verify(token, cryptoKey);
+    // Utiliser la fonction verifyJWT du module partagé
+    const payload = await verifyJWT(token);
     
     console.log("✅ Token verified successfully");
     
@@ -48,4 +29,4 @@ export const authMiddleware = async (ctx: any, next: any) => {
     ctx.response.status = 401;
     ctx.response.body = { error: "Unauthorized: Invalid or expired token" };
   }
-};
+}
