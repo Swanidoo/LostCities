@@ -425,7 +425,9 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
       return obj;
     }
     
-    ctx.response.body = convertBigIntsToNumbers(gameState);    
+    ctx.response.body = JSON.parse(JSON.stringify(gameState, (key, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    ));
 
 
   } catch (err) {

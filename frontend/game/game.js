@@ -27,6 +27,7 @@ const gameState = {
     opponentSide: null
 };
 
+
 // Éléments DOM
 let elements = {};
 
@@ -701,44 +702,47 @@ function showGameEnd(isSurrender = false) {
     let durationMinutes = 0;
 
     if (gameState.gameData && gameState.gameData.started_at) {
-        const startTime = new Date(gameState.gameData.started_at);
-        
-        // S'assurer que started_at est valide
-        if (isNaN(startTime.getTime())) {
-            console.error("Date de début invalide:", gameState.gameData.started_at);
-            durationMinutes = 1; // Valeur par défaut
-        } else {
-            // Si la partie est finie et a une date de fin, l'utiliser
-            // Sinon, utiliser l'heure actuelle
-            const endTime = gameState.gameData.ended_at ? 
-                new Date(gameState.gameData.ended_at) : new Date();
-            
-            if (isNaN(endTime.getTime())) {
-                console.error("Date de fin invalide:", gameState.gameData.ended_at);
-                durationMinutes = 1; // Valeur par défaut
-            } else {
-                // Calculer la différence en millisecondes
-                const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
-                
-                // Convertir en minutes et s'assurer que c'est au moins 1 minute pour une partie complète
-                durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
-            }
-        }
+    console.log("Timestamps disponibles:", {
+        started_at: gameState.gameData.started_at,
+        ended_at: gameState.gameData.ended_at || "non disponible"
+    });
+    
+    const startTime = new Date(gameState.gameData.started_at);
+    
+    // Si la partie est finie et a une date de fin, l'utiliser
+    // Sinon, utiliser l'heure actuelle
+    const endTime = gameState.gameData.ended_at ? 
+        new Date(gameState.gameData.ended_at) : new Date();
+    
+    // Vérifier que les dates sont valides avant de calculer
+    if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
+        const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+        durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
         
         // Formater l'affichage
         const hours = Math.floor(durationMinutes / 60);
         const minutes = durationMinutes % 60;
         
         if (hours > 0) {
-            durationDisplay = `${hours}h${minutes}m`;
+        durationDisplay = `${hours}h${minutes}m`;
         } else {
-            durationDisplay = `${minutes}m`;
+        durationDisplay = `${minutes}m`;
         }
+        
+        console.log(`Durée calculée: ${durationDisplay} (${durationMinutes} minutes)`);
     } else {
-        console.error("Données temporelles manquantes pour le calcul de la durée");
-        // Définir une durée par défaut de 3 minutes pour les parties
-        durationMinutes = 3;
-        durationDisplay = '3m';
+        console.error("Dates invalides:", { 
+        startTime: startTime.toString(), 
+        endTime: endTime.toString() 
+        });
+        durationMinutes = 5; // Valeur par défaut plus réaliste
+        durationDisplay = '5m';
+    }
+    } else {
+    console.error("Données temporelles manquantes:", gameState.gameData);
+    // Définir une durée par défaut raisonnable
+    durationMinutes = 5;
+    durationDisplay = '5m';
     }
     
     // Calculer la marge de victoire
