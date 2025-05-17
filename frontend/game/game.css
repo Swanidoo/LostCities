@@ -964,13 +964,6 @@ body {
     font-size: var(--font-lg);
 }
 
-.chat-message.self .chat-sender,
-.chat-message.self .chat-text {
-    text-align: left !important;
-    float: none !important;
-    display: inline-block;
-}
-
 .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -981,12 +974,11 @@ body {
 }
 
 .chat-message {
-    padding: 10px 15px;
-    border-radius: 12px;
+    padding: var(--spacing-sm);
+    border-radius: clamp(8px, 1vw, 12px);
     max-width: 85%;
     word-break: break-word;
-    margin-bottom: 8px;
-    clear: both; /* Forcer le clear pour éviter les flottements */
+    animation: fadeInUp 0.3s ease;
 }
 
 @keyframes fadeInUp {
@@ -1000,30 +992,16 @@ body {
     }
 }
 
-
-
-
 .chat-message.self {
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-start; /* Aligne le contenu à gauche dans le conteneur */
-    align-self: flex-end; /* Place le conteneur lui-même à droite */
     background-color: rgba(33, 150, 243, 0.3);
     border: 1px solid rgba(33, 150, 243, 0.5);
-    text-align: left !important; /* Force l'alignement du texte */
-    color: white; /* Couleur du texte */
-}
-
-.chat-message.self * {
-    text-align: left !important;
+    align-self: flex-end;
 }
 
 .chat-message.other {
     background-color: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    float: left; /* Alignement à gauche */
-    text-align: left;
-    color: white;
+    align-self: flex-start;
 }
 
 .chat-message.system {

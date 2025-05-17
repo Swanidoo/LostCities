@@ -30,6 +30,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Stocker l'ID de l'utilisateur pour l'utiliser plus tard
                 const userId = user.id;
                 localStorage.setItem('user_id', userId);
+
+                const userAvatar = document.getElementById('user-avatar');
+                if (userAvatar) {
+                    userAvatar.style.cursor = 'pointer';
+                    userAvatar.addEventListener('click', () => {
+                        // Rediriger vers la page de profil avec l'ID de l'utilisateur connecté
+                        const userId = localStorage.getItem('user_id');
+                        if (userId) {
+                            window.location.href = `/profile/profile.html?id=${userId}`;
+                        }
+                    });
+                }
                 
                 // AJOUTEZ CETTE LIGNE : Mettre à jour le rôle utilisateur
                 currentUserRole = user.role || 'user';

@@ -245,7 +245,7 @@ body {
     background: linear-gradient(135deg, rgba(33, 150, 243, 0.15), rgba(33, 150, 243, 0.05));
     border-left-color: #2196F3;
     margin-left: 2rem;
-    text-align: right;
+    text-align: left;
 }
 
 .chat-message:hover {

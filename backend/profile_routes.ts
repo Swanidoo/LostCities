@@ -1,6 +1,7 @@
 import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { authMiddleware } from "./middlewares/auth_middleware.ts";
 import { client } from "./db_client.ts";
+import { hash, compare } from "https://deno.land/x/bcrypt@v0.2.4/mod.ts";
 
 const profileRouter = new Router();
 
@@ -266,6 +267,104 @@ profileRouter.post("/api/report", authMiddleware, async (ctx) => {
   }
 });
 
+//Mettre à jour le mot de passe
+profileRouter.put("/api/profile/password", authMiddleware, async (ctx) => {
+  try {
+    const userId = ctx.state.user.id;
+    const { currentPassword, newPassword } = await ctx.request.body({ type: "json" }).value;
+    
+    // Vérifier que les champs requis sont présents
+    if (!currentPassword || !newPassword) {
+      ctx.response.status = 400;
+      ctx.response.body = { message: "Les champs 'currentPassword' et 'newPassword' sont requis" };
+      return;
+    }
+    
+    // Récupérer le mot de passe actuel de l'utilisateur
+    const userResult = await client.queryObject(
+      "SELECT password FROM users WHERE id = $1",
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      ctx.response.status = 404;
+      ctx.response.body = { message: "Utilisateur non trouvé" };
+      return;
+    }
+    
+    // Vérifier si le mot de passe actuel est correct
+    const isPasswordValid = await compare(currentPassword, userResult.rows[0].password);
+    if (!isPasswordValid) {
+      ctx.response.status = 401;
+      ctx.response.body = { message: "Mot de passe actuel incorrect" };
+      return;
+    }
+    
+    // Hasher le nouveau mot de passe
+    const hashedPassword = await hash(newPassword);
+    
+    // Mettre à jour le mot de passe dans la base de données
+    await client.queryObject(
+      "UPDATE users SET password = $1 WHERE id = $2",
+      [hashedPassword, userId]
+    );
+    
+    ctx.response.status = 200;
+    ctx.response.body = { message: "Mot de passe mis à jour avec succès" };
+  } catch (err) {
+    console.error("Error updating password:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { message: "Erreur lors de la mise à jour du mot de passe" };
+  }
+});
+
+
+// PUT /api/profile/username - Mettre à jour le nom d'utilisateur
+profileRouter.put("/api/profile/username", authMiddleware, async (ctx) => {
+  try {
+    const userId = ctx.state.user.id;
+    const { username } = await ctx.request.body({ type: "json" }).value;
+    
+    // Vérifier que le champ username est présent
+    if (!username) {
+      ctx.response.status = 400;
+      ctx.response.body = { message: "Le champ 'username' est requis" };
+      return;
+    }
+    
+    // Vérifier que le nom d'utilisateur respecte certaines contraintes (optionnel mais recommandé)
+    if (username.length < 3 || username.length > 20) {
+      ctx.response.status = 400;
+      ctx.response.body = { message: "Le nom d'utilisateur doit contenir entre 3 et 20 caractères" };
+      return;
+    }
+    
+    // Vérifier si le nom d'utilisateur est déjà utilisé par un autre utilisateur
+    const existingUser = await client.queryObject(
+      "SELECT id FROM users WHERE username = $1 AND id != $2",
+      [username, userId]
+    );
+    
+    if (existingUser.rows.length > 0) {
+      ctx.response.status = 409; // Conflict
+      ctx.response.body = { message: "Ce nom d'utilisateur est déjà utilisé" };
+      return;
+    }
+    
+    // Mettre à jour le nom d'utilisateur
+    await client.queryObject(
+      "UPDATE users SET username = $1 WHERE id = $2",
+      [username, userId]
+    );
+    
+    ctx.response.status = 200;
+    ctx.response.body = { message: "Nom d'utilisateur mis à jour avec succès" };
+  } catch (err) {
+    console.error("Error updating username:", err);
+    ctx.response.status = 500;
+    ctx.response.body = { message: "Erreur lors de la mise à jour du nom d'utilisateur" };
+  }
+});
 
 
 export default profileRouter;
