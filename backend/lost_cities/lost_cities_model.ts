@@ -402,29 +402,47 @@ export async function loadGameState(gameId: string | number): Promise<LostCities
 export async function saveGameState(game: LostCitiesGame): Promise<void> {
   const gameId = game.gameId;
   
-  // Update game table
-  await client.queryObject(
-    `UPDATE games 
-    SET current_turn_player_id = $1,
-        status = $2,
-        winner_id = $3,
-        turn_phase = $4,
-        last_discarded_pile = $5,
-        ended_at = CASE WHEN $2 = 'finished' AND $7 IS NOT NULL THEN $7::timestamp ELSE ended_at END
-    WHERE id = $6`,
-    [
-      game.currentPlayerId,
-      game.gameStatus,
-      game.winner || null,
-      game.turnPhase,
-      game.lastDiscardedPile || null,
-      gameId,
-      // Format the timestamp or pass null
-      game.ended_at instanceof Date 
-        ? game.ended_at.toISOString() 
-        : (typeof game.ended_at === 'string' ? game.ended_at : null)
-    ]
-  );
+  // Séparer les requêtes selon que le jeu est terminé ou non
+  if (game.gameStatus === 'finished') {
+    // Pour les jeux terminés, mettre à jour ended_at
+    await client.queryObject(
+      `UPDATE games 
+      SET current_turn_player_id = $1,
+          status = $2,
+          winner_id = $3,
+          turn_phase = $4,
+          last_discarded_pile = $5,
+          ended_at = COALESCE(ended_at, CURRENT_TIMESTAMP)
+      WHERE id = $6`,
+      [
+        game.currentPlayerId,
+        game.gameStatus,
+        game.winner || null,
+        game.turnPhase,
+        game.lastDiscardedPile || null,
+        gameId
+      ]
+    );
+  } else {
+    // Pour les jeux en cours, ne pas toucher à ended_at
+    await client.queryObject(
+      `UPDATE games 
+      SET current_turn_player_id = $1,
+          status = $2,
+          winner_id = $3,
+          turn_phase = $4,
+          last_discarded_pile = $5
+      WHERE id = $6`,
+      [
+        game.currentPlayerId,
+        game.gameStatus,
+        game.winner || null,
+        game.turnPhase,
+        game.lastDiscardedPile || null,
+        gameId
+      ]
+    );
+  }
   
   // Update board table
   await client.queryObject(
