@@ -14,8 +14,8 @@ gameDetailsRouter.get("/api/games/:gameId/details", async (ctx) => {
         g.started_at,
         g.ended_at,
         g.game_mode,
-        g.score_player1,   // Ajout important
-        g.score_player2,   // Ajout important
+        g.score_player1,
+        g.score_player2,
         g.winner_id,
         g.player1_id,
         g.player2_id,

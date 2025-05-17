@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!authResponse.ok) {
             window.location.href = '/login/login.html';
             return;
+        // Ensure this closing brace is correctly placed or remove it if unnecessary
+        // If it belongs to a function or block, verify the corresponding opening brace
         }
         
         const authData = await authResponse.json();
@@ -699,33 +701,39 @@ function showGameEnd(isSurrender = false) {
     let durationMinutes = 0;
 
     if (gameState.gameData && gameState.gameData.started_at) {
-        console.log("Started at:", gameState.gameData.started_at);
-        console.log("Ended at:", gameState.gameData.ended_at || "not set");
-        
         const startTime = new Date(gameState.gameData.started_at);
         
-        // Si la partie est finie et qu'on a une date de fin, l'utiliser
-        // Sinon, utiliser l'heure actuelle
-        const endTime = gameState.gameData.ended_at ? 
-            new Date(gameState.gameData.ended_at) : new Date();
-        
-        // S'assurer que les dates sont valides
-        if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
-            // Calculer la différence en millisecondes
-            const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+        // S'assurer que started_at est valide
+        if (isNaN(startTime.getTime())) {
+            console.error("Date de début invalide:", gameState.gameData.started_at);
+            durationMinutes = 1; // Valeur par défaut
+        } else {
+            // Si la partie est finie et a une date de fin, l'utiliser
+            // Sinon, utiliser l'heure actuelle
+            const endTime = gameState.gameData.ended_at ? 
+                new Date(gameState.gameData.ended_at) : new Date();
             
-            // Convertir en minutes et s'assurer que c'est au moins 1 minute pour une partie complète
-            durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
-            
-            // Formatage avec heures si nécessaire
-            const hours = Math.floor(durationMinutes / 60);
-            const minutes = durationMinutes % 60;
-            
-            if (hours > 0) {
-                durationDisplay = `${hours}h${minutes}m`;
+            if (isNaN(endTime.getTime())) {
+                console.error("Date de fin invalide:", gameState.gameData.ended_at);
+                durationMinutes = 1; // Valeur par défaut
             } else {
-                durationDisplay = `${minutes}m`;
+                // Calculer la différence en millisecondes
+                const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+                
+                // Convertir en minutes et s'assurer que c'est au moins 1 minute pour une partie complète
+                durationMinutes = Math.max(1, Math.round(durationMs / (1000 * 60)));
             }
+        }
+        
+        // Formater l'affichage
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = durationMinutes % 60;
+        
+        if (hours > 0) {
+            durationDisplay = `${hours}h${minutes}m`;
+        } else {
+            durationDisplay = `${minutes}m`;
+        }
             
             console.log(`⏱️ Calculated duration: ${durationDisplay} (${durationMinutes} minutes)`);
         } else {
@@ -739,7 +747,6 @@ function showGameEnd(isSurrender = false) {
             durationMinutes = 3;
             durationDisplay = '3m';
         }
-    }
     
     // Calculer la marge de victoire
     const margin = Math.abs(playerScore - opponentScore);
@@ -955,9 +962,13 @@ function handleGameUpdate(data) {
     gameState.playerSide = playerSide;
     gameState.opponentSide = opponentSide;
     
-    console.log('🔍 Player side:', playerSide, 'Opponent side:', opponentSide);
-    console.log('🔍 Player data:', gameState.gameData[playerSide]);
-    console.log('🔍 Opponent data:', gameState.gameData[opponentSide]);
+    console.log("Scores reçus:", {
+        playerSide: gameState.playerSide,
+        opponentSide: gameState.opponentSide,
+        playerScore: gameState.gameData?.scores?.[gameState.playerSide]?.total || 0,
+        opponentScore: gameState.gameData?.scores?.[gameState.opponentSide]?.total || 0,
+        winner: gameState.gameData?.winner
+    });
     
     // Update current phase and turn
     gameState.currentPhase = data.gameState.turnPhase;

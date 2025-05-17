@@ -823,18 +823,18 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
     // Validation des données scores - vérifier qu'elles sont numériques
     const player1Score = typeof game.scores.player1.total === 'number' ? game.scores.player1.total : 0;
     const player2Score = typeof game.scores.player2.total === 'number' ? game.scores.player2.total : 0;
-    
-    console.log(`📊 Validated scores: P1=${player1Score}, P2=${player2Score}, winner=${game.winner || 'tie'}`);
-    
-    // Update game table with critical information
+
+    console.log(`📊 Sauvegarde des scores: P1=${player1Score}, P2=${player2Score}, gagnant=${game.winner || 'égalité'}`);
+
+    // S'assurer que les scores sont inclus dans la requête UPDATE
     await client.queryObject(`
       UPDATE games 
       SET current_turn_player_id = $1,
           status = $2,
           winner_id = $3,
           turn_phase = $4,
-          score_player1 = $5,
-          score_player2 = $6,
+          score_player1 = $5, -- Important: inclu les scores
+          score_player2 = $6, -- Important: inclu les scores
           last_discarded_pile = $7
       WHERE id = $8`,
       [

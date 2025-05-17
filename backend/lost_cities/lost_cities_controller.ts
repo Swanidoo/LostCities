@@ -537,43 +537,48 @@ import {
     calculatePlayerScore(player: Player): number {
       let totalScore = 0;
       
-      // Calculate score for each expedition
+      console.log(`Calcul du score pour le joueur ${player.id}:`);
+      
+      // Calculer le score pour chaque expédition
       Object.keys(player.expeditions).forEach(color => {
-        const expedition = player.expeditions[color];
-        
-        // Skip empty expeditions
-        if (expedition.length === 0) {
-          return;
-        }
-        
-        // Count wager cards
-        const wagerCount = expedition.filter(card => card.type === 'wager').length;
-        
-        // Sum expedition card values
-        let expeditionSum = 0;
-        expedition.forEach(card => {
-          if (card.type === 'expedition' && typeof card.value === 'number') {
-            expeditionSum += card.value;
+          const expedition = player.expeditions[color];
+          
+          // Ignorer les expéditions vides
+          if (expedition.length === 0) {
+              return;
           }
-        });
-        
-        // Subtract expedition cost (20 points)
-        let expeditionScore = expeditionSum - 20;
-        
-        // Apply wager multiplier (if any)
-        if (wagerCount > 0) {
-          expeditionScore *= (wagerCount + 1);
-        }
-        
-        // Apply expedition bonus (if 8 or more cards)
-        if (expedition.length >= 8) {
-          expeditionScore += 20;
-        }
-        
-        // Add to total
-        totalScore += expeditionScore;
+          
+          // Compter les cartes wager
+          const wagerCount = expedition.filter(card => card.type === 'wager').length;
+          
+          // Somme des valeurs des cartes d'expédition
+          let expeditionSum = 0;
+          expedition.forEach(card => {
+              if (card.type === 'expedition' && typeof card.value === 'number') {
+                  expeditionSum += card.value;
+              }
+          });
+          
+          // Soustraire le coût d'expédition (20 points)
+          let expeditionScore = expeditionSum - 20;
+          
+          // Appliquer le multiplicateur de wager (si présent)
+          if (wagerCount > 0) {
+              expeditionScore *= (wagerCount + 1);
+          }
+          
+          // Appliquer le bonus d'expédition (si 8 cartes ou plus)
+          if (expedition.length >= 8) {
+              expeditionScore += 20;
+          }
+          
+          console.log(`  - Expédition ${color}: ${expedition.length} cartes, ${wagerCount} wagers, score: ${expeditionScore}`);
+          
+          // Ajouter au total
+          totalScore += expeditionScore;
       });
       
+      console.log(`  Score final: ${totalScore}`);
       return totalScore;
     }
     
