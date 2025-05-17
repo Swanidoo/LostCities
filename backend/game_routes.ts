@@ -366,6 +366,8 @@ gameRouter.get("/lost-cities/games/:id", authMiddleware, async (ctx) => {
     const gameState = {
       gameId: game.id,
       status: game.status,
+      started_at: game.started_at,
+      ended_at: game.ended_at,
       currentRound: Number(game.current_round), // Convert to number
       totalRounds: totalRounds,
       currentPlayerId: Number(game.current_turn_player_id), // Convert to number

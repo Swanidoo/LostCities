@@ -14,17 +14,14 @@ gameDetailsRouter.get("/api/games/:gameId/details", async (ctx) => {
         g.started_at,
         g.ended_at,
         g.game_mode,
-        g.score_player1,
-        g.score_player2,
+        g.score_player1,   // Ajout important
+        g.score_player2,   // Ajout important
         g.winner_id,
         g.player1_id,
         g.player2_id,
         u1.username as player1_name,
         u2.username as player2_name,
         b.current_round,
-        b.round1_score_player1, b.round1_score_player2,
-        b.round2_score_player1, b.round2_score_player2,
-        b.round3_score_player1, b.round3_score_player2,
         b.use_purple_expedition
       FROM games g
       JOIN users u1 ON g.player1_id = u1.id

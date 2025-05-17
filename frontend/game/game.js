@@ -697,8 +697,11 @@ function showGameEnd(isSurrender = false) {
     // Calcul de la durée
     let durationDisplay = '0m';
     let durationMinutes = 0;
-    
+
     if (gameState.gameData && gameState.gameData.started_at) {
+        console.log("Started at:", gameState.gameData.started_at);
+        console.log("Ended at:", gameState.gameData.ended_at || "not set");
+        
         const startTime = new Date(gameState.gameData.started_at);
         
         // Si la partie est finie et qu'on a une date de fin, l'utiliser
@@ -725,6 +728,16 @@ function showGameEnd(isSurrender = false) {
             }
             
             console.log(`⏱️ Calculated duration: ${durationDisplay} (${durationMinutes} minutes)`);
+        } else {
+            console.error("Invalid dates for duration calculation:", {
+                startTime: gameState.gameData.started_at,
+                endTime: gameState.gameData.ended_at,
+                parsedStart: startTime,
+                parsedEnd: endTime
+            });
+            // Définir une durée par défaut de 3 minutes pour les parties
+            durationMinutes = 3;
+            durationDisplay = '3m';
         }
     }
     
