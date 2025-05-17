@@ -662,29 +662,47 @@ export async function recordMove(
   destination?: string,
   source?: string,
   color?: string
-): Promise<void> {
-  await client.queryObject(
-    `INSERT INTO move (
-      game_id, 
-      player_id, 
-      turn_number, 
-      action, 
-      card_id, 
-      destination, 
-      source,
-      color
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      gameId, 
-      playerId, 
-      turnNumber,
-      action,
-      cardId || null,
-      destination || null,
-      source || null,
-      color || null
-    ]
-  );
+): Promise<boolean> {
+  try {
+    console.log(`🎮 Recording move for game ${gameId}: ${action} by player ${playerId}`);
+    
+    // Validation basique des données requises
+    if (!gameId || !playerId || turnNumber === undefined || !action) {
+      console.error(`❌ Invalid move data: Missing required fields`);
+      return false;
+    }
+    
+    // Insertion dans la base de données
+    await client.queryObject(
+      `INSERT INTO move (
+        game_id, 
+        player_id, 
+        turn_number, 
+        action, 
+        card_id, 
+        destination, 
+        source,
+        color,
+        timestamp
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)`,
+      [
+        gameId, 
+        playerId, 
+        turnNumber,
+        action,
+        cardId || null,
+        destination || null,
+        source || null,
+        color || null
+      ]
+    );
+    
+    console.log(`✅ Move successfully recorded for game ${gameId}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error recording move for game ${gameId}:`, error);
+    return false;
+  }
 }
 
 /**

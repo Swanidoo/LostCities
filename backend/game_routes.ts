@@ -815,143 +815,177 @@ gameRouter.post("/lost-cities/games/:id/chat", authMiddleware, async (ctx) => {
 async function saveGameState(game: LostCitiesGame): Promise<void> {
   const gameId = game.gameId;
   
-  // Update game table
-  await client.queryObject(`
-    UPDATE games 
-    SET current_turn_player_id = $1,
-        status = $2,
-        winner_id = $3,
-        turn_phase = $4
-    WHERE id = $5
-  `, [
-    game.currentPlayerId,
-    game.gameStatus,
-    game.winner || null,
-    game.turnPhase,
-    gameId
-  ]);
+  console.log(`💾 Saving game state for game ${gameId}, status: ${game.gameStatus}`);
   
-  // Update board table
-  await client.queryObject(`
-    UPDATE board
-    SET current_round = $1,
-        remaining_cards_in_deck = $2
-    WHERE game_id = $3
-  `, [
-    game.currentRound,
-    game.deck.length,
-    gameId
-  ]);
-  
-  // Handle score updates if needed
-  if (game.gameStatus === 'finished' || game.currentRound > 1) {
-    const roundScoreField1 = `round${game.currentRound}_score_player1`;
-    const roundScoreField2 = `round${game.currentRound}_score_player2`;
-    
+  try {
+    // Update game table - AJOUT des scores
     await client.queryObject(`
-      UPDATE board
-      SET ${roundScoreField1} = $1,
-          ${roundScoreField2} = $2
-      WHERE game_id = $3
+      UPDATE games 
+      SET current_turn_player_id = $1,
+          status = $2,
+          winner_id = $3,
+          turn_phase = $4,
+          score_player1 = $5,
+          score_player2 = $6,
+          last_discarded_pile = $7
+      WHERE id = $8
     `, [
-      game.scores.player1[`round${game.currentRound}`],
-      game.scores.player2[`round${game.currentRound}`],
+      game.currentPlayerId,
+      game.gameStatus,
+      game.winner || null,
+      game.turnPhase,
+      game.scores.player1.total,
+      game.scores.player2.total,
+      game.lastDiscardedPile || null,
       gameId
     ]);
-  }
-
-  if (game.gameStatus === 'finished') {
-    // Vérifier si ended_at est déjà défini
-    const endedCheck = await client.queryObject(
-      `SELECT ended_at FROM games WHERE id = $1`,
-      [gameId]
-    );
     
-    // Si ended_at n'est pas défini, le définir maintenant
-    if (!endedCheck.rows[0].ended_at) {
-      await client.queryObject(
-        `UPDATE games SET ended_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [gameId]
-      );
+    // Update board table
+    await client.queryObject(`
+      UPDATE board
+      SET current_round = $1,
+          remaining_cards_in_deck = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE game_id = $3
+    `, [
+      game.currentRound,
+      game.deck.length,
+      gameId
+    ]);
+    
+    // Handle score updates if needed
+    if (game.gameStatus === 'finished' || game.currentRound > 1) {
+      const roundScoreField1 = `round${game.currentRound}_score_player1`;
+      const roundScoreField2 = `round${game.currentRound}_score_player2`;
+      
+      await client.queryObject(`
+        UPDATE board
+        SET ${roundScoreField1} = $1,
+            ${roundScoreField2} = $2
+        WHERE game_id = $3
+      `, [
+        game.scores.player1[`round${game.currentRound}`],
+        game.scores.player2[`round${game.currentRound}`],
+        gameId
+      ]);
     }
     
-    // Enregistrer les scores dans le leaderboard
-    const gameMode = game.totalRounds === 1 ? 'quick' : 'classic';
-    const withExtension = game.usePurpleExpedition;
-    
-    // Fetch player usernames from the users table (not players)
-    const player1Result = await client.queryObject<{ username: string }>(
+    // Si le jeu est terminé, s'assurer que ended_at est défini 
+    // et enregistrer les scores dans le leaderboard
+    if (game.gameStatus === 'finished') {
+      // Vérifier si ended_at est déjà défini
+      const endedCheck = await client.queryObject(
+        `SELECT ended_at FROM games WHERE id = $1`,
+        [gameId]
+      );
+      
+      // Si ended_at n'est pas défini, le définir maintenant
+      if (!endedCheck.rows[0].ended_at) {
+        await client.queryObject(
+          `UPDATE games SET ended_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [gameId]
+        );
+      }
+      
+      // Enregistrer les scores dans le leaderboard
+      const gameMode = game.totalRounds === 1 ? 'quick' : 'classic';
+      const withExtension = game.usePurpleExpedition;
+      
+      // Récupérer les noms d'utilisateurs
+      const player1Result = await client.queryObject<{ username: string }>(
         `SELECT username FROM users WHERE id = $1`,
         [game.player1.id]
-    );
-    const player1Name = player1Result.rows[0]?.username || "Unknown Player";
-
-    // Enregistrer le score du joueur 1
-    await client.queryObject(
+      );
+      const player1Name = player1Result.rows[0]?.username || "Unknown Player";
+      
+      // Enregistrer le score du joueur 1
+      await client.queryObject(
         `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
         VALUES ($1, $2, $3, $4, $5)`,
         [game.player1.id, player1Name, game.scores.player1.total, gameMode, withExtension]
-    );
-    
-    // Fetch player2's username
-    const player2Result = await client.queryObject<{ username: string }>(
+      );
+      
+      // Récupérer le nom du joueur 2
+      const player2Result = await client.queryObject<{ username: string }>(
         `SELECT username FROM users WHERE id = $1`,
         [game.player2.id]
-    );
-    const player2Name = player2Result.rows[0]?.username || "Unknown Player";
-
-    // Enregistrer le score du joueur 2
-    await client.queryObject(
+      );
+      const player2Name = player2Result.rows[0]?.username || "Unknown Player";
+      
+      // Enregistrer le score du joueur 2
+      await client.queryObject(
         `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension)
         VALUES ($1, $2, $3, $4, $5)`,
         [game.player2.id, player2Name, game.scores.player2.total, gameMode, withExtension]
+      );
+      
+      console.log(`✅ Scores recorded in leaderboard for game ${gameId}`);
+    }
+    
+    // Get board ID
+    const boardResult = await client.queryObject<{id: number}>(
+      `SELECT id FROM board WHERE game_id = $1`,
+      [gameId]
     );
-  }
-  
-  // We'll assume the game logic has already updated the cards in memory,
-  // so now we need to sync those changes to the database
-  
-  // Clear all card locations (we'll re-insert them)
-  await client.queryObject(`
-    UPDATE game_card
-    SET location = 'removed',
-        expedition_id = NULL,
-        pile_id = NULL
-    WHERE game_id = $1
-  `, [gameId]);
-  
-  // Re-insert player 1 hand
-  for (let i = 0; i < game.player1.hand.length; i++) {
-    const card = game.player1.hand[i];
-    await client.queryObject(`
-      UPDATE game_card
-      SET location = 'player1_hand',
-          position = $1
-      WHERE game_id = $2 AND card_id = $3
-    `, [i, gameId, card.id]);
-  }
-  
-  // Re-insert player 2 hand
-  for (let i = 0; i < game.player2.hand.length; i++) {
-    const card = game.player2.hand[i];
-    await client.queryObject(`
-      UPDATE game_card
-      SET location = 'player2_hand',
-          position = $1
-      WHERE game_id = $2 AND card_id = $3
-    `, [i, gameId, card.id]);
-  }
-  
-  // Re-insert deck
-  for (let i = 0; i < game.deck.length; i++) {
-    const card = game.deck[i];
-    await client.queryObject(`
-      UPDATE game_card
-      SET location = 'deck',
-          position = $1
-      WHERE game_id = $2 AND card_id = $3
-    `, [i, gameId, card.id]);
-  }
+    
+    if (boardResult.rows.length === 0) {
+      throw new Error("Board not found for game");
+    }
+    
+    const boardId = boardResult.rows[0].id;
+    
+    // Update card positions - mise à jour de la position des cartes
+    // First mark all cards as removed (we'll update their actual location)
+    await client.queryObject(
+      `UPDATE game_card
+      SET location = 'removed',
+          expedition_id = NULL,
+          pile_id = NULL
+      WHERE game_id = $1`,
+      [gameId]
+    );
+    
+    // Update player 1 hand
+    for (let i = 0; i < game.player1.hand.length; i++) {
+      const card = game.player1.hand[i];
+      await client.queryObject(
+        `UPDATE game_card
+        SET location = 'player1_hand',
+            position = $1,
+            expedition_id = NULL,
+            pile_id = NULL
+        WHERE game_id = $2 AND card_id = $3`,
+        [i, gameId, card.id]
+      );
+    }
+    
+    // Update player 2 hand
+    for (let i = 0; i < game.player2.hand.length; i++) {
+      const card = game.player2.hand[i];
+      await client.queryObject(
+        `UPDATE game_card
+        SET location = 'player2_hand',
+            position = $1,
+            expedition_id = NULL,
+            pile_id = NULL
+        WHERE game_id = $2 AND card_id = $3`,
+        [i, gameId, card.id]
+      );
+    }
+    
+    // Update deck
+    for (let i = 0; i < game.deck.length; i++) {
+      const card = game.deck[i];
+      await client.queryObject(
+        `UPDATE game_card
+        SET location = 'deck',
+            position = $1,
+            expedition_id = NULL,
+            pile_id = NULL
+        WHERE game_id = $2 AND card_id = $3`,
+        [i, gameId, card.id]
+      );
+    }
   
   // Re-insert expeditions
   const colors = Object.keys(game.player1.expeditions);
@@ -1074,11 +1108,17 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
         `, [pileId]);
       }
     }
+  } // Fermeture de la boucle for (color of colors)
+    
+  console.log(`✅ Game state saved successfully for game ${gameId}`);
+  } catch (error) {
+    console.error(`❌ Error saving game state for game ${gameId}:`, error);
+    throw error; // Propager l'erreur pour la gestion en amont
   }
 }
 
-
 export { loadGameState };
+
 
 export default gameRouter;
 

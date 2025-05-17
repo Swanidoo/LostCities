@@ -486,59 +486,73 @@ function handleChatMessage(
   });
 }
 
+// Fonction handleSurrender corrigée
 async function handleSurrender(data: any, socket: WebSocket, username: string) {
   const { gameId } = data;
   
   try {
-      console.log(`🏳️ Player ${username} surrendering game ${gameId}`);
-      
-      // Get user ID
-      const userId = await getUserIdFromUsername(username);
-      
-      // Update game status in database
-      const gameResult = await client.queryObject(`
-          SELECT player1_id, player2_id FROM games WHERE id = $1
-      `, [gameId]);
-      
-      if (gameResult.rows.length === 0) {
-          throw new Error("Game not found");
-      }
-      
-      const game = gameResult.rows[0];
-      
-      // Determine the winner (opponent)
-      const winnerId = game.player1_id === userId ? game.player2_id : game.player1_id;
-      
-      // Update game status in database
-      await client.queryObject(`
-          UPDATE games 
-          SET status = 'finished', 
-              winner_id = $1,
-              ended_at = CURRENT_TIMESTAMP
-          WHERE id = $2
-      `, [winnerId, gameId]);
-      
-      // Load the full game state to notify players
-      const fullGame = await loadGameState(gameId);
-      const gameState = fullGame.getGameState();
-      
-      // Add surrender info to the game state
-      (gameState as any).surrenderInfo = {
-          playerId: userId,
-          type: 'surrender'
-      };
-      
-      // Notify ALL players (including the one who surrendered)
-      notifyGamePlayers(gameId, gameState);
-      
-      console.log(`✅ Surrender processed for player ${username} in game ${gameId}`);
-      
+    console.log(`🏳️ Player ${username} surrendering game ${gameId}`);
+    
+    // Get user ID
+    const userId = await getUserIdFromUsername(username);
+    
+    // Load the game
+    const game = await loadGameFromDatabase(gameId);
+    
+    // AJOUT: Enregistrer la reddition comme un mouvement
+    await game.recordMove({
+      playerId: userId,
+      action: 'surrender',
+      cardId: null,
+      destination: null,
+      source: null,
+      color: null
+    });
+    
+    // Update game status in database
+    const gameResult = await client.queryObject(`
+      SELECT player1_id, player2_id FROM games WHERE id = $1
+    `, [gameId]);
+    
+    if (gameResult.rows.length === 0) {
+      throw new Error("Game not found");
+    }
+    
+    const gameData = gameResult.rows[0];
+    
+    // Determine the winner (opponent)
+    const winnerId = gameData.player1_id === userId ? gameData.player2_id : gameData.player1_id;
+    
+    // Update game status in database
+    await client.queryObject(`
+      UPDATE games 
+      SET status = 'finished', 
+          winner_id = $1,
+          ended_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `, [winnerId, gameId]);
+    
+    // Load the full game state to notify players
+    const fullGame = await loadGameState(gameId);
+    const gameState = fullGame.getGameState();
+    
+    // Add surrender info to the game state
+    (gameState as any).surrenderInfo = {
+      playerId: userId,
+      type: 'surrender'
+    };
+    
+    // Notify ALL players (including the one who surrendered)
+    notifyGamePlayers(gameId, gameState);
+    
+    console.log(`✅ Surrender processed for player ${username} in game ${gameId}`);
+    
   } catch (error) {
-      console.error(`❌ Error handling surrender: ${error}`);
-      socket.send(JSON.stringify({
-          event: 'error',
-          data: { message: 'Failed to surrender game' }
-      }));
+    console.error(`❌ Error handling surrender: ${error}`);
+    socket.send(JSON.stringify({
+      event: 'error',
+      data: { message: 'Failed to surrender game' }
+    }));
   }
 }
 
@@ -810,12 +824,21 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
     const game = await loadGameState(gameId);
     const userId = await getUserIdFromUsername(username);
     
-    // Make the move - DEBUG
+    // Make the move
     console.log(`Before move: ${game.player1.hand.length} cards in P1 hand`);
     const success = game.playCardToExpedition(userId, cardId, color);
     console.log(`After move: ${game.player1.hand.length} cards in P1 hand`);
     
     if (success) {
+      // AJOUT: Enregistrer explicitement le mouvement
+      await game.recordMove({
+        playerId: userId,
+        action: 'play_card',
+        cardId: cardId,
+        destination: 'expedition',
+        color: color
+      });
+      
       // Save the updated game state
       await game.save();
       
@@ -844,7 +867,7 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
   }
 }
 
-// Handle discard card action
+
 async function handleDiscardCard(data: any, socket: WebSocket, username: string) {
   const { gameId, cardId } = data;
   
@@ -859,6 +882,15 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
     const success = game.discardCard(userId, cardId);
     
     if (success) {
+      // AJOUT: Enregistrer explicitement le mouvement
+      await game.recordMove({
+        playerId: userId,
+        action: 'discard_card',
+        cardId: cardId,
+        destination: 'discard_pile',
+        color: null // La couleur est déterminée par la carte
+      });
+      
       // Save the updated game state
       await game.save();
       
@@ -881,6 +913,7 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
   }
 }
 
+
 // Handle draw card action
 async function handleDrawCard(data: any, socket: WebSocket, username: string) {
   const { gameId, source, color } = data;
@@ -901,6 +934,14 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
     }
     
     if (success) {
+      // AJOUT: Enregistrer explicitement le mouvement
+      await game.recordMove({
+        playerId: userId,
+        action: 'draw_card',
+        source: source,
+        color: source === 'discard_pile' ? color : null
+      });
+      
       // Save the updated game state
       await game.save();
       

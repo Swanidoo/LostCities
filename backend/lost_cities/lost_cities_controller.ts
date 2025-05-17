@@ -681,17 +681,44 @@ import {
     /**
      * Record a move in the database
      */
-    async recordMove(move: MoveRecord): Promise<void> {
-      await GameModel.recordMove(
-        this.gameId,
-        move.playerId,
-        this.moveHistory.length,
-        move.action,
-        move.cardId,
-        move.destination,
-        move.source,
-        move.color
-      );
+    async recordMove(move: MoveRecord): Promise<boolean> {
+      try {
+        console.log(`🎮 Recording move in controller: ${move.action} by ${move.playerId}`);
+        
+        // Vérifier si le mouvement est dans l'historique
+        const moveExists = this.moveHistory.some(m => 
+          m.action === move.action && 
+          m.playerId === move.playerId && 
+          m.cardId === move.cardId
+        );
+        
+        if (!moveExists) {
+          console.log(`⚠️ Adding move to history before recording`);
+          this.moveHistory.push(move);
+        }
+        
+        const result = await GameModel.recordMove(
+          this.gameId,
+          move.playerId,
+          this.moveHistory.length - 1,  // Index 0-based 
+          move.action,
+          move.cardId,
+          move.destination,
+          move.source,
+          move.color
+        );
+        
+        if (result) {
+          console.log(`✅ Move recorded successfully`);
+        } else {
+          console.error(`❌ Failed to record move`);
+        }
+        
+        return result;
+      } catch (error) {
+        console.error(`❌ Error in recordMove for game ${this.gameId}:`, error);
+        return false;
+      }
     }
     
     /**
