@@ -646,8 +646,12 @@ import {
         usePurpleExpedition: this.usePurpleExpedition,
         cardsInDeck: this.deck.length,
         lastDiscardedPile: this.lastDiscardedPile,
-        started_at: this.started_at ? this.started_at.toISOString() : undefined,
-        ended_at: this.ended_at ? this.ended_at.toISOString() : undefined,
+        started_at: this.started_at instanceof Date 
+          ? this.started_at.toISOString() 
+          : (typeof this.started_at === 'string' ? this.started_at : undefined),
+        ended_at: this.ended_at instanceof Date 
+          ? this.ended_at.toISOString() 
+          : (typeof this.ended_at === 'string' ? this.ended_at : undefined),
         player1: {
           id: this.player1.id,
           expeditions: this.player1.expeditions,
