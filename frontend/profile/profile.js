@@ -657,7 +657,9 @@ function displayGameDetails(details, modal) {
     const content = modal.querySelector('.game-detail-content');
     
     // Calculer les informations additionnelles en tenant compte des différents formats possibles de scores
-    const winner = details.basic.winner ? details.basic.winner.name : 'Égalité';
+    const winner = details.basic.winner ? 
+        (typeof details.basic.winner === 'object' ? details.basic.winner.name : details.basic.winner) : 
+        'Égalité';
 
     // Extraction des scores - adaptée pour fonctionner à la fois avec un objet ou un tableau
     let player1Score, player2Score, winnerScore, loserScore;
@@ -667,18 +669,22 @@ function displayGameDetails(details, modal) {
         // Le format est un tableau (ancien format)
         [player1Score, player2Score] = details.basic.scores;
         const winnerIndex = details.basic.players.indexOf(winner);
-        winnerScore = details.basic.scores[winnerIndex];
-        loserScore = details.basic.scores[1 - winnerIndex];
+        winnerScore = details.basic.scores[winnerIndex >= 0 ? winnerIndex : 0];
+        loserScore = details.basic.scores[1 - (winnerIndex >= 0 ? winnerIndex : 0)];
     } else if (typeof details.basic.scores === 'object' && details.basic.scores !== null) {
         // Le format est un objet (nouveau format)
         // Vérifier si nous avons les propriétés player1/player2 ou des scores totaux
         if ('player1' in details.basic.scores && 'player2' in details.basic.scores) {
             // Utiliser directement les propriétés de l'objet
-            player1Score = details.basic.scores.player1;
-            player2Score = details.basic.scores.player2;
+            player1Score = typeof details.basic.scores.player1 === 'object' ? 
+                '0' : details.basic.scores.player1;
+            player2Score = typeof details.basic.scores.player2 === 'object' ? 
+                '0' : details.basic.scores.player2;
             
             // Déterminer le score du gagnant et du perdant
-            if (winner === details.basic.players[0]) {
+            if (winner === (Array.isArray(details.basic.players) && details.basic.players.length > 0 ? 
+                (typeof details.basic.players[0] === 'object' ? details.basic.players[0].name : details.basic.players[0]) : 
+                'Joueur 1')) {
                 winnerScore = player1Score;
                 loserScore = player2Score;
             } else {
@@ -702,11 +708,11 @@ function displayGameDetails(details, modal) {
         loserScore = 0;
     }
     
-    // Calculer la marge
-    const margin = Math.abs(details.basic.scores.player1 - details.basic.scores.player2);
+    // Calculer la marge de manière sécurisée
+    const margin = Math.abs(Number(player1Score) - Number(player2Score));
 
     // Créer l'affichage du score
-    const scoresDisplay = `${details.basic.scores.player1} - ${details.basic.scores.player2}`;
+    const scoresDisplay = `${player1Score} - ${player2Score}`;
 
     // Formater la durée
     let durationText = 'Durée inconnue';
@@ -715,6 +721,19 @@ function displayGameDetails(details, modal) {
         const minutes = details.basic.duration % 60;
         durationText = hours > 0 ? `${hours}h${minutes}m` : `${minutes}m`;
     }
+
+    // Extraire le mode de jeu de manière sécurisée
+    const gameMode = details.basic.mode === 'quick' ? 'Rapide' : 'Classique';
+    const withExtension = details.basic.withExtension ? ' + Extension' : '';
+    
+    // Préparer l'extraction des joueurs
+    const player1Name = Array.isArray(details.basic.players) && details.basic.players.length > 0 ?
+        (typeof details.basic.players[0] === 'object' ? details.basic.players[0].name : details.basic.players[0]) :
+        'Joueur 1';
+    
+    const player2Name = Array.isArray(details.basic.players) && details.basic.players.length > 1 ?
+        (typeof details.basic.players[1] === 'object' ? details.basic.players[1].name : details.basic.players[1]) :
+        'Joueur 2';
     
     content.innerHTML = `
         <div class="game-detail-tabs">
@@ -745,24 +764,30 @@ function displayGameDetails(details, modal) {
                     </div>
                     <div class="summary-row">
                         <span class="summary-label">🎮 Mode :</span>
-                        <span class="summary-value">${
-                            details.basic.mode === 'quick' ? 'Rapide' : 'Classique'
-                        }${details.basic.withExtension ? ' + Extension' : ''}</span>
+                        <span class="summary-value">${gameMode}${withExtension}</span>
                     </div>
                 </div>
                 
                 <div class="rounds-summary">
                     <h3>Scores par manche</h3>
                     <div class="rounds-grid">
-                        ${details.rounds.map(round => `
-                            <div class="round-item">
-                                <div class="round-number">Manche ${round.round}</div>
-                                <div class="round-scores">
-                                    <span>${details.basic.players[0]}: ${round.score_p1}</span>
-                                    <span>${details.basic.players[1]}: ${round.score_p2}</span>
+                        ${details.rounds.map(round => {
+                            // Vérifier que les propriétés existent et sont des nombres
+                            const scoreP1 = typeof round.score_p1 === 'object' ? 
+                                JSON.stringify(round.score_p1) : (round.score_p1 || 0);
+                            const scoreP2 = typeof round.score_p2 === 'object' ? 
+                                JSON.stringify(round.score_p2) : (round.score_p2 || 0);
+                            
+                            return `
+                                <div class="round-item">
+                                    <div class="round-number">Manche ${round.round}</div>
+                                    <div class="round-scores">
+                                        <span>${player1Name}: ${scoreP1}</span>
+                                        <span>${player2Name}: ${scoreP2}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             </div>
@@ -770,13 +795,19 @@ function displayGameDetails(details, modal) {
             <!-- Onglet Chronologie -->
             <div class="detail-tab-pane" id="moves-pane">
                 <div class="moves-timeline">
-                    ${details.moves.map(move => `
-                        <div class="move-item">
-                            <div class="move-time">${new Date(move.timestamp).toLocaleTimeString('fr-FR')}</div>
-                            <div class="move-player ${move.player === details.basic.players[0] ? 'player1' : 'player2'}">${move.player}</div>
-                            <div class="move-action">${formatMoveAction(move)}</div>
-                        </div>
-                    `).join('')}
+                    ${details.moves.map(move => {
+                        // Assurer que player est une chaîne
+                        const playerName = typeof move.player === 'object' ? 
+                            (move.player.name || JSON.stringify(move.player)) : move.player;
+                        
+                        return `
+                            <div class="move-item">
+                                <div class="move-time">${new Date(move.timestamp).toLocaleTimeString('fr-FR')}</div>
+                                <div class="move-player ${playerName === player1Name ? 'player1' : 'player2'}">${playerName}</div>
+                                <div class="move-action">${formatMoveAction(move)}</div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
             
@@ -827,8 +858,19 @@ function formatMoveAction(move) {
     
     let description = actionTexts[move.action] || move.action;
     
+    // CORRECTION : Vérifier si card est un objet et accéder à ses propriétés
     if (move.card) {
-        description += ` <span class="card-name">${move.card}</span>`;
+        // Si c'est un objet, accéder à l'ID ou créer une description lisible
+        if (typeof move.card === 'object') {
+            // Formatter la carte en texte lisible, par exemple "rouge 5" ou "bleu wager"
+            const cardText = move.card.color && move.card.type ? 
+                `${move.card.color}_${move.card.value || move.card.type}` : 
+                move.card.id || JSON.stringify(move.card);
+            description += ` <span class="card-name">${cardText}</span>`;
+        } else {
+            // Si c'est déjà une chaîne, l'utiliser directement
+            description += ` <span class="card-name">${move.card}</span>`;
+        }
     }
     
     if (move.destination === 'expedition') {
