@@ -284,6 +284,7 @@ body {
     width: var(--card-width);
     min-height: var(--card-height);
     transition: all 0.3s ease;
+    z-index: 20;
 }
 
 .expedition-stack .card {
@@ -329,6 +330,10 @@ body {
 /* Enhanced hover effects pour les expéditions */
 .expedition-stack:hover {
     z-index: 100;
+}
+
+.expedition-stack:hover .card {
+    z-index: 200 !important;
 }
 
 #player-area .expedition-stack:hover .card:nth-child(1) { transform: translateY(0); z-index: 1; }
