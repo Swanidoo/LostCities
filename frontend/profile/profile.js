@@ -656,64 +656,59 @@ async function showGameDetail(gameId) {
 function displayGameDetails(details, modal) {
     const content = modal.querySelector('.game-detail-content');
     
-    // Calculer les informations additionnelles en tenant compte des différents formats possibles de scores
+    // Extraire les informations du vainqueur
     const winner = details.basic.winner ? 
         (typeof details.basic.winner === 'object' ? details.basic.winner.name : details.basic.winner) : 
         'Égalité';
 
-    // Extraction des scores - adaptée pour fonctionner à la fois avec un objet ou un tableau
-    let player1Score, player2Score, winnerScore, loserScore;
+    // CORRECTION: Extraire les scores des manches et les totaliser
+    let player1Score = 0, player2Score = 0;
     
-    // Vérifier le format des scores et les extraire de manière appropriée
-    if (Array.isArray(details.basic.scores)) {
-        // Le format est un tableau (ancien format)
-        [player1Score, player2Score] = details.basic.scores;
-        const winnerIndex = details.basic.players.indexOf(winner);
-        winnerScore = details.basic.scores[winnerIndex >= 0 ? winnerIndex : 0];
-        loserScore = details.basic.scores[1 - (winnerIndex >= 0 ? winnerIndex : 0)];
-    } else if (typeof details.basic.scores === 'object' && details.basic.scores !== null) {
-        // Le format est un objet (nouveau format)
-        // Vérifier si nous avons les propriétés player1/player2 ou des scores totaux
-        if ('player1' in details.basic.scores && 'player2' in details.basic.scores) {
-            // Utiliser directement les propriétés de l'objet
-            player1Score = typeof details.basic.scores.player1 === 'object' ? 
-                '0' : details.basic.scores.player1;
-            player2Score = typeof details.basic.scores.player2 === 'object' ? 
-                '0' : details.basic.scores.player2;
+    // Vérifier si nous avons des données de manche
+    if (Array.isArray(details.rounds)) {
+        // Calculer les scores à partir des scores des manches
+        details.rounds.forEach(round => {
+            const roundScoreP1 = typeof round.score_p1 === 'object' ? 0 : Number(round.score_p1 || 0);
+            const roundScoreP2 = typeof round.score_p2 === 'object' ? 0 : Number(round.score_p2 || 0);
             
-            // Déterminer le score du gagnant et du perdant
-            if (winner === (Array.isArray(details.basic.players) && details.basic.players.length > 0 ? 
-                (typeof details.basic.players[0] === 'object' ? details.basic.players[0].name : details.basic.players[0]) : 
-                'Joueur 1')) {
-                winnerScore = player1Score;
-                loserScore = player2Score;
-            } else {
-                winnerScore = player2Score;
-                loserScore = player1Score;
-            }
-        } else {
-            // Format inattendu, utiliser des valeurs par défaut
-            console.warn("Format de scores inattendu:", details.basic.scores);
-            player1Score = 0;
-            player2Score = 0;
-            winnerScore = 0;
-            loserScore = 0;
+            player1Score += roundScoreP1;
+            player2Score += roundScoreP2;
+        });
+    } 
+    // Vérifier si nous avons les scores directement dans le round1/2/3_score_player1/2
+    else if (details.basic.round1_score_player1 !== undefined) {
+        // Additionner les scores des 3 manches possibles
+        player1Score = Number(details.basic.round1_score_player1 || 0) +
+                      Number(details.basic.round2_score_player1 || 0) +
+                      Number(details.basic.round3_score_player1 || 0);
+                      
+        player2Score = Number(details.basic.round1_score_player2 || 0) +
+                      Number(details.basic.round2_score_player2 || 0) +
+                      Number(details.basic.round3_score_player2 || 0);
+    } 
+    // Fallback sur les scores principaux
+    else if (details.basic.scores) {
+        if (typeof details.basic.scores === 'object') {
+            player1Score = Number(details.basic.scores.player1) || 0;
+            player2Score = Number(details.basic.scores.player2) || 0;
+        } else if (Array.isArray(details.basic.scores)) {
+            [player1Score, player2Score] = details.basic.scores.map(s => Number(s) || 0);
         }
-    } else {
-        // Aucune information de score disponible
-        console.warn("Aucune information de score disponible");
-        player1Score = 0;
-        player2Score = 0;
-        winnerScore = 0;
-        loserScore = 0;
+    } 
+    // Dernier fallback sur score_player1/2
+    else if (details.basic.score_player1 !== undefined) {
+        player1Score = Number(details.basic.score_player1) || 0;
+        player2Score = Number(details.basic.score_player2) || 0;
     }
     
     // Calculer la marge de manière sécurisée
-    const margin = Math.abs(Number(player1Score) - Number(player2Score));
-
+    const margin = Math.abs(player1Score - player2Score);
+    
     // Créer l'affichage du score
     const scoresDisplay = `${player1Score} - ${player2Score}`;
-
+    
+    // Reste de la fonction identique...
+    
     // Formater la durée
     let durationText = 'Durée inconnue';
     if (details.basic.duration) {
@@ -727,13 +722,15 @@ function displayGameDetails(details, modal) {
     const withExtension = details.basic.withExtension ? ' + Extension' : '';
     
     // Préparer l'extraction des joueurs
-    const player1Name = Array.isArray(details.basic.players) && details.basic.players.length > 0 ?
-        (typeof details.basic.players[0] === 'object' ? details.basic.players[0].name : details.basic.players[0]) :
-        'Joueur 1';
+    const player1Name = details.basic.player1_name || 
+        (Array.isArray(details.basic.players) && details.basic.players.length > 0 ?
+            (typeof details.basic.players[0] === 'object' ? details.basic.players[0].name : details.basic.players[0]) :
+            'Joueur 1');
     
-    const player2Name = Array.isArray(details.basic.players) && details.basic.players.length > 1 ?
-        (typeof details.basic.players[1] === 'object' ? details.basic.players[1].name : details.basic.players[1]) :
-        'Joueur 2';
+    const player2Name = details.basic.player2_name || 
+        (Array.isArray(details.basic.players) && details.basic.players.length > 1 ?
+            (typeof details.basic.players[1] === 'object' ? details.basic.players[1].name : details.basic.players[1]) :
+            'Joueur 2');
     
     content.innerHTML = `
         <div class="game-detail-tabs">
@@ -771,23 +768,7 @@ function displayGameDetails(details, modal) {
                 <div class="rounds-summary">
                     <h3>Scores par manche</h3>
                     <div class="rounds-grid">
-                        ${details.rounds.map(round => {
-                            // Vérifier que les propriétés existent et sont des nombres
-                            const scoreP1 = typeof round.score_p1 === 'object' ? 
-                                JSON.stringify(round.score_p1) : (round.score_p1 || 0);
-                            const scoreP2 = typeof round.score_p2 === 'object' ? 
-                                JSON.stringify(round.score_p2) : (round.score_p2 || 0);
-                            
-                            return `
-                                <div class="round-item">
-                                    <div class="round-number">Manche ${round.round}</div>
-                                    <div class="round-scores">
-                                        <span>${player1Name}: ${scoreP1}</span>
-                                        <span>${player2Name}: ${scoreP2}</span>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
+                        ${getRoundsHTML(details, player1Name, player2Name)}
                     </div>
                 </div>
             </div>
@@ -847,6 +828,55 @@ function displayGameDetails(details, modal) {
     
     // Activer la navigation entre onglets
     setupDetailTabs(modal);
+}
+
+function getRoundsHTML(details, player1Name, player2Name) {
+    // Si nous avons des données de manches dans le format d'array attendu
+    if (Array.isArray(details.rounds) && details.rounds.length > 0) {
+        return details.rounds.map(round => {
+            const scoreP1 = typeof round.score_p1 === 'object' ? 0 : (round.score_p1 || 0);
+            const scoreP2 = typeof round.score_p2 === 'object' ? 0 : (round.score_p2 || 0);
+            
+            return `
+                <div class="round-item">
+                    <div class="round-number">Manche ${round.round}</div>
+                    <div class="round-scores">
+                        <span>${player1Name}: ${scoreP1}</span>
+                        <span>${player2Name}: ${scoreP2}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    // Si nous avons des données formatées comme round1_score_player1, etc.
+    else if (details.basic.round1_score_player1 !== undefined) {
+        let roundsHTML = '';
+        
+        // Ajouter chaque manche qui a un score non-nul pour au moins un joueur
+        for (let i = 1; i <= 3; i++) {
+            const p1ScoreKey = `round${i}_score_player1`;
+            const p2ScoreKey = `round${i}_score_player2`;
+            
+            if ((details.basic[p1ScoreKey] !== 0 && details.basic[p1ScoreKey] !== null) || 
+                (details.basic[p2ScoreKey] !== 0 && details.basic[p2ScoreKey] !== null)) {
+                
+                roundsHTML += `
+                    <div class="round-item">
+                        <div class="round-number">Manche ${i}</div>
+                        <div class="round-scores">
+                            <span>${player1Name}: ${details.basic[p1ScoreKey] || 0}</span>
+                            <span>${player2Name}: ${details.basic[p2ScoreKey] || 0}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        return roundsHTML;
+    }
+    
+    // Fallback si aucun format reconnu
+    return `<div class="no-rounds">Aucune information de manche disponible</div>`;
 }
 
 function formatMoveAction(move) {
