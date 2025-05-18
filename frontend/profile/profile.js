@@ -774,7 +774,7 @@ function displayGameDetails(details, modal) {
 
     // Extraire le mode de jeu de manière sécurisée
     const gameMode = details.basic.mode === 'quick' ? 'Rapide' : 'Classique';
-    const withExtension = details.basic.withExtension ? ' + Extension' : '';
+    const withExtension = details.basic.withExtension ? ' + Extension 🟣' : '';
     
     // Préparer l'extraction des joueurs
     const player1Name = details.basic.player1_name || 
