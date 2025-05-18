@@ -357,23 +357,49 @@ function displayGameHistory(games) {
     }
     
     const gamesHTML = games.map(game => {
-        const isVictory = game.result === 'victory';
+        // CORRECTION: Calculer les vrais scores à partir des rounds si disponibles
+        let playerScore = game.score.player;
+        let opponentScore = game.score.opponent;
+        
+        // Si les scores sont à 0 mais qu'il y a des données de round, utiliser ces données
+        if (playerScore === 0 && opponentScore === 0 && game.rounds) {
+            playerScore = 0;
+            opponentScore = 0;
+            
+            // Calculer les scores à partir des rounds
+            if (Array.isArray(game.rounds)) {
+                game.rounds.forEach(round => {
+                    playerScore += Number(round.player_score || 0);
+                    opponentScore += Number(round.opponent_score || 0);
+                });
+            } 
+            // Si le format est round1_score, round2_score, etc.
+            else if (game.round1_score_player !== undefined) {
+                playerScore = Number(game.round1_score_player || 0) + 
+                             Number(game.round2_score_player || 0) + 
+                             Number(game.round3_score_player || 0);
+                opponentScore = Number(game.round1_score_opponent || 0) + 
+                               Number(game.round2_score_opponent || 0) + 
+                               Number(game.round3_score_opponent || 0);
+            }
+        }
+        
+        // Déterminer la victoire en fonction des scores calculés
+        const isVictory = playerScore > opponentScore || game.result === 'victory';
         const resultClass = isVictory ? 'victory' : 'defeat';
         const resultIcon = isVictory ? '🏆' : '❌';
         const resultText = isVictory ? 'Victoire' : 'Défaite';
         
-        // Formater la date et l'heure
+        // Reste du code inchangé
         const gameDate = new Date(game.date);
         const formattedDate = gameDate.toLocaleDateString('fr-FR');
         const formattedTime = gameDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         
-        // Déterminer le mode de jeu avec icônes
         let modeText = game.mode === 'quick' ? '⚡ Mode Rapide' : '🎯 Mode Classique';
         if (game.with_extension) {
             modeText += ' 🟣';
         }
         
-        // Afficher la durée avec formatage
         let durationDisplay = '';
         if (game.duration !== null) {
             const hours = Math.floor(game.duration / 60);
@@ -386,7 +412,7 @@ function displayGameHistory(games) {
         }
         
         // Calcul du différentiel de score
-        const scoreDiff = Math.abs(game.score.player - game.score.opponent);
+        const scoreDiff = Math.abs(playerScore - opponentScore);
         let victoryType = '';
         if (isVictory) {
             if (scoreDiff > 50) victoryType = ' • Victoire écrasante!';
@@ -412,9 +438,9 @@ function displayGameHistory(games) {
                         <span class="result-text">${resultText}${victoryType}</span>
                     </div>
                     <div class="game-score">
-                        <span class="score-player ${isVictory ? 'winning-score' : ''}">${game.score.player}</span>
+                        <span class="score-player ${isVictory ? 'winning-score' : ''}">${playerScore}</span>
                         <span class="score-separator">-</span>
-                        <span class="score-opponent ${!isVictory ? 'winning-score' : ''}">${game.score.opponent}</span>
+                        <span class="score-opponent ${!isVictory ? 'winning-score' : ''}">${opponentScore}</span>
                     </div>
                 </div>
             </div>
@@ -432,7 +458,35 @@ function appendGameHistory(games) {
     const gamesListContainer = document.getElementById('games-list');
     
     games.forEach(game => {
-        const isVictory = game.result === 'victory';
+        // CORRECTION: Calculer les vrais scores à partir des rounds si disponibles
+        let playerScore = game.score.player;
+        let opponentScore = game.score.opponent;
+        
+        // Si les scores sont à 0 mais qu'il y a des données de round, utiliser ces données
+        if ((playerScore === 0 && opponentScore === 0) || game.rounds) {
+            // Réinitialiser les scores pour recalcul
+            playerScore = 0;
+            opponentScore = 0;
+            
+            // Calculer les scores à partir des rounds
+            if (Array.isArray(game.rounds)) {
+                game.rounds.forEach(round => {
+                    playerScore += Number(round.player_score || 0);
+                    opponentScore += Number(round.opponent_score || 0);
+                });
+            } 
+            // Si le format est round1_score, round2_score, etc.
+            else if (game.round1_score_player !== undefined) {
+                playerScore = Number(game.round1_score_player || 0) + 
+                             Number(game.round2_score_player || 0) + 
+                             Number(game.round3_score_player || 0);
+                opponentScore = Number(game.round1_score_opponent || 0) + 
+                               Number(game.round2_score_opponent || 0) + 
+                               Number(game.round3_score_opponent || 0);
+            }
+        }
+        
+        const isVictory = playerScore > opponentScore || game.result === 'victory';
         const resultClass = isVictory ? 'victory' : 'defeat';
         const resultIcon = isVictory ? '🏆' : '❌';
         const resultText = isVictory ? 'Victoire' : 'Défaite';
@@ -457,7 +511,7 @@ function appendGameHistory(games) {
             }
         }
         
-        const scoreDiff = Math.abs(game.score.player - game.score.opponent);
+        const scoreDiff = Math.abs(playerScore - opponentScore);
         let victoryType = '';
         if (isVictory) {
             if (scoreDiff > 50) victoryType = ' • Victoire écrasante!';
@@ -485,9 +539,9 @@ function appendGameHistory(games) {
                     <span class="result-text">${resultText}${victoryType}</span>
                 </div>
                 <div class="game-score">
-                    <span class="score-player ${isVictory ? 'winning-score' : ''}">${game.score.player}</span>
+                    <span class="score-player ${isVictory ? 'winning-score' : ''}">${playerScore}</span>
                     <span class="score-separator">-</span>
-                    <span class="score-opponent ${!isVictory ? 'winning-score' : ''}">${game.score.opponent}</span>
+                    <span class="score-opponent ${!isVictory ? 'winning-score' : ''}">${opponentScore}</span>
                 </div>
             </div>
         `;

@@ -64,8 +64,31 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
     const games = gamesResult.rows.map(row => {
       const isPlayer1 = Number(row.player1_id) === userId;
       const opponent = isPlayer1 ? row.player2_name : row.player1_name;
-      const playerScore = isPlayer1 ? row.score_player1 : row.score_player2;
-      const opponentScore = isPlayer1 ? row.score_player2 : row.score_player1;
+      let playerScore = 0;
+      let opponentScore = 0;
+
+      // Additionner les scores des manches
+      if (row.round1_score_player1 !== undefined) {
+        if (isPlayer1) {
+          playerScore = (Number(row.round1_score_player1) || 0) +
+                      (Number(row.round2_score_player1) || 0) +
+                      (Number(row.round3_score_player1) || 0);
+          opponentScore = (Number(row.round1_score_player2) || 0) +
+                        (Number(row.round2_score_player2) || 0) +
+                        (Number(row.round3_score_player2) || 0);
+        } else {
+          playerScore = (Number(row.round1_score_player2) || 0) +
+                      (Number(row.round2_score_player2) || 0) +
+                      (Number(row.round3_score_player2) || 0);
+          opponentScore = (Number(row.round1_score_player1) || 0) +
+                        (Number(row.round2_score_player1) || 0) +
+                        (Number(row.round3_score_player1) || 0);
+        }
+      } else {
+        // Fallback sur les scores existants
+        playerScore = isPlayer1 ? row.score_player1 : row.score_player2;
+        opponentScore = isPlayer1 ? row.score_player2 : row.score_player1;
+      }
       
       let result = 'defeat';
       if (Number(row.winner_id) === userId) result = 'victory';
