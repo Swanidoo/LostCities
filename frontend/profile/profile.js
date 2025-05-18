@@ -362,25 +362,26 @@ function displayGameHistory(games) {
         let opponentScore = game.score.opponent;
         
         // Si les scores sont à 0 mais qu'il y a des données de round, utiliser ces données
-        if (playerScore === 0 && opponentScore === 0 && game.rounds) {
+        if ((playerScore === 0 && opponentScore === 0) || game.rounds) {
+            // Réinitialiser les scores pour recalcul
             playerScore = 0;
             opponentScore = 0;
             
             // Calculer les scores à partir des rounds
             if (Array.isArray(game.rounds)) {
-                game.rounds.forEach(round => {
-                    playerScore += Number(round.player_score || 0);
-                    opponentScore += Number(round.opponent_score || 0);
-                });
+            game.rounds.forEach(round => {
+                playerScore += Number(round.player_score || 0);
+                opponentScore += Number(round.opponent_score || 0);
+            });
             } 
-            // Si le format est round1_score, round2_score, etc.
-            else if (game.round1_score_player !== undefined) {
-                playerScore = Number(game.round1_score_player || 0) + 
-                             Number(game.round2_score_player || 0) + 
-                             Number(game.round3_score_player || 0);
-                opponentScore = Number(game.round1_score_opponent || 0) + 
-                               Number(game.round2_score_opponent || 0) + 
-                               Number(game.round3_score_opponent || 0);
+            // Si le format est round1_score_player1, round1_score_player2, etc.
+            else if (game.round1_score_player1 !== undefined || game.round1_score_player2 !== undefined) {
+            playerScore = Number(game.round1_score_player1 || 0) + 
+                        Number(game.round2_score_player1 || 0) + 
+                        Number(game.round3_score_player1 || 0);
+            opponentScore = Number(game.round1_score_player2 || 0) + 
+                            Number(game.round2_score_player2 || 0) + 
+                            Number(game.round3_score_player2 || 0);
             }
         }
         

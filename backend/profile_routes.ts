@@ -47,10 +47,18 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
         g.player1_id,
         g.player2_id,
         u1.username as player1_name,
-        u2.username as player2_name
+        u2.username as player2_name,
+        b.round1_score_player1, 
+        b.round1_score_player2,
+        b.round2_score_player1, 
+        b.round2_score_player2,
+        b.round3_score_player1, 
+        b.round3_score_player2,
+        b.use_purple_expedition
       FROM games g
       JOIN users u1 ON g.player1_id = u1.id
       JOIN users u2 ON g.player2_id = u2.id
+      LEFT JOIN board b ON g.id = b.game_id
       WHERE (g.player1_id = $1 OR g.player2_id = $1) 
         AND g.status = 'finished'
         AND g.started_at > NOW() - INTERVAL '1 month'
@@ -68,26 +76,26 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
       let opponentScore = 0;
 
       // Additionner les scores des manches
-      if (row.round1_score_player1 !== undefined) {
+      if (row.round1_score_player1 !== undefined || row.round1_score_player2 !== undefined) {
         if (isPlayer1) {
-          playerScore = (Number(row.round1_score_player1) || 0) +
-                      (Number(row.round2_score_player1) || 0) +
-                      (Number(row.round3_score_player1) || 0);
-          opponentScore = (Number(row.round1_score_player2) || 0) +
-                        (Number(row.round2_score_player2) || 0) +
-                        (Number(row.round3_score_player2) || 0);
+          playerScore = Number(row.round1_score_player1 || 0) +
+                      Number(row.round2_score_player1 || 0) +
+                      Number(row.round3_score_player1 || 0);
+          opponentScore = Number(row.round1_score_player2 || 0) +
+                        Number(row.round2_score_player2 || 0) +
+                        Number(row.round3_score_player2 || 0);
         } else {
-          playerScore = (Number(row.round1_score_player2) || 0) +
-                      (Number(row.round2_score_player2) || 0) +
-                      (Number(row.round3_score_player2) || 0);
-          opponentScore = (Number(row.round1_score_player1) || 0) +
-                        (Number(row.round2_score_player1) || 0) +
-                        (Number(row.round3_score_player1) || 0);
+          playerScore = Number(row.round1_score_player2 || 0) +
+                      Number(row.round2_score_player2 || 0) +
+                      Number(row.round3_score_player2 || 0);
+          opponentScore = Number(row.round1_score_player1 || 0) +
+                        Number(row.round2_score_player1 || 0) +
+                        Number(row.round3_score_player1 || 0);
         }
       } else {
-        // Fallback sur les scores existants
-        playerScore = isPlayer1 ? row.score_player1 : row.score_player2;
-        opponentScore = isPlayer1 ? row.score_player2 : row.score_player1;
+        // Fallback sur les scores existants (convertir en nombre et gérer les undefined)
+        playerScore = isPlayer1 ? Number(row.score_player1 || 0) : Number(row.score_player2 || 0);
+        opponentScore = isPlayer1 ? Number(row.score_player2 || 0) : Number(row.score_player1 || 0);
       }
       
       let result = 'defeat';
@@ -121,7 +129,7 @@ profileRouter.get("/api/profile/:id/games", async (ctx) => {
           player: Number(playerScore) || 0,
           opponent: Number(opponentScore) || 0
         },
-        with_extension: false, // Pour l'instant, on met false par défaut
+        with_extension: Boolean(row.use_purple_expedition),
         duration: duration,
         status: row.status
       };
