@@ -59,8 +59,13 @@ leaderboardRouter.get("/api/leaderboard", async (ctx) => {
   
   console.log(`Found ${leaderboard.rows.length} entries`); // Debug
 
+  //Convertir les BigInt en nombre
+  const safeData = JSON.parse(JSON.stringify(leaderboard.rows, (key, value) =>
+    typeof value === 'bigint' ? Number(value) : value
+  ));
+
   ctx.response.body = {
-    data: leaderboard.rows,
+    data: safeData,
     pagination: {
       page: pageNumber,
       limit: pageSize,
