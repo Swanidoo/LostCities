@@ -130,7 +130,7 @@ function setupWebSocketEventListeners() {
     // Connexion établie
     socket.addEventListener('open', () => {
         console.log("✅ WebSocket connection established");
-        updateStatus("Connecté au serveur", false);
+        updateStatus("Prêt à jouer", false);
     });
     
     // Erreur de connexion

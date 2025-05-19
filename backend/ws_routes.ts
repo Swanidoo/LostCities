@@ -1079,13 +1079,16 @@ async function createGame(
   try {
     console.log(`🎮 Creating new game ${gameId} between ${player1Id} and ${player2Id}`, options);
     
+    const randomFirstPlayerId = Math.random() < 0.5 ? player1Id : player2Id;
+    console.log(`🎲 First player randomly selected: ${randomFirstPlayerId}`);
+    
     // Create the game record with the correct mode and rounds
     await client.queryObject(`
       INSERT INTO games (id, player1_id, player2_id, status, current_turn_player_id, turn_phase, started_at, game_mode)
-      VALUES ($1, $2, $3, 'in_progress', $2, 'play', CURRENT_TIMESTAMP, $4)
-    `, [gameId, player1Id, player2Id, options.gameMode]);
+      VALUES ($1, $2, $3, 'in_progress', $4, 'play', CURRENT_TIMESTAMP, $5)
+    `, [gameId, player1Id, player2Id, randomFirstPlayerId, options.gameMode]);
     
-    console.log(`✅ Game created with mode: ${options.gameMode}`);
+    console.log(`✅ Game created with mode: ${options.gameMode}, first player: ${randomFirstPlayerId}`);
     
     // Create the board record with extension settings
     const boardResult = await client.queryObject<{id: number}>(

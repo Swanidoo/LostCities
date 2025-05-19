@@ -69,7 +69,7 @@ gameRouter.delete("/games/:id", async (ctx) => {
 
 // ----------- LOST CITIES SPECIFIC ROUTES -----------
 
-// Create a new Lost Cities game
+// Create a new Lost Cities game (pas encore implémentée, mais permet de créer des games manuellement, hors matchmaking (ex inviter un ami a jouer))
 gameRouter.post("/lost-cities/games", authMiddleware, async (ctx) => {
   try {
     const { opponentId, usePurpleExpedition } = await ctx.request.body({ type: "json" }).value;
