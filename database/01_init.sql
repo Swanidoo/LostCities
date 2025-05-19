@@ -172,8 +172,10 @@ CREATE TABLE IF NOT EXISTS leaderboard (
     month INTEGER,
     year INTEGER,
     game_mode VARCHAR(10) DEFAULT 'classic',
-    with_extension BOOLEAN DEFAULT false
+    with_extension BOOLEAN DEFAULT false,
+    game_id BIGINT
 );
+
 
 -- Now add the foreign key constraints
 DO $$
@@ -276,6 +278,10 @@ BEGIN
     -- Leaderboard constraints
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_leaderboard_player') THEN
         ALTER TABLE leaderboard ADD CONSTRAINT fk_leaderboard_player FOREIGN KEY (player_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_leaderboard_game') THEN
+        ALTER TABLE leaderboard ADD CONSTRAINT fk_leaderboard_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE;
     END IF;
     
     -- New constraints for moderation tables
@@ -418,6 +424,7 @@ CREATE INDEX IF NOT EXISTS idx_leaderboard_score ON leaderboard(score DESC);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_game_mode ON leaderboard(game_mode);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_with_extension ON leaderboard(with_extension);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_date ON leaderboard(date DESC);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_game_id ON leaderboard(game_id);
 
 -- New indexes for moderation features
 CREATE INDEX IF NOT EXISTS idx_users_banned ON users(is_banned);
