@@ -3,6 +3,7 @@ import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
 import { loadGameState } from "./game_routes.ts";
 import { client } from "./db_client.ts";
 import { LostCitiesGame } from "./lost_cities/lost_cities_controller.ts";
+import { updateLeaderboardForGame } from "./game_routes.ts";
 
 const wsRouter = new Router();
 const connectedClients: { socket: WebSocket; username: string }[] = [];
@@ -486,7 +487,7 @@ function handleChatMessage(
   });
 }
 
-// Fonction handleSurrender corrigée
+// Fonction handleSurrender
 async function handleSurrender(data: any, socket: WebSocket, username: string) {
   const { gameId } = data;
   
@@ -499,7 +500,17 @@ async function handleSurrender(data: any, socket: WebSocket, username: string) {
     // Load the game
     const game = await loadGameFromDatabase(gameId);
     
-    // AJOUT: Enregistrer la reddition comme un mouvement
+    // MODIFICATION: Recueillir l'info avant de changer le statut pour notification
+    const isPlayer1 = Number(game.player1.id) === Number(userId);
+    
+    // Determine the winner (opponent)
+    const winnerId = isPlayer1 ? game.player2.id : game.player1.id;
+    
+    // IMPORTANT: Mettre à jour l'état du jeu en mémoire
+    game.gameStatus = 'finished';
+    game.winner = winnerId;
+    
+    // AJOUT: Enregistrer l'action de reddition
     await game.recordMove({
       playerId: userId,
       action: 'surrender',
@@ -509,21 +520,7 @@ async function handleSurrender(data: any, socket: WebSocket, username: string) {
       color: null
     });
     
-    // Update game status in database
-    const gameResult = await client.queryObject(`
-      SELECT player1_id, player2_id FROM games WHERE id = $1
-    `, [gameId]);
-    
-    if (gameResult.rows.length === 0) {
-      throw new Error("Game not found");
-    }
-    
-    const gameData = gameResult.rows[0];
-    
-    // Determine the winner (opponent)
-    const winnerId = gameData.player1_id === userId ? gameData.player2_id : gameData.player1_id;
-    
-    // Update game status in database
+    // Mise à jour de la base de données
     await client.queryObject(`
       UPDATE games 
       SET status = 'finished', 
@@ -532,18 +529,22 @@ async function handleSurrender(data: any, socket: WebSocket, username: string) {
       WHERE id = $2
     `, [winnerId, gameId]);
     
-    // Load the full game state to notify players
-    const fullGame = await loadGameState(gameId);
-    const gameState = fullGame.getGameState();
+    // MODIFICATION: TOUJOURS sauvegarder le jeu après mise à jour
+    await game.save();
     
-    // Add surrender info to the game state
-    (gameState as any).surrenderInfo = {
+    // NOUVEAU: Mise à jour du leaderboard
+    await updateLeaderboardForGame(gameId);
+    
+    // IMPORTANT: Préparer un gameState spécial pour la notification
+    const gameState = game.getGameState();
+    gameState.surrenderInfo = {
       playerId: userId,
+      playerName: username,
       type: 'surrender'
     };
     
-    // Notify ALL players (including the one who surrendered)
-    notifyGamePlayers(gameId, gameState);
+    // IMPORTANT: Notification EXPLICITE aux deux joueurs
+    await notifyGamePlayers(gameId, gameState);
     
     console.log(`✅ Surrender processed for player ${username} in game ${gameId}`);
     

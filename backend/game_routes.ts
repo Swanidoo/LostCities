@@ -763,19 +763,18 @@ gameRouter.post("/lost-cities/games/:id/surrender", authMiddleware, async (ctx) 
       return;
     }
     
-    const game = gameResult.rows[0];
+    const game = await loadGameState(gameId);
+  
+    // Déterminer le gagnant (l'autre joueur)
+    const isPlayer1 = game.player1.id === userId;
+    const winnerId = isPlayer1 ? game.player2.id : game.player1.id;
     
-    // Determine winner (the other player)
-    const winnerId = game.player1_id === userId ? game.player2_id : game.player1_id;
+    // Mettre à jour l'état du jeu
+    game.gameStatus = 'finished';
+    game.winner = winnerId;
     
-    // Update game status
-    await client.queryObject(`
-      UPDATE games 
-      SET status = 'finished', 
-          winner_id = $1,
-          ended_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-    `, [winnerId, gameId]);
+    // Sauvegarder (ceci va déclencher la mise à jour du leaderboard)
+    await saveGameState(game);
     
     ctx.response.body = { 
       message: "You have surrendered the game",
@@ -925,7 +924,7 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
       ]);
     }
     
-    // Si le jeu est terminé, TOUJOURS définir ended_at et enregistrer les scores
+    // Si le jeu est terminé, TOUJOURS définir ended_at et appeler updateLeaderboardForGame
     if (game.gameStatus === 'finished') {
       console.log(`🏁 Game ${gameId} is finished, ensuring ended_at is set`);
       
@@ -937,69 +936,11 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
       
       console.log(`⏱️ Ensured ended_at timestamp is set for game ${gameId}`);
       
-      // Enregistrer les scores dans le leaderboard, en gérant les cas où le jeu est abandonné
-      const gameMode = game.totalRounds === 1 ? 'quick' : 'classic';
-      const withExtension = game.usePurpleExpedition;
-
-      //Conversion des IDs de joueur en nombres pour éviter les conflits lors des requetes
-      const player1Id = Number(game.player1.id);
-      const player2Id = Number(game.player2.id);
-      const player1Score = Number(game.scores.player1.total || 0);
-      const player2Score = Number(game.scores.player2.total || 0);
-      
-      // D'abord vérifier si des entrées existantes sont présentes pour éviter les doublons
-      const existingEntries = await client.queryObject(
-        `SELECT id FROM leaderboard 
-         WHERE game_id = $1`,
-        [gameId]
-      );
-      
-      if (existingEntries.rows.length === 0) {
-        console.log(`🏆 Recording leaderboard entries for game ${gameId}`);
-        
-        // Récupérer les noms d'utilisateurs en une seule requête
-        const playersResult = await client.queryObject<{ id: string, username: string }>(
-          `SELECT id, username FROM users WHERE id IN ($1, $2)`,
-          [game.player1.id, game.player2.id]
-        );
-        
-        const players = new Map();
-        playersResult.rows.forEach(row => {
-          players.set(row.id, row.username);
-        });
-        
-        const player1Name = players.get(game.player1.id) || "Unknown Player";
-        const player2Name = players.get(game.player2.id) || "Unknown Player";
-        
-        try {
-          // Insérer les scores dans le leaderboard
-          await client.queryObject(`BEGIN`);
-          
-          // Insérer le score du joueur 1 avec la référence à la partie
-          await client.queryObject(
-            `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension, game_id)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [player1Id, player1Name, player1Score, gameMode, withExtension, gameId]
-          );
-          
-          // Insérer le score du joueur 2 avec la référence à la partie
-          await client.queryObject(
-            `INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension, game_id)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [player2Id, player2Name, player2Score, gameMode, withExtension, gameId]
-          );
-          
-          await client.queryObject(`COMMIT`);
-          console.log(`✅ Scores enregistrés dans le leaderboard pour la partie ${gameId}`);
-        } catch (error) {
-          await client.queryObject(`ROLLBACK`);
-          console.error(`❌ Échec de l'enregistrement des scores dans le leaderboard:`, error);
-          // Ajouter des détails sur l'erreur
-          console.error(`Détails: ${error.message}`);
-          console.error(`Stack: ${error.stack}`);
-        }
-      } else {
-        console.log(`ℹ️ Leaderboard entries already exist for players in game ${gameId}`);
+      // NOUVEAU: Appeler la fonction dédiée au leaderboard
+      try {
+        await updateLeaderboardForGame(gameId);
+      } catch (error) {
+        console.error(`❌ Error updating leaderboard: ${error.message}`);
       }
     }
     
@@ -1231,6 +1172,8 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
     }
     
     console.log(`✅ Game state saved successfully for game ${gameId}`);
+    
+    return;
   } catch (error) {
     console.error(`❌ Error saving game state for game ${gameId}:`, error);
     // Log the full error stack for better debugging
@@ -1241,8 +1184,98 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
   }
 }
 
-export { loadGameState };
+// Fonction dédiée à l'enregistrement dans le leaderboard
+async function updateLeaderboardForGame(gameId: string): Promise<void> {
+  try {
+    console.log(`🏆 Starting leaderboard update for game ${gameId}`);
+    
+    // Récupérer les infos du jeu
+    const gameInfo = await client.queryObject(`
+      SELECT 
+        g.id, g.status, g.game_mode, g.score_player1, g.score_player2,
+        g.player1_id, g.player2_id, g.winner_id,
+        u1.username as player1_name, u2.username as player2_name,
+        b.use_purple_expedition
+      FROM games g
+      JOIN users u1 ON g.player1_id = u1.id
+      JOIN users u2 ON g.player2_id = u2.id
+      JOIN board b ON g.id = b.game_id
+      WHERE g.id = $1
+    `, [gameId]);
 
+    if (gameInfo.rows.length === 0) {
+      console.error(`❌ Game not found for leaderboard update: ${gameId}`);
+      return;
+    }
 
+    const game = gameInfo.rows[0];
+    
+    // Vérifier si le jeu est bien terminé
+    if (game.status !== 'finished') {
+      console.log(`ℹ️ Game ${gameId} not finished, skipping leaderboard update`);
+      return;
+    }
+
+    // Vérifier si des entrées existent déjà
+    const existingEntries = await client.queryObject(`
+      SELECT id FROM leaderboard WHERE game_id = $1
+    `, [gameId]);
+
+    if (existingEntries.rows.length > 0) {
+      console.log(`ℹ️ Leaderboard entries already exist for game ${gameId}`);
+      return;
+    }
+
+    console.log(`🏆 Recording leaderboard entries for game ${gameId}`);
+    console.log(`🔍 Player IDs: P1=${game.player1_id}, P2=${game.player2_id}`);
+    console.log(`🔍 Player Names: P1=${game.player1_name}, P2=${game.player2_name}`);
+    console.log(`🔍 Scores: P1=${game.score_player1}, P2=${game.score_player2}`);
+    console.log(`🔍 Game mode: ${game.game_mode}, Extension: ${game.use_purple_expedition}`);
+
+    try {
+      // Transaction pour garantir que les deux entrées sont créées ou aucune
+      await client.queryObject(`BEGIN`);
+      
+      // Insérer score pour joueur 1
+      await client.queryObject(`
+        INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension, game_id, date)
+        VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      `, [
+        game.player1_id, 
+        game.player1_name, 
+        game.score_player1, 
+        game.game_mode || 'classic', 
+        game.use_purple_expedition, 
+        gameId
+      ]);
+      
+      // Insérer score pour joueur 2
+      await client.queryObject(`
+        INSERT INTO leaderboard (player_id, player, score, game_mode, with_extension, game_id, date)
+        VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      `, [
+        game.player2_id, 
+        game.player2_name, 
+        game.score_player2, 
+        game.game_mode || 'classic', 
+        game.use_purple_expedition, 
+        gameId
+      ]);
+      
+      await client.queryObject(`COMMIT`);
+      console.log(`✅ Leaderboard entries created for game ${gameId}`);
+    } catch (error) {
+      await client.queryObject(`ROLLBACK`);
+      console.error(`❌ Failed to insert leaderboard entries:`, error);
+      console.error(`Message: ${error.message}`);
+      console.error(`Stack: ${error.stack}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error updating leaderboard for game ${gameId}:`, error);
+    console.error(`Message: ${error.message}`);
+    console.error(`Stack: ${error.stack}`);
+  }
+}
+
+export { loadGameState, updateLeaderboardForGame };
 export default gameRouter;
-
