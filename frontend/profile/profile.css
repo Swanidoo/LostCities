@@ -490,6 +490,64 @@ body {
     }
 }
 
+/* Admin messages table styling (messages récents) */
+.messages-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: var(--spacing-md);
+}
+
+.messages-table th,
+.messages-table td {
+    padding: var(--spacing-md);
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.messages-table th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+    color: #4CAF50;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Add proper column spacing */
+.messages-table th:not(:last-child),
+.messages-table td:not(:last-child) {
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Column widths */
+.messages-table th:nth-child(1), 
+.messages-table td:nth-child(1) {
+    width: 20%;  /* Date column */
+}
+
+.messages-table th:nth-child(2), 
+.messages-table td:nth-child(2) {
+    width: 15%;  /* Context column */
+}
+
+.messages-table th:nth-child(3), 
+.messages-table td:nth-child(3) {
+    width: 55%;  /* Message column */
+}
+
+.messages-table th:nth-child(4), 
+.messages-table td:nth-child(4) {
+    width: 10%;  /* Status column */
+}
+
+/* Deleted message styling */
+.message-deleted {
+    text-decoration: line-through;
+    color: #999;
+    font-style: italic;
+}
+
 /* ===== RESPONSIVE BIO SECTION ===== */
 .bio-section {
     display: flex;

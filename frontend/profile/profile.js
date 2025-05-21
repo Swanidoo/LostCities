@@ -314,10 +314,10 @@ async function loadGameHistory(page = 1) {
         totalPages = data.pagination.totalPages;
         
         // Afficher les résultats
-        if (page === 1) {
-            displayGameHistory(data.games);
-        } else {
-            appendGameHistory(data.games);
+        displayGameHistory(data.games);
+
+        if (gamesListContainer) {
+            gamesListContainer.scrollTop = 0;
         }
         
         // Ajouter la pagination

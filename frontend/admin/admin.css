@@ -336,6 +336,11 @@ button:not([style*="background"]):not([onclick*="mute"]):not([onclick*="ban"]):n
     background: rgba(255, 255, 255, 0.05);
 }
 
+#reportsTable th:nth-child(4),
+#reportsTable td:nth-child(4) {
+    text-align: center;
+}
+
 @media (max-width: 768px) {
     #dashboard-stats,
     #users-section,
@@ -488,6 +493,9 @@ button:contains("Effacer"):hover,
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    text-align: center;
+    justify-content: center;
+    width: 100%;
 }
 
 .status-pending {
@@ -601,6 +609,22 @@ td small {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     border-color: #4CAF50;
+}
+
+.report-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.reject-btn {
+    background: linear-gradient(135deg, #f44336, #d32f2f) !important;
+    color: white !important;
+}
+
+.reject-btn:hover {
+    background: linear-gradient(135deg, #d32f2f, #b71c1c) !important;
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.5)!important;
 }
 
 @keyframes slideInNotification {

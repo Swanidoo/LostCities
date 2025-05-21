@@ -177,6 +177,18 @@ function connectWebSocket() {
 function setupEventListeners() {
     // Boutons de contrôle
     elements.rulesBtn.addEventListener('click', () => {
+        // Mettre à jour la phrase des manches en fonction du mode de jeu
+        const roundsText = document.getElementById('rules-rounds-text');
+        if (roundsText && gameState.gameData) {
+            const totalRounds = gameState.gameData.totalRounds || 3;
+            // Gestion du pluriel
+            if (totalRounds === 1) {
+                roundsText.textContent = "La partie se joue en 1 manche, le joueur avec le plus de points gagne.";
+            } else {
+                roundsText.textContent = `La partie se joue en ${totalRounds} manches, le joueur avec le plus de points gagne.`;
+            }
+        }
+        
         elements.rulesModal.classList.add('visible');
     });
     

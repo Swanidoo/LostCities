@@ -7,6 +7,45 @@ let currentUsersPage = 1;
 let currentMessagesPage = 1;
 
 
+// Fonction rapide pour formater les dates en format francais
+function formatDateFr(date) {
+    if (!date) return '';
+    return new Date(date).toLocaleString('fr-FR', {
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+}
+
+//Fonction pour traduire les types de rapport (pour que le site soit tout en francais)
+function translateReportType(type) {
+    const translations = {
+        'chat_abuse': 'Abus de chat',
+        'cheating': 'Triche',
+        'spam': 'Spam',
+        'harassment': 'Harcèlement',
+        'inappropriate_name': 'Pseudo inapproprié',
+        'other': 'Autre'
+    };
+    
+    return translations[type] || type;
+}
+
+
+// Fonction pour traduire les statuts
+function translateStatus(status) {
+    const translations = {
+        'pending': 'En attente',
+        'resolved': 'Résolu',
+        'dismissed': 'Rejeté',
+        'reviewed': 'Examiné'
+    };
+    
+    return translations[status.toLowerCase()] || status;
+}
+
 // Fonction de notification commune pour toutes les actions d'administration
 function showNotification(message, success = true) {
     const notification = document.createElement('div');
@@ -315,7 +354,7 @@ async function loadChatMessages(page = 1) {
                 <td>${msg.id}</td>
                 <td><strong>${msg.sender_username}</strong></td>
                 <td><div class="message-content">${msg.message}</div></td>
-                <td><span class="timestamp">${new Date(msg.timestamp).toLocaleString()}</span></td>
+                <td><span class="timestamp">${formatDateFr(msg.timestamp)}</span></td>
                 <td><span class="status-badge ${msg.report_count > 0 ? 'status-pending' : ''}">${msg.report_count || 0}</span></td>
                 <td>
                     <button onclick="muteUserFromChat(${msg.sender_id}, '${msg.sender_username}')" title="Mute">🔇 Mute</button>
@@ -525,21 +564,25 @@ async function loadReports() {
         reportsTableBody.innerHTML = "";
         
         reports.forEach(report => {
+            const statusText = report.status === 'pending' ? 'En attente' : report.status;
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td>${report.id}</td>
-                <td>${report.reporter_username || 'Inconnu'}<br>
-                    <small style="color: #aaa;">${report.reporter_email || ''}</small>
-                </td>
-                <td>${report.reported_username || 'Inconnu'}<br>
-                    <small style="color: #aaa;">${report.reported_email || ''}</small>
-                </td>
-                <td>${report.report_type}</td>
-                <td>${report.description}</td>
-                <td><span class="status-badge status-${report.status}">${report.status}</span></td>
+            <td>${report.id}</td>
+            <td>${report.reporter_username || 'Inconnu'}<br>
+                <small style="color: #aaa;">${report.reporter_email || ''}</small>
+            </td>
+            <td>${report.reported_username || 'Inconnu'}<br>
+                <small style="color: #aaa;">${report.reported_email || ''}</small>
+            </td>
+            <td>${translateReportType(report.report_type)}</td>
+            <td>${report.description}</td>
+            <td>${formatDateFr(report.created_at)}</td>
+            <td><span class="status-badge status-${report.status}" style="text-align: center; display: block;">${translateStatus(report.status)}</span></td>
                 <td>
-                    <button onclick="resolveReport(${report.id}, 'resolved')">Résoudre</button>
-                    <button onclick="resolveReport(${report.id}, 'dismissed')">Rejeter</button>
+                    <div class="report-actions">
+                        <button class="resolve-btn" onclick="resolveReport(${report.id}, 'resolved')">Résoudre</button>
+                        <button class="reject-btn" onclick="resolveReport(${report.id}, 'dismissed')">Rejeter</button>
+                    </div>
                 </td>
             `;
             reportsTableBody.appendChild(row);
@@ -553,25 +596,27 @@ async function loadReports() {
 
 // Fonction pour résoudre un rapport
 async function resolveReport(reportId, resolution) {
-    const notes = prompt("Notes de résolution:");
+    const action = resolution === 'resolved' ? " la résolution" : "le rejet";
+    const notes = prompt(`Notes pour ${action} du rapport :`);
     if (notes === null) return;
-    
+
     try {
         const response = await fetch(`${API_URL}/api/admin/reports/${reportId}/resolve`, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json"
             },
-            credentials: 'include', // AJOUTÉ
+            credentials: 'include',
             body: JSON.stringify({ resolution, notes })
         });
-        
+
         if (response.ok) {
-            showNotification(`Rapport traité avec succès!`);
+            showNotification(`Rapport ${resolution === 'resolved' ? "résolu" : "rejeté"} avec succès!`);
             loadReports();
         }
     } catch (error) {
-        console.error("Error resolving report:", error);
+        console.error(`Error ${resolution === 'resolved' ? "résolvant" : "rejetant"} le rapport:`, error);
+        showNotification(`Erreur lors de la ${action} du rapport`, false);
     }
 }
 
