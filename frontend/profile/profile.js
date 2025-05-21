@@ -668,6 +668,9 @@ function showGameUserMenu(event, username) {
             <div class="user-menu-item" onclick="muteUserDirectly('${username}')">
                 <span class="menu-icon">🔇</span> Mute
             </div>
+            <div class="user-menu-item" onclick="banUserDirectly('${username}')">
+                <span class="menu-icon">🚫</span> Bannir
+            </div>
         `;
     } else {
         menu.innerHTML = `
@@ -777,20 +780,24 @@ function showReportDialog(username) {
             <h3>Signaler ${username}</h3>
             <form id="report-form">
                 <label>
-                    <input type="radio" name="report_type" value="chat_abuse" required>
-                    Abus dans le chat
+                    <input type="radio" name="report_type" value="cheating" required>
+                    Triche
                 </label>
                 <label>
-                    <input type="radio" name="report_type" value="harassment" required>
-                    Harcèlement
+                    <input type="radio" name="report_type" value="anti_game" required>
+                    Anti-jeu
                 </label>
                 <label>
-                    <input type="radio" name="report_type" value="spam" required>
-                    Spam
+                    <input type="radio" name="report_type" value="voluntary_abandon" required>
+                    Abandon volontaire
                 </label>
                 <label>
-                    <input type="radio" name="report_type" value="other" required>
-                    Autre
+                    <input type="radio" name="report_type" value="toxic_behavior" required>
+                    Comportement toxique
+                </label>
+                <label>
+                    <input type="radio" name="report_type" value="inappropriate_chat" required>
+                    Propos inappropriés en jeu
                 </label>
                 <textarea name="description" placeholder="Description du problème" required></textarea>
                 <div class="dialog-buttons">
@@ -825,17 +832,21 @@ async function submitReport(username, formData) {
             return;
         }
         
+        // Créer une description détaillée avec le contexte "game_report"
+        const reportData = {
+            reported_user_id: user.id,
+            report_type: formData.get('report_type'),
+            description: formData.get('description'),
+            report_context: 'game_report' // Indique que le signalement vient de l'historique des parties
+        };
+        
         const reportResponse = await fetch(`${API_URL}/api/report`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             credentials: 'include',
-            body: JSON.stringify({
-                reported_user_id: user.id,
-                report_type: formData.get('report_type'),
-                description: formData.get('description')
-            })
+            body: JSON.stringify(reportData)
         });
         
         if (reportResponse.ok) {

@@ -445,6 +445,14 @@ body {
     width: 90%;
     max-width: 400px;
     color: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+#report-form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 }
 
 .report-dialog h3 {
@@ -476,14 +484,21 @@ body {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
+    margin-top: 16px;
 }
 
 .dialog-buttons button {
-    padding: 8px 20px;
+    flex: 1;
+    padding: 10px 20px;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
+    transition: all 0.2s ease;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .dialog-buttons button[type="submit"] {

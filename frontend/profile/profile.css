@@ -1371,19 +1371,39 @@ body {
     width: 90%;
     max-width: 400px;
     color: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+#report-form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 }
 
 .report-dialog h3 {
     margin-top: 0;
     color: #4CAF50;
     margin-bottom: 16px;
+    font-weight: 600;
 }
 
 .report-dialog label {
-    display: block;
+    display: flex;
+    align-items: center;
     margin: 10px 0;
     cursor: pointer;
     color: white;
+    transition: opacity 0.2s;
+}
+
+.report-dialog label:hover {
+    opacity: 0.8;
+}
+
+.report-dialog input[type="radio"] {
+    margin-right: 10px;
+    cursor: pointer;
 }
 
 .report-dialog textarea {
@@ -1407,11 +1427,17 @@ body {
 }
 
 .dialog-buttons button {
-    padding: 8px 20px;
+    flex: 1;
+    padding: 10px 20px;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
+    transition: all 0.2s ease;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .dialog-buttons button[type="submit"] {
@@ -1419,9 +1445,20 @@ body {
     color: white;
 }
 
+.dialog-buttons button[type="submit"]:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+
 .dialog-buttons button[type="button"] {
     background: #666;
     color: white;
+}
+
+.dialog-buttons button[type="button"]:hover {
+    background: #555;
+    transform: translateY(-2px);
 }
 
 /* ===== STATISTICS STYLES ===== */
