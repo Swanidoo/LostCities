@@ -861,6 +861,99 @@ async function submitReport(username, formData) {
     }
 }
 
+// Ajouter une nouvelle fonction pour mute directement
+async function muteUserDirectly(username) {
+    closeUserMenu();
+    
+    // D'abord la raison
+    const reason = prompt(username ? `Raison du mute pour ${username}:` : "Raison du mute:");
+    if (reason === null) return;
+    
+    // Ensuite la durée
+    const duration = prompt("Durée du mute en secondes (laisser vide pour permanent):");
+    if (duration === null) return;
+    
+    try {
+        // Récupérer l'ID de l'utilisateur
+        const response = await fetch(`${API_URL}/api/users`);
+        const users = await response.json();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            alert('Utilisateur introuvable');
+            return;
+        }
+        
+        const muteResponse = await fetch(`${API_URL}/api/admin/users/${user.id}/mute`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                duration: duration ? parseInt(duration) : null,
+                reason: reason
+            })
+        });
+        
+        if (muteResponse.ok) {
+            showNotification(`${username} a été muté avec succès!`, 'success');
+        } else {
+            showNotification('Erreur lors du mute', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error muting user:', error);
+        showNotification('Erreur lors du mute', 'error');
+    }
+}
+
+async function banUserDirectly(username) {
+    closeUserMenu();
+    
+    // D'abord la raison
+    const reason = prompt(username ? `Raison du ban pour ${username}:` : "Raison du ban:");
+    if (reason === null) return;
+    
+    // Ensuite la durée
+    const duration = prompt("Durée du ban en secondes (laisser vide pour permanent):");
+    if (duration === null) return;
+    
+    try {
+        // Récupérer l'ID de l'utilisateur
+        const response = await fetch(`${API_URL}/api/users`);
+        const users = await response.json();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            showNotification('Utilisateur introuvable', 'error');
+            return;
+        }
+        
+        const banResponse = await fetch(`${API_URL}/api/admin/users/${user.id}/ban`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                duration: duration ? parseInt(duration) : null,
+                reason: reason
+            })
+        });
+        
+        if (banResponse.ok) {
+            showNotification(`${username} a été banni avec succès!`, 'success');
+        } else {
+            showNotification('Erreur lors du ban', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error banning user:', error);
+        showNotification('Erreur lors du ban', 'error');
+    }
+}
+
 // Gestionnaires d'événements pour les détails des parties
 function addGameDetailHandlers() {
     document.querySelectorAll('.game-item').forEach(item => {
