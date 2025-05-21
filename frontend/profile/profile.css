@@ -1304,6 +1304,126 @@ body {
     font-weight: 600;
 }
 
+/* Styles pour le nom d'utilisateur cliquable */
+.clickable-username {
+    cursor: pointer;
+    color: #4CAF50;
+    font-weight: bold;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.clickable-username:hover {
+    text-decoration: underline;
+    color: #45a049;
+}
+
+/* Menu popup */
+.user-menu-popup {
+    position: fixed;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    min-width: 180px;
+    max-width: 250px;
+    overflow: hidden;
+}
+
+.user-menu-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    transition: background-color 0.2s;
+}
+
+.user-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.menu-icon {
+    font-size: 16px;
+}
+
+/* Dialog de signalement */
+.report-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+}
+
+.report-dialog {
+    background: #2a2a2a;
+    padding: 24px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    color: white;
+}
+
+.report-dialog h3 {
+    margin-top: 0;
+    color: #4CAF50;
+    margin-bottom: 16px;
+}
+
+.report-dialog label {
+    display: block;
+    margin: 10px 0;
+    cursor: pointer;
+    color: white;
+}
+
+.report-dialog textarea {
+    width: 100%;
+    min-height: 100px;
+    margin: 16px 0;
+    padding: 12px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    background: #1a1a1a;
+    color: white;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.dialog-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.dialog-buttons button {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.dialog-buttons button[type="submit"] {
+    background: #4CAF50;
+    color: white;
+}
+
+.dialog-buttons button[type="button"] {
+    background: #666;
+    color: white;
+}
+
 /* ===== STATISTICS STYLES ===== */
 .stats-grid {
     display: grid;

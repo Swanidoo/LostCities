@@ -6,6 +6,7 @@ const API_URL = window.location.hostname === "localhost"
 let currentUserId = null;
 let isOwnProfile = false;
 let isAdmin = false;
+let currentUserMenu = null;
 
 // État pour la pagination
 let currentPage = 1;
@@ -425,7 +426,7 @@ function displayGameHistory(games) {
             <div class="game-item" data-game-id="${game.id}">
                 <div class="game-info">
                     <div class="game-header">
-                        <h4>vs ${game.opponent}</h4>
+                        <h4>vs <span class="clickable-username" onclick="showGameUserMenu(event, '${game.opponent}')">${game.opponent}</span></h4>
                         <span class="game-mode">${modeText}</span>
                     </div>
                     <div class="game-details">
@@ -526,7 +527,7 @@ function appendGameHistory(games) {
         gameElement.innerHTML = `
             <div class="game-info">
                 <div class="game-header">
-                    <h4>vs ${game.opponent}</h4>
+                    <h4>vs <span class="clickable-username" onclick="showGameUserMenu(event, '${game.opponent}')">${game.opponent}</span></h4>
                     <span class="game-mode">${modeText}</span>
                 </div>
                 <div class="game-details">
@@ -640,6 +641,213 @@ function updatePagination(pagination) {
     paginationHTML += '</div>';
     
     paginationContainer.innerHTML = paginationHTML;
+}
+
+
+//J'ai récupéré les fonctions ci dessous (menu utilisateur, signalement, etc.) de profile.js, c'est donc du code dupliqué mais c'est un changement de derniere minute et je ne voulais pas restructurer le code.
+// Fonction pour afficher le menu utilisateur
+function showGameUserMenu(event, username) {
+    // Arrêter la propagation de l'événement aux parents
+    event.stopPropagation();
+    
+    // Fermer le menu existant s'il y en a un
+    if (currentUserMenu) {
+        currentUserMenu.remove();
+    }
+    
+    // Créer le menu
+    const menu = document.createElement('div');
+    menu.className = 'user-menu-popup';
+    
+    // Utiliser directement la variable globale isAdmin
+    if (isAdmin) {
+        menu.innerHTML = `
+            <div class="user-menu-item" onclick="viewProfileFromGame('${username}')">
+                <span class="menu-icon">👤</span> Voir le profil
+            </div>
+            <div class="user-menu-item" onclick="muteUserDirectly('${username}')">
+                <span class="menu-icon">🔇</span> Mute
+            </div>
+        `;
+    } else {
+        menu.innerHTML = `
+            <div class="user-menu-item" onclick="viewProfileFromGame('${username}')">
+                <span class="menu-icon">👤</span> Voir le profil
+            </div>
+            <div class="user-menu-item" onclick="reportUserFromGame('${username}')">
+                <span class="menu-icon">⚠️</span> Signaler
+            </div>
+        `;
+    }
+    
+    // Positionner le menu
+    document.body.appendChild(menu);
+    
+    // Obtenir les dimensions et position de l'élément cliqué
+    const rect = event.target.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight
+    };
+    
+    // Calculer la position initiale (en dessous de l'élément cliqué)
+    let left = rect.left;
+    let top = rect.bottom + 5;
+    
+    // Vérifier si le menu sort de la viewport horizontalement
+    if (left + menuRect.width > viewport.width) {
+        left = viewport.width - menuRect.width - 10; // 10px de marge
+    }
+    
+    // Vérifier si le menu sort de la viewport verticalement
+    if (top + menuRect.height > viewport.height) {
+        // Placer le menu au-dessus de l'élément au lieu d'en dessous
+        top = rect.top - menuRect.height - 5;
+        
+        // Si ça sort encore par le haut, le placer au maximum visible
+        if (top < 0) {
+            top = 10; // 10px de marge du haut
+        }
+    }
+    
+    // Assurer que le menu ne sort pas par la gauche
+    if (left < 0) {
+        left = 10; // 10px de marge de la gauche
+    }
+    
+    // Appliquer la position
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    
+    currentUserMenu = menu;
+    
+    // Fermer le menu si on clique ailleurs
+    setTimeout(() => {
+        document.addEventListener('click', closeUserMenu);
+    }, 0);
+}
+
+function closeUserMenu() {
+    if (currentUserMenu) {
+        currentUserMenu.remove();
+        currentUserMenu = null;
+        document.removeEventListener('click', closeUserMenu);
+    }
+}
+
+// Fonction pour voir le profil
+function viewProfileFromGame(username) {
+    closeUserMenu();
+    
+    // Navigation vers le profil
+    fetchUserIdAndNavigate(username);
+}
+
+// Fonction pour signaler un utilisateur
+function reportUserFromGame(username) {
+    closeUserMenu();
+    showReportDialog(username);
+}
+
+// Fonction pour récupérer l'ID d'un utilisateur et naviguer vers son profil
+async function fetchUserIdAndNavigate(username) {
+    try {
+        const response = await fetch(`${API_URL}/api/users`);
+        const users = await response.json();
+        const user = users.find(u => u.username === username);
+        
+        if (user) {
+            window.location.href = `/profile/profile.html?id=${user.id}`;
+        } else {
+            showNotification('Utilisateur introuvable', 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        showNotification('Erreur lors de la recherche de l\'utilisateur', 'error');
+    }
+}
+
+// Fonction pour afficher le dialogue de signalement
+function showReportDialog(username) {
+    const dialog = document.createElement('div');
+    dialog.className = 'report-dialog-overlay';
+    dialog.innerHTML = `
+        <div class="report-dialog">
+            <h3>Signaler ${username}</h3>
+            <form id="report-form">
+                <label>
+                    <input type="radio" name="report_type" value="chat_abuse" required>
+                    Abus dans le chat
+                </label>
+                <label>
+                    <input type="radio" name="report_type" value="harassment" required>
+                    Harcèlement
+                </label>
+                <label>
+                    <input type="radio" name="report_type" value="spam" required>
+                    Spam
+                </label>
+                <label>
+                    <input type="radio" name="report_type" value="other" required>
+                    Autre
+                </label>
+                <textarea name="description" placeholder="Description du problème" required></textarea>
+                <div class="dialog-buttons">
+                    <button type="submit">Envoyer</button>
+                    <button type="button" onclick="closeReportDialog()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    dialog.querySelector('#report-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await submitReport(username, new FormData(e.target));
+    });
+}
+
+function closeReportDialog() {
+    document.querySelector('.report-dialog-overlay')?.remove();
+}
+
+async function submitReport(username, formData) {
+    try {
+        // Récupérer l'ID de l'utilisateur
+        const response = await fetch(`${API_URL}/api/users`);
+        const users = await response.json();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            showNotification('Utilisateur introuvable', 'error');
+            return;
+        }
+        
+        const reportResponse = await fetch(`${API_URL}/api/report`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                reported_user_id: user.id,
+                report_type: formData.get('report_type'),
+                description: formData.get('description')
+            })
+        });
+        
+        if (reportResponse.ok) {
+            showNotification('Signalement envoyé avec succès', 'success');
+            closeReportDialog();
+        } else {
+            showNotification('Erreur lors de l\'envoi du signalement', 'error');
+        }
+    } catch (error) {
+        console.error('Error submitting report:', error);
+        showNotification('Erreur lors de l\'envoi du signalement', 'error');
+    }
 }
 
 // Gestionnaires d'événements pour les détails des parties
