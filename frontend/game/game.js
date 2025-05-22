@@ -969,32 +969,48 @@ function handleActivityTimers(data) {
     if (!data.timers || !gameState.userId) return;
     
     const playerTimer = data.timers[gameState.userId];
-    if (!playerTimer) return;
+    const opponentId = gameState.gameData.player1.id === Number(gameState.userId) 
+        ? gameState.gameData.player2.id 
+        : gameState.gameData.player1.id;
+    const opponentTimer = data.timers[opponentId];
     
-    updateActivityTimerDisplay(playerTimer.timeRemaining);
+    // Mettre à jour le timer du joueur
+    if (playerTimer) {
+        updatePlayerTimerDisplay('player-timer', playerTimer);
+    }
+    
+    // Mettre à jour le timer de l'adversaire
+    if (opponentTimer) {
+        updatePlayerTimerDisplay('opponent-timer', opponentTimer);
+    }
 }
 
-function updateActivityTimerDisplay(secondsRemaining) {
-    const timerElement = document.getElementById('activity-timer');
+function updatePlayerTimerDisplay(elementId, timerData) {
+    const timerElement = document.getElementById(elementId);
     if (!timerElement) return;
     
     // Formater le temps (mm:ss)
-    const minutes = Math.floor(secondsRemaining / 60);
-    const seconds = secondsRemaining % 60;
+    const minutes = Math.floor(timerData.timeRemaining / 60);
+    const seconds = timerData.timeRemaining % 60;
     const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     
     timerElement.textContent = formattedTime;
     
-    // Changer les styles selon le temps restant
-    const timerContainer = timerElement.closest('.activity-timer');
-    timerContainer.classList.remove('warning', 'critical');
+    // Changer les styles selon l'état
+    timerElement.classList.remove('active', 'warning', 'critical', 'inactive');
     
-    if (secondsRemaining <= 30) {
-        timerContainer.classList.add('critical');
-    } else if (secondsRemaining <= 60) {
-        timerContainer.classList.add('warning');
+    if (!timerData.isCurrentTurn) {
+        // Pas le tour de ce joueur = grisé
+        timerElement.classList.add('inactive');
+    } else if (timerData.timeRemaining <= 30) {
+        timerElement.classList.add('critical');
+    } else if (timerData.timeRemaining <= 60) {
+        timerElement.classList.add('warning');
+    } else {
+        timerElement.classList.add('active');
     }
 }
+
 
 // Demander l'état actuel de la partie
 function requestGameState() {

@@ -198,32 +198,37 @@ body {
     word-wrap: break-word;                   
 }
 
-.activity-timer {
-    background: rgba(255, 193, 7, 0.2);
-    border: 1px solid rgba(255, 193, 7, 0.4);
+.player-timer {
+    font-size: var(--font-xs);
+    color: #ffd700;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
     transition: all 0.3s ease;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
 }
-  
-.activity-timer.warning {
-    background: rgba(255, 87, 34, 0.3);
-    border-color: rgba(255, 87, 34, 0.5);
+
+.player-timer.active {
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.2);
+}
+
+.player-timer.warning {
+    color: #ff9800;
+    background: rgba(255, 152, 0, 0.2);
     animation: pulse-warning 1s infinite;
 }
-  
-.activity-timer.critical {
-    background: rgba(244, 67, 54, 0.4);
-    border-color: rgba(244, 67, 54, 0.6);
+
+.player-timer.critical {
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.2);
     animation: pulse-critical 0.5s infinite;
 }
-  
-@keyframes pulse-warning {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-  
-@keyframes pulse-critical {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+.player-timer.inactive {
+    color: #666;
+    background: rgba(102, 102, 102, 0.1);
 }
 
 

@@ -340,12 +340,31 @@ function updatePlayerActivity(gameId: string, playerId: string) {
   // Mettre à jour la dernière action
   activity.lastActionAt = new Date();
   
-  // Redémarrer le timer
-  startInactivityTimer(gameId, playerId);
+  // Ne redémarrer le timer QUE si c'est le tour de ce joueur
+  checkAndStartTimerForCurrentPlayer(gameId, playerId);
   
   // Notifier tous les joueurs du jeu des timers mis à jour
   broadcastActivityTimers(gameId);
 }
+
+// Vérifier qui doit avoir un timer actif
+async function checkAndStartTimerForCurrentPlayer(gameId: string, playerId: string) {
+  try {
+    // Charger la partie pour connaître le joueur actuel
+    const game = await loadGameFromDatabase(gameId);
+    
+    if (game.currentPlayerId === playerId && game.gameStatus === 'in_progress') {
+      // C'est le tour de ce joueur, démarrer son timer
+      startInactivityTimer(gameId, playerId);
+      console.log(`⏰ Started timer for ${playerId} (their turn)`);
+    } else {
+      console.log(`⏸️ No timer for ${playerId} (not their turn)`);
+    }
+  } catch (error) {
+    console.error(`Error checking current player for timer: ${error}`);
+  }
+}
+
 
 function startInactivityTimer(gameId: string, playerId: string) {
   const key = `${gameId}-${playerId}`;
@@ -412,29 +431,36 @@ function broadcastActivityTimers(gameId: string) {
   const subscribers = gameSubscriptions.get(gameId);
   if (!subscribers) return;
   
-  // Calculer les temps restants pour chaque joueur
-  const timers = {};
-  
-  playerActivities.forEach((activity, key) => {
-    if (activity.gameId === gameId) {
-      const timeElapsed = Date.now() - activity.lastActionAt.getTime();
-      const timeRemaining = Math.max(0, INACTIVITY_TIMEOUT - timeElapsed);
-      timers[activity.playerId] = {
-        playerId: activity.playerId,
-        username: activity.username,
-        timeRemaining: Math.ceil(timeRemaining / 1000) // en secondes
-      };
-    }
-  });
-  
-  // Envoyer à tous les abonnés
-  subscribers.forEach(socket => {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
-        event: 'activityTimers',
-        data: { gameId, timers }
-      }));
-    }
+  loadGameFromDatabase(gameId).then(game => {
+    const timers = {};
+    
+    playerActivities.forEach((activity, key) => {
+      if (activity.gameId === gameId) {
+        const isCurrentPlayer = game.currentPlayerId === activity.playerId;
+        const timeElapsed = Date.now() - activity.lastActionAt.getTime();
+        const timeRemaining = Math.max(0, INACTIVITY_TIMEOUT - timeElapsed);
+        
+        timers[activity.playerId] = {
+          playerId: activity.playerId,
+          username: activity.username,
+          timeRemaining: Math.ceil(timeRemaining / 1000), // en secondes
+          isActive: isCurrentPlayer, // NOUVEAU: indique si le timer est actif
+          isCurrentTurn: isCurrentPlayer
+        };
+      }
+    });
+    
+    // Envoyer à tous les abonnés
+    subscribers.forEach(socket => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+          event: 'activityTimers',
+          data: { gameId, timers }
+        }));
+      }
+    });
+  }).catch(error => {
+    console.error(`Error broadcasting timers: ${error}`);
   });
 }
 
@@ -993,7 +1019,6 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
     
     if (success) {
       const userId = await getUserIdFromUsername(username);
-      updatePlayerActivity(gameId, userId);
       await game.recordMove({
         playerId: userId,
         action: 'play_card',
@@ -1005,6 +1030,9 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
       // Save the updated game state
       await game.save();
       
+      // Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
+      updatePlayerActivity(gameId, userId);
+
       // Get updated game state to notify players
       const updatedGame = await loadGameState(gameId);
       const gameState = updatedGame.getGameState();
@@ -1046,7 +1074,6 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
     
     if (success) {
         const userId = await getUserIdFromUsername(username);
-        updatePlayerActivity(gameId, userId);      
         await game.recordMove({
         playerId: userId,
         action: 'discard_card',
@@ -1054,7 +1081,10 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
         destination: 'discard_pile',
         color: null // La couleur est déterminée par la carte
       });
-      
+
+      //Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
+      updatePlayerActivity(gameId, userId);      
+
       // Save the updated game state
       await game.save();
       
@@ -1099,13 +1129,15 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
     
     if (success) {
         const userId = await getUserIdFromUsername(username);
-        updatePlayerActivity(gameId, userId);      
         await game.recordMove({
         playerId: userId,
         action: 'draw_card',
         source: source,
         color: source === 'discard_pile' ? color : null
       });
+
+      //Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
+      updatePlayerActivity(gameId, userId);   
       
       // Save the updated game state
       await game.save();
