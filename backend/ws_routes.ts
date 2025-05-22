@@ -332,21 +332,21 @@ function updatePlayerActivity(gameId: string, playerId: string) {
   
   if (!activity) return;
   
-  // Reset timer existant
+  // Reset timer
   if (activity.timeout) {
     clearTimeout(activity.timeout);
   }
   
-  // RESET la dernière action (seulement lors d'actions de jeu)
+  // IMPORTANT: Always update lastActionAt timestamp
   activity.lastActionAt = new Date();
   
-  // Ne redémarrer le timer QUE si c'est le tour de ce joueur
-  checkAndStartTimerForCurrentPlayer(gameId, playerId);
+  // Start new timer
+  startInactivityTimer(gameId, playerId);
   
-  // Notifier tous les joueurs du jeu des timers mis à jour
+  // Notify all players
   broadcastActivityTimers(gameId);
   
-  console.log(`⏰ Timer RESET for ${activity.username} due to game action`);
+  console.log(`⏰ Timer RESET for ${activity.username} after action`);
 }
 
 // Vérifier qui doit avoir un timer actif
@@ -1154,19 +1154,20 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
     }
     
     if (success) {
-        const userId = await getUserIdFromUsername(username);
-        await game.recordMove({
+      const userId = await getUserIdFromUsername(username);
+      await game.recordMove({
         playerId: userId,
         action: 'draw_card',
         source: source,
         color: source === 'discard_pile' ? color : null
       });
 
-      //Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
-      updatePlayerActivity(gameId, userId);   
       
       // Save the updated game state
       await game.save();
+
+      //Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
+      updatePlayerActivity(gameId, userId);   
       
       // Notify all players
       const gameState = game.getGameState();

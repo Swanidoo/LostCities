@@ -624,19 +624,17 @@ function showGameEnd(isSurrender = false) {
         isWinner = gameState.gameData.winner == gameState.userId;
         isDraw = gameState.gameData.winner === null;
         
-        // NOUVEAU: Vérifier s'il y a eu de l'inactivité (priorité sur surrender)
+        // Vérifier s'il y a eu de l'inactivité (priorité sur surrender)
         if (gameState.gameData.inactivityInfo) {
             const inactivePlayerId = gameState.gameData.inactivityInfo.inactivePlayerId;
-            console.log(`🕐 Inactivity detected: player ${inactivePlayerId} was inactive`);
-            
             if (inactivePlayerId == gameState.userId) {
-                resultType = 'inactivity-self';
-                isWinner = false;
-                isDraw = false;
+              // You were inactive
+              resultType = 'inactivity-self';
+              isWinner = false;
             } else {
-                resultType = 'inactivity-opponent';
-                isWinner = true;
-                isDraw = false;
+              // Opponent was inactive
+              resultType = 'inactivity-opponent';
+              isWinner = true;
             }
         }
         // Vérifier s'il y a eu un abandon (info du serveur)
