@@ -16,15 +16,17 @@
     <div class="game-container">
         <div class="header">
             <div class="header-content">
-                <!-- Section Joueur 1 (Réorganisée verticalement) -->
+                <!-- Left side with player info and timer -->
                 <div class="player-section">
-                    <div class="turn-indicator waiting" id="player-turn">Votre tour</div>
+                    <div class="player-avatar" id="player-avatar"></div>
                     <div class="player-details">
-                        <div class="player-avatar" id="player-avatar"></div>
-                        <div class="player-name" id="player-name"></div>
+                        <div class="player-name" id="player-name">Joueur 1</div>
                         <div class="player-score" id="player-score">Score: 0</div>
                     </div>
-                    <div class="player-timer" id="player-timer">3:00</div>
+                    <div class="turn-container">
+                        <div class="turn-indicator waiting" id="player-turn">Votre tour</div>
+                        <div class="player-timer" id="player-timer">3:00</div>
+                    </div>
                 </div>
                 
                 <!-- Section centrale -->
@@ -42,15 +44,17 @@
                     </div>
                 </div>
                 
-                <!-- Section Joueur 2 (Réorganisée verticalement) -->
+                <!-- Right side with opponent info and timer -->
                 <div class="player-section right">
-                    <div class="turn-indicator waiting" id="opponent-turn">En attente</div>
+                    <div class="turn-container">
+                        <div class="turn-indicator waiting" id="opponent-turn">En attente</div>
+                        <div class="player-timer" id="opponent-timer">3:00</div>
+                    </div>
                     <div class="player-details">
-                        <div class="player-avatar" id="opponent-avatar"></div>
-                        <div class="player-name" id="opponent-name"></div>
+                        <div class="player-name" id="opponent-name">Adversaire</div>
                         <div class="player-score" id="opponent-score">Score: 0</div>
                     </div>
-                    <div class="player-timer" id="opponent-timer">3:00</div>
+                    <div class="player-avatar" id="opponent-avatar"></div>
                 </div>
             </div>
         </div>
