@@ -579,6 +579,9 @@ function showGameEnd(isSurrender = false) {
         return;
     }
     
+    // DEBUG: Inspecter en détail l'information d'inactivité
+    console.log('🔎 INSPECTION DE L\'INFO D\'INACTIVITÉ:', gameState.gameData.inactivityInfo);
+    
     // Ajouter ces logs pour déboguer
     console.log(`🔍 Données jeu fin de partie:`, {
         startTime: gameState.gameData.started_at,
@@ -591,11 +594,9 @@ function showGameEnd(isSurrender = false) {
         currentRound: gameState.gameData.currentRound,
         totalRounds: gameState.gameData.totalRounds,
         winner: gameState.gameData.winner,
-        inactivityInfo: gameState.gameData.inactivityInfo, // AJOUT: Log de l'info d'inactivité
-        surrenderInfo: gameState.gameData.surrenderInfo    // AJOUT: Log de l'info d'abandon
+        inactivityInfo: gameState.gameData.inactivityInfo,
+        surrenderInfo: gameState.gameData.surrenderInfo
     });
-    
-    console.log('🔍 Game data available:', gameState.gameData);
     
     // Extraire les scores s'ils existent
     const playerScore = gameState.gameData.scores && gameState.gameData.scores[gameState.playerSide] 
@@ -605,8 +606,6 @@ function showGameEnd(isSurrender = false) {
     const opponentScore = gameState.gameData.scores && gameState.gameData.scores[gameState.opponentSide] 
         ? gameState.gameData.scores[gameState.opponentSide].total || 0 
         : 0;
-    
-    console.log(`📊 Scores - Player: ${playerScore}, Opponent: ${opponentScore}`);
     
     // Déterminer le résultat
     let isWinner = false;
@@ -624,23 +623,35 @@ function showGameEnd(isSurrender = false) {
         isWinner = gameState.gameData.winner == gameState.userId;
         isDraw = gameState.gameData.winner === null;
         
-        // Vérifier s'il y a eu de l'inactivité (priorité sur surrender)
+        // IMPORTANT: Log détaillé de la décision du type de résultat
+        console.log(`🔍 Décision de résultat - Base:`, {
+            isWinner,
+            isDraw,
+            inactivityInfo: gameState.gameData.inactivityInfo ? 'présent' : 'absent',
+            surrenderInfo: gameState.gameData.surrenderInfo ? 'présent' : 'absent'
+        });
+        
+        // Vérifier si l'information d'inactivité existe dans les propriétés directes
         if (gameState.gameData.inactivityInfo) {
             const inactivePlayerId = gameState.gameData.inactivityInfo.inactivePlayerId;
-            if (inactivePlayerId == gameState.userId) {
-              // You were inactive
-              resultType = 'inactivity-self';
-              isWinner = false;
+            console.log(`🔍 Inactivité détectée! Joueur inactif: ${inactivePlayerId}, Mon ID: ${gameState.userId}`);
+            
+            if (Number(inactivePlayerId) === Number(gameState.userId)) {
+                console.log(`🔍 C'est MOI qui suis inactif`);
+                resultType = 'inactivity-self';
+                isWinner = false;
             } else {
-              // Opponent was inactive
-              resultType = 'inactivity-opponent';
-              isWinner = true;
+                console.log(`🔍 C'est MON ADVERSAIRE qui est inactif`);
+                resultType = 'inactivity-opponent';
+                isWinner = true;
             }
         }
         // Vérifier s'il y a eu un abandon (info du serveur)
         else if (gameState.gameData.surrenderInfo) {
             const surrenderPlayerId = gameState.gameData.surrenderInfo.playerId;
-            if (surrenderPlayerId == gameState.userId) {
+            console.log(`🔍 Abandon détecté! Joueur: ${surrenderPlayerId}, Mon ID: ${gameState.userId}`);
+            
+            if (Number(surrenderPlayerId) === Number(gameState.userId)) {
                 resultType = 'abandon-self';
                 isWinner = false;
             } else {
@@ -711,6 +722,7 @@ function showGameEnd(isSurrender = false) {
     };
     
     const message = messages[resultType] || messages['loss-points'];
+    console.log(`🎯 Message choisi:`, message);
     
     // Mettre à jour le titre
     if (elements.gameResult) {
