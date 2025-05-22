@@ -16,6 +16,19 @@ const playersLookingForMatch: {
     useExtension: boolean;
   };
 }[] = [];
+
+interface PlayerActivity {
+  gameId: string;
+  playerId: string;
+  username: string;
+  lastActionAt: Date;
+  timeout: NodeJS.Timeout | null;
+}
+
+const playerActivities: Map<string, PlayerActivity> = new Map(); // key = `${gameId}-${playerId}`
+
+// Constante pour le timeout (3 minutes)
+const INACTIVITY_TIMEOUT = 3 * 60 * 1000; // 3 minutes en ms
 const gameSubscriptions: Map<string, Set<WebSocket>> = new Map();
 
 const jwtKey = Deno.env.get("JWT_SECRET");
@@ -166,7 +179,7 @@ wsRouter.get("/ws", async (ctx) => {
       logConnectedClients();
       
       // WebSocket message event handler 
-      socket.onmessage = function(event) {
+      socket.onmessage = async function(event) {
         try {
           const data = JSON.parse(event.data);
           console.log("📩 Message received:", data);
@@ -211,7 +224,7 @@ wsRouter.get("/ws", async (ctx) => {
             case "subscribeGame":
                 // Handle game subscriptions
                 if (data.data?.gameId) {
-                    handleGameSubscription(data.data, socket, clientData.username);
+                    await handleGameSubscription(data.data, socket, clientData.username);
                 }
                 break;
             case "requestGameState":
@@ -293,6 +306,154 @@ wsRouter.get("/ws", async (ctx) => {
     ctx.response.body = { error: error.message || "Internal server error" };
   }
 });
+
+
+
+function initializePlayerActivity(gameId: string, playerId: string, username: string) {
+  const key = `${gameId}-${playerId}`;
+  
+  const activity: PlayerActivity = {
+    gameId,
+    playerId,
+    username,
+    lastActionAt: new Date(),
+    timeout: null
+  };
+  
+  playerActivities.set(key, activity);
+  startInactivityTimer(gameId, playerId);
+  
+  console.log(`🕐 Initialized activity timer for ${username} in game ${gameId}`);
+}
+
+function updatePlayerActivity(gameId: string, playerId: string) {
+  const key = `${gameId}-${playerId}`;
+  const activity = playerActivities.get(key);
+  
+  if (!activity) return;
+  
+  // Reset timer existant
+  if (activity.timeout) {
+    clearTimeout(activity.timeout);
+  }
+  
+  // Mettre à jour la dernière action
+  activity.lastActionAt = new Date();
+  
+  // Redémarrer le timer
+  startInactivityTimer(gameId, playerId);
+  
+  // Notifier tous les joueurs du jeu des timers mis à jour
+  broadcastActivityTimers(gameId);
+}
+
+function startInactivityTimer(gameId: string, playerId: string) {
+  const key = `${gameId}-${playerId}`;
+  const activity = playerActivities.get(key);
+  
+  if (!activity) return;
+  
+  activity.timeout = setTimeout(async () => {
+    console.log(`⏰ Player ${activity.username} has been inactive for 3 minutes in game ${gameId}`);
+    await autoFinishGameForInactivity(gameId, playerId);
+  }, INACTIVITY_TIMEOUT);
+}
+
+async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: string) {
+  try {
+    console.log(`🏳️ Auto-finishing game ${gameId} due to player ${inactivePlayerId} inactivity`);
+    
+    // Charger la partie
+    const game = await loadGameFromDatabase(gameId);
+    
+    // Déterminer le gagnant (l'autre joueur)
+    const winnerId = game.player1.id === inactivePlayerId ? game.player2.id : game.player1.id;
+    
+    // Mettre à jour l'état du jeu
+    game.gameStatus = 'finished';
+    game.winner = winnerId;
+    
+    // Enregistrer l'action d'inactivité
+    await game.recordMove({
+      playerId: inactivePlayerId,
+      action: 'timeout',
+      cardId: null,
+      destination: null,
+      source: null,
+      color: null
+    });
+    
+    // Sauvegarder
+    await game.save();
+    
+    // Nettoyer les timers
+    cleanupGameActivityTimers(gameId);
+    
+    // Mettre à jour le leaderboard
+    await updateLeaderboardForGame(gameId);
+    
+    // Notifier les joueurs avec info spéciale
+    const gameState = game.getGameState();
+    gameState.timeoutInfo = {
+      playerId: inactivePlayerId,
+      type: 'inactivity'
+    };
+    
+    await notifyGamePlayers(gameId, gameState);
+    
+    console.log(`✅ Game ${gameId} auto-finished due to inactivity`);
+    
+  } catch (error) {
+    console.error(`❌ Error auto-finishing game ${gameId}:`, error);
+  }
+}
+
+function broadcastActivityTimers(gameId: string) {
+  const subscribers = gameSubscriptions.get(gameId);
+  if (!subscribers) return;
+  
+  // Calculer les temps restants pour chaque joueur
+  const timers = {};
+  
+  playerActivities.forEach((activity, key) => {
+    if (activity.gameId === gameId) {
+      const timeElapsed = Date.now() - activity.lastActionAt.getTime();
+      const timeRemaining = Math.max(0, INACTIVITY_TIMEOUT - timeElapsed);
+      timers[activity.playerId] = {
+        playerId: activity.playerId,
+        username: activity.username,
+        timeRemaining: Math.ceil(timeRemaining / 1000) // en secondes
+      };
+    }
+  });
+  
+  // Envoyer à tous les abonnés
+  subscribers.forEach(socket => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        event: 'activityTimers',
+        data: { gameId, timers }
+      }));
+    }
+  });
+}
+
+function cleanupGameActivityTimers(gameId: string) {
+  const keysToDelete = [];
+  
+  playerActivities.forEach((activity, key) => {
+    if (activity.gameId === gameId) {
+      if (activity.timeout) {
+        clearTimeout(activity.timeout);
+      }
+      keysToDelete.push(key);
+    }
+  });
+  
+  keysToDelete.forEach(key => playerActivities.delete(key));
+  console.log(`🧹 Cleaned up activity timers for game ${gameId}`);
+}
+
 
 async function handleCheckMuteStatus(socket: WebSocket, username: string) {
   const userId = await getUserIdFromUsername(username);
@@ -831,7 +992,8 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
     console.log(`After move: ${game.player1.hand.length} cards in P1 hand`);
     
     if (success) {
-      // AJOUT: Enregistrer explicitement le mouvement
+      const userId = await getUserIdFromUsername(username);
+      updatePlayerActivity(gameId, userId);
       await game.recordMove({
         playerId: userId,
         action: 'play_card',
@@ -883,8 +1045,9 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
     const success = game.discardCard(userId, cardId);
     
     if (success) {
-      // AJOUT: Enregistrer explicitement le mouvement
-      await game.recordMove({
+        const userId = await getUserIdFromUsername(username);
+        updatePlayerActivity(gameId, userId);      
+        await game.recordMove({
         playerId: userId,
         action: 'discard_card',
         cardId: cardId,
@@ -935,8 +1098,9 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
     }
     
     if (success) {
-      // AJOUT: Enregistrer explicitement le mouvement
-      await game.recordMove({
+        const userId = await getUserIdFromUsername(username);
+        updatePlayerActivity(gameId, userId);      
+        await game.recordMove({
         playerId: userId,
         action: 'draw_card',
         source: source,

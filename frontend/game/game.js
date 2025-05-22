@@ -939,7 +939,11 @@ function handleWebSocketMessage(event) {
             case "systemMessage":
                 handleSystemMessage(data.data);
                 break;
-                
+            
+            case "activityTimers":
+                handleActivityTimers(data.data);
+                break;    
+
             default:
                 console.log("Type de message non reconnu:", data.event);
         }
@@ -958,6 +962,38 @@ function subscribeToGame() {
         event: "subscribeGame",
         data: { gameId: gameState.gameId }
     }));
+}
+
+//Fonction pour gérer les timers d'activité
+function handleActivityTimers(data) {
+    if (!data.timers || !gameState.userId) return;
+    
+    const playerTimer = data.timers[gameState.userId];
+    if (!playerTimer) return;
+    
+    updateActivityTimerDisplay(playerTimer.timeRemaining);
+}
+
+function updateActivityTimerDisplay(secondsRemaining) {
+    const timerElement = document.getElementById('activity-timer');
+    if (!timerElement) return;
+    
+    // Formater le temps (mm:ss)
+    const minutes = Math.floor(secondsRemaining / 60);
+    const seconds = secondsRemaining % 60;
+    const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    timerElement.textContent = formattedTime;
+    
+    // Changer les styles selon le temps restant
+    const timerContainer = timerElement.closest('.activity-timer');
+    timerContainer.classList.remove('warning', 'critical');
+    
+    if (secondsRemaining <= 30) {
+        timerContainer.classList.add('critical');
+    } else if (secondsRemaining <= 60) {
+        timerContainer.classList.add('warning');
+    }
 }
 
 // Demander l'état actuel de la partie
