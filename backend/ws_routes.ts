@@ -428,8 +428,15 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
 }
 
 function broadcastActivityTimers(gameId: string) {
+  console.log(`🔍 Broadcasting activity timers for game ${gameId}`);
+  
   const subscribers = gameSubscriptions.get(gameId);
-  if (!subscribers) return;
+  if (!subscribers) {
+    console.log(`❌ No subscribers found for game ${gameId}`);
+    return;
+  }
+  
+  console.log(`📡 Found ${subscribers.size} subscribers for game ${gameId}`);
   
   loadGameFromDatabase(gameId).then(game => {
     const timers = {};
@@ -443,12 +450,16 @@ function broadcastActivityTimers(gameId: string) {
         timers[activity.playerId] = {
           playerId: activity.playerId,
           username: activity.username,
-          timeRemaining: Math.ceil(timeRemaining / 1000), // en secondes
-          isActive: isCurrentPlayer, // NOUVEAU: indique si le timer est actif
+          timeRemaining: Math.ceil(timeRemaining / 1000),
+          isActive: isCurrentPlayer,
           isCurrentTurn: isCurrentPlayer
         };
+        
+        console.log(`⏰ Timer for ${activity.username} (${activity.playerId}): ${Math.ceil(timeRemaining / 1000)}s, active: ${isCurrentPlayer}`);
       }
     });
+    
+    console.log(`📤 Sending timers:`, timers);
     
     // Envoyer à tous les abonnés
     subscribers.forEach(socket => {
@@ -457,10 +468,11 @@ function broadcastActivityTimers(gameId: string) {
           event: 'activityTimers',
           data: { gameId, timers }
         }));
+        console.log(`✅ Sent timer update to subscriber`);
       }
     });
   }).catch(error => {
-    console.error(`Error broadcasting timers: ${error}`);
+    console.error(`❌ Error broadcasting timers: ${error}`);
   });
 }
 
@@ -1447,6 +1459,10 @@ function handleGameSubscription(data: { gameId: string }, socket: WebSocket, use
   subscribers.add(socket);
   
   console.log(`✅ User ${username} subscribed to game ${data.gameId}. Total subscribers: ${subscribers.size}`);
+  console.log(`🔍 Current player activities:`);
+  playerActivities.forEach((activity, key) => {
+    console.log(`  - ${key}: ${activity.username}, last action: ${activity.lastActionAt}`);
+  });
   
   // Send confirmation to the client
   try {

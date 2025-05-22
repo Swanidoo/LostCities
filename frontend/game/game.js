@@ -966,13 +966,21 @@ function subscribeToGame() {
 
 //Fonction pour gérer les timers d'activité
 function handleActivityTimers(data) {
-    if (!data.timers || !gameState.userId) return;
+    console.log('🔍 Received activityTimers:', data);
+    
+    if (!data.timers || !gameState.userId) {
+        console.log('❌ Missing timers or userId:', { timers: data.timers, userId: gameState.userId });
+        return;
+    }
     
     const playerTimer = data.timers[gameState.userId];
     const opponentId = gameState.gameData.player1.id === Number(gameState.userId) 
         ? gameState.gameData.player2.id 
         : gameState.gameData.player1.id;
     const opponentTimer = data.timers[opponentId];
+    
+    console.log('🔍 Player timer:', playerTimer);
+    console.log('🔍 Opponent timer:', opponentTimer);
     
     // Mettre à jour le timer du joueur
     if (playerTimer) {
