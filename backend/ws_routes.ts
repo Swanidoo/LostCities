@@ -382,45 +382,28 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
   try {
     console.log(`🏳️ Auto-finishing game ${gameId} due to player ${inactivePlayerId} inactivity`);
     
-    // Charger la partie
     const game = await loadGameFromDatabase(gameId);
-    
-    // Déterminer le gagnant (l'autre joueur)
     const winnerId = game.player1.id === inactivePlayerId ? game.player2.id : game.player1.id;
     
-    // Mettre à jour l'état du jeu
     game.gameStatus = 'finished';
     game.winner = winnerId;
     
-    // Enregistrer l'action d'inactivité
-    await game.recordMove({
-      playerId: inactivePlayerId,
-      action: 'timeout',
-      cardId: null,
-      destination: null,
-      source: null,
-      color: null
-    });
+    // Information sur l'inactivité
+    const inactivePlayerName = playerActivities.get(`${gameId}-${inactivePlayerId}`)?.username || 'Joueur';
     
-    // Sauvegarder
     await game.save();
-    
-    // Nettoyer les timers
     cleanupGameActivityTimers(gameId);
-    
-    // Mettre à jour le leaderboard
     await updateLeaderboardForGame(gameId);
     
-    // Notifier les joueurs avec info spéciale
+    // Ajouter les infos d'inactivité
     const gameState = game.getGameState();
-    gameState.timeoutInfo = {
-      playerId: inactivePlayerId,
+    gameState.inactivityInfo = {
+      inactivePlayerId: inactivePlayerId,
+      inactivePlayerName: inactivePlayerName,
       type: 'inactivity'
     };
     
     await notifyGamePlayers(gameId, gameState);
-    
-    console.log(`✅ Game ${gameId} auto-finished due to inactivity`);
     
   } catch (error) {
     console.error(`❌ Error auto-finishing game ${gameId}:`, error);
@@ -474,6 +457,21 @@ function broadcastActivityTimers(gameId: string) {
   }).catch(error => {
     console.error(`❌ Error broadcasting timers: ${error}`);
   });
+}
+
+
+function startTimerBroadcastInterval() {
+  setInterval(() => {
+    // Pour chaque partie en cours, diffuser les timers
+    const activeGames = new Set();
+    playerActivities.forEach(activity => {
+      activeGames.add(activity.gameId);
+    });
+    
+    activeGames.forEach(gameId => {
+      broadcastActivityTimers(gameId);
+    });
+  }, 1000); // Toutes les secondes
 }
 
 function cleanupGameActivityTimers(gameId: string) {
@@ -1606,6 +1604,8 @@ async function handleGameStateRequest(data: any, socket: WebSocket, username: st
     }
   }
 }
+
+startTimerBroadcastInterval();
 
 
 export { notifyGamePlayers };

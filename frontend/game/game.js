@@ -590,7 +590,8 @@ function showGameEnd(isSurrender = false) {
         },
         currentRound: gameState.gameData.currentRound,
         totalRounds: gameState.gameData.totalRounds,
-        winner: gameState.gameData.winner
+        winner: gameState.gameData.winner,
+        inactivityInfo: gameState.gameData.inactivityInfo // AJOUT: Log de l'info d'inactivité
     });
     
     console.log('🔍 Game data available:', gameState.gameData);
@@ -622,8 +623,23 @@ function showGameEnd(isSurrender = false) {
         isWinner = gameState.gameData.winner == gameState.userId;
         isDraw = gameState.gameData.winner === null;
         
+        // NOUVEAU: Vérifier s'il y a eu de l'inactivité (priorité sur surrender)
+        if (gameState.gameData.inactivityInfo) {
+            const inactivePlayerId = gameState.gameData.inactivityInfo.inactivePlayerId;
+            console.log(`🕐 Inactivity detected: player ${inactivePlayerId} was inactive`);
+            
+            if (inactivePlayerId == gameState.userId) {
+                resultType = 'inactivity-self';
+                isWinner = false;
+                isDraw = false;
+            } else {
+                resultType = 'inactivity-opponent';
+                isWinner = true;
+                isDraw = false;
+            }
+        }
         // Vérifier s'il y a eu un abandon (info du serveur)
-        if (gameState.gameData.surrenderInfo) {
+        else if (gameState.gameData.surrenderInfo) {
             const surrenderPlayerId = gameState.gameData.surrenderInfo.playerId;
             if (surrenderPlayerId == gameState.userId) {
                 resultType = 'abandon-self';
@@ -633,7 +649,7 @@ function showGameEnd(isSurrender = false) {
                 isWinner = true;
             }
         } 
-        // Pas d'abandon, résultat par points
+        // Pas d'abandon ni d'inactivité, résultat par points
         else if (isDraw) {
             resultType = 'draw';
         } else if (isWinner) {
@@ -648,6 +664,8 @@ function showGameEnd(isSurrender = false) {
         isWinner = false;
         isDraw = false;
     }
+
+    console.log(`🎯 Result determined: ${resultType}, isWinner: ${isWinner}, isDraw: ${isDraw}`);
 
     // Couleur de la modal selon le résultat
     const modalContent = elements.gameEndModal.querySelector('.modal-content');
@@ -682,6 +700,14 @@ function showGameEnd(isSurrender = false) {
         'draw': {
             title: 'Égalité',
             subtitle: 'Scores identiques des deux côtés.'
+        },
+        'inactivity-self': {
+            title: 'Défaite',
+            subtitle: 'Vous êtes resté inactif pendant trop longtemps.'
+        },
+        'inactivity-opponent': {
+            title: 'Victoire',
+            subtitle: 'Votre adversaire est resté inactif pendant trop longtemps.'
         }
     };
     
@@ -778,7 +804,7 @@ function showGameEnd(isSurrender = false) {
         durationDisplay = '5m';
     }
     
-    // Calculer la marge de victoire
+    // Calculer la marge de victoire (sauf pour inactivité et abandon)
     const margin = Math.abs(playerScore - opponentScore);
     
     // Informations détaillées avec emojis
@@ -792,7 +818,7 @@ function showGameEnd(isSurrender = false) {
                 <span class="summary-label">📊 Score final :</span>
                 <span class="summary-value">${playerScore} - ${opponentScore}</span>
             </div>
-            ${!isDraw && resultType !== 'abandon-self' && resultType !== 'abandon-opponent' ? `
+            ${!isDraw && !resultType.includes('abandon') && !resultType.includes('inactivity') ? `
             <div class="summary-row">
                 <span class="summary-label">🎯 Marge de victoire :</span>
                 <span class="summary-value">${margin} points</span>
@@ -968,10 +994,7 @@ function subscribeToGame() {
 function handleActivityTimers(data) {
     console.log('🔍 Received activityTimers:', data);
     
-    if (!data.timers || !gameState.userId) {
-        console.log('❌ Missing timers or userId:', { timers: data.timers, userId: gameState.userId });
-        return;
-    }
+    if (!data.timers || !gameState.userId) return;
     
     const playerTimer = data.timers[gameState.userId];
     const opponentId = gameState.gameData.player1.id === Number(gameState.userId) 
@@ -979,18 +1002,38 @@ function handleActivityTimers(data) {
         : gameState.gameData.player1.id;
     const opponentTimer = data.timers[opponentId];
     
-    console.log('🔍 Player timer:', playerTimer);
-    console.log('🔍 Opponent timer:', opponentTimer);
+    // Stocker les timers pour le décompte local
+    gameState.playerTimerData = playerTimer;
+    gameState.opponentTimerData = opponentTimer;
     
-    // Mettre à jour le timer du joueur
-    if (playerTimer) {
-        updatePlayerTimerDisplay('player-timer', playerTimer);
+    // Démarrer le décompte local si pas déjà actif
+    if (!gameState.localTimerInterval) {
+        startLocalTimer();
     }
     
-    // Mettre à jour le timer de l'adversaire
-    if (opponentTimer) {
-        updatePlayerTimerDisplay('opponent-timer', opponentTimer);
+    // Mettre à jour immédiatement
+    if (playerTimer) updatePlayerTimerDisplay('player-timer', playerTimer);
+    if (opponentTimer) updatePlayerTimerDisplay('opponent-timer', opponentTimer);
+}
+
+function startLocalTimer() {
+    // Éviter les doublons
+    if (gameState.localTimerInterval) {
+        clearInterval(gameState.localTimerInterval);
     }
+    
+    gameState.localTimerInterval = setInterval(() => {
+        // Décrémenter le timer du joueur actuel
+        if (gameState.playerTimerData && gameState.playerTimerData.isCurrentTurn && gameState.playerTimerData.timeRemaining > 0) {
+            gameState.playerTimerData.timeRemaining--;
+            updatePlayerTimerDisplay('player-timer', gameState.playerTimerData);
+        }
+        
+        if (gameState.opponentTimerData && gameState.opponentTimerData.isCurrentTurn && gameState.opponentTimerData.timeRemaining > 0) {
+            gameState.opponentTimerData.timeRemaining--;
+            updatePlayerTimerDisplay('opponent-timer', gameState.opponentTimerData);
+        }
+    }, 1000);
 }
 
 function updatePlayerTimerDisplay(elementId, timerData) {
