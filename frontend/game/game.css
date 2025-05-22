@@ -474,9 +474,9 @@ body {
 
 /* ===== RESPONSIVE DECK AND DISCARD PILES (POINTILLÉS RESTAURÉS) ===== */
 .deck-pile, .discard-pile {
-    width: 70px;
-    height: 100px;
-    border-radius: 5px;
+    width: var(--card-width);
+    height: var(--card-height);
+    border-radius: clamp(4px, 0.5vw, 8px);
     position: relative;
     border: 1px dashed rgba(255, 255, 255, 0.3);
     transition: all 0.3s ease;
@@ -560,35 +560,40 @@ body {
 .discard-pile:hover {
     z-index: 100; /* Au-dessus de tout pour éviter les coupures */
 }
-
+/* Effet d'éventail responsive pour les cartes de défausse au survol */
 .discard-pile:hover .card:nth-child(1) { 
-    transform: translateX(-60px) translateY(-10px) rotate(-15deg); 
+    transform: translateX(calc(-0.85 * var(--card-width))) translateY(calc(-0.1 * var(--card-height))) rotate(-15deg); 
     z-index: 1; 
 }
+
 .discard-pile:hover .card:nth-child(2) { 
-    transform: translateX(-35px) translateY(-8px) rotate(-8deg); 
+    transform: translateX(calc(-0.5 * var(--card-width))) translateY(calc(-0.08 * var(--card-height))) rotate(-8deg); 
     z-index: 2; 
 }
+
 .discard-pile:hover .card:nth-child(3) { 
-    transform: translateX(-10px) translateY(-5px) rotate(-2deg); 
+    transform: translateX(calc(-0.14 * var(--card-width))) translateY(calc(-0.05 * var(--card-height))) rotate(-2deg); 
     z-index: 3; 
 }
+
 .discard-pile:hover .card:nth-child(4) { 
-    transform: translateX(15px) translateY(-8px) rotate(5deg); 
+    transform: translateX(calc(0.21 * var(--card-width))) translateY(calc(-0.08 * var(--card-height))) rotate(5deg); 
     z-index: 4; 
 }
+
 .discard-pile:hover .card:nth-child(5) { 
-    transform: translateX(40px) translateY(-10px) rotate(12deg); 
+    transform: translateX(calc(0.57 * var(--card-width))) translateY(calc(-0.1 * var(--card-height))) rotate(12deg); 
     z-index: 5; 
 }
 
 /* Pour les piles avec plus de 5 cartes */
 .discard-pile:hover .card:nth-child(6) { 
-    transform: translateX(65px) translateY(-12px) rotate(18deg); 
+    transform: translateX(calc(0.93 * var(--card-width))) translateY(calc(-0.12 * var(--card-height))) rotate(18deg); 
     z-index: 6; 
 }
+
 .discard-pile:hover .card:nth-child(7) { 
-    transform: translateX(90px) translateY(-15px) rotate(25deg); 
+    transform: translateX(calc(1.29 * var(--card-width))) translateY(calc(-0.15 * var(--card-height))) rotate(25deg); 
     z-index: 7; 
 }
 
