@@ -1017,13 +1017,12 @@ function handleActivityTimers(data) {
 }
 
 function startLocalTimer() {
-    // Éviter les doublons
+    // Éviter les doublons, un timer a la fois
     if (gameState.localTimerInterval) {
         clearInterval(gameState.localTimerInterval);
     }
     
     gameState.localTimerInterval = setInterval(() => {
-        // Décrémenter le timer du joueur actuel
         if (gameState.playerTimerData && gameState.playerTimerData.isCurrentTurn && gameState.playerTimerData.timeRemaining > 0) {
             gameState.playerTimerData.timeRemaining--;
             updatePlayerTimerDisplay('player-timer', gameState.playerTimerData);
