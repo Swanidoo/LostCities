@@ -337,7 +337,7 @@ function updatePlayerActivity(gameId: string, playerId: string) {
     clearTimeout(activity.timeout);
   }
   
-  // Mettre à jour la dernière action
+  // RESET la dernière action (seulement lors d'actions de jeu)
   activity.lastActionAt = new Date();
   
   // Ne redémarrer le timer QUE si c'est le tour de ce joueur
@@ -345,6 +345,8 @@ function updatePlayerActivity(gameId: string, playerId: string) {
   
   // Notifier tous les joueurs du jeu des timers mis à jour
   broadcastActivityTimers(gameId);
+  
+  console.log(`⏰ Timer RESET for ${activity.username} due to game action`);
 }
 
 // Vérifier qui doit avoir un timer actif
@@ -1180,6 +1182,19 @@ function removeFromMatchmaking(socket: WebSocket) {
   }
 }
 
+function reactivatePlayerActivity(gameId: string, playerId: string) {
+  const key = `${gameId}-${playerId}`;
+  const activity = playerActivities.get(key);
+  
+  if (!activity) return;
+  
+  // Ne PAS mettre à jour lastActionAt (c'est le point clé)
+  // Juste redémarrer le timer si c'est le tour du joueur
+  checkAndStartTimerForCurrentPlayer(gameId, playerId);
+  
+  console.log(`🔄 Reactivated timer for ${activity.username} without resetting time`);
+}
+
 function tryFindMatch() {
   // Need at least 2 players to make a match
   if (playersLookingForMatch.length >= 2) {
@@ -1457,10 +1472,6 @@ async function handleGameSubscription(data: { gameId: string }, socket: WebSocke
   subscribers.add(socket);
   
   console.log(`✅ User ${username} subscribed to game ${data.gameId}. Total subscribers: ${subscribers.size}`);
-  console.log(`🔍 Current player activities:`);
-  playerActivities.forEach((activity, key) => {
-    console.log(`  - ${key}: ${activity.username}, last action: ${activity.lastActionAt}`);
-  });
   
   // Gérer le timer d'activité du joueur
   try {
@@ -1469,16 +1480,14 @@ async function handleGameSubscription(data: { gameId: string }, socket: WebSocke
       const key = `${data.gameId}-${userId}`;
       
       if (playerActivities.has(key)) {
-        // Timer existe déjà, le réactiver (le joueur revient)
-        console.log(`🔄 Reactivating activity timer for ${username} in game ${data.gameId}`);
-        updatePlayerActivity(data.gameId, userId);
+        // MODIFICATION: Timer existe déjà, le réactiver SANS reset
+        console.log(`🔄 Reactivating activity timer for ${username} in game ${data.gameId} (NO RESET)`);
+        reactivatePlayerActivity(data.gameId, userId); // NOUVELLE fonction
       } else {
         // Nouveau timer (premier join ou partie qui commence)
         console.log(`🆕 Initializing new activity timer for ${username} in game ${data.gameId}`);
         initializePlayerActivity(data.gameId, userId, username);
       }
-    } else {
-      console.error(`❌ Could not find userId for username ${username}`);
     }
   } catch (error) {
     console.error(`❌ Error setting up activity timer for ${username}:`, error);
