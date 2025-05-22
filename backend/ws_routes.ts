@@ -1446,12 +1446,12 @@ async function createGame(
 }
 
 // Handle game subscription requests
-function handleGameSubscription(data: { gameId: string }, socket: WebSocket, username: string): void {
+async function handleGameSubscription(data: { gameId: string }, socket: WebSocket, username: string): Promise<void> {
   console.log(`🎮 User ${username} subscribing to game ${data.gameId}`);
   
   // Create set for this game if it doesn't exist
   if (!gameSubscriptions.has(data.gameId)) {
-      gameSubscriptions.set(data.gameId, new Set());
+    gameSubscriptions.set(data.gameId, new Set());
   }
   
   // Add socket to the game's subscriptions
@@ -1464,14 +1464,36 @@ function handleGameSubscription(data: { gameId: string }, socket: WebSocket, use
     console.log(`  - ${key}: ${activity.username}, last action: ${activity.lastActionAt}`);
   });
   
+  // Gérer le timer d'activité du joueur
+  try {
+    const userId = await getUserIdFromUsername(username);
+    if (userId) {
+      const key = `${data.gameId}-${userId}`;
+      
+      if (playerActivities.has(key)) {
+        // Timer existe déjà, le réactiver (le joueur revient)
+        console.log(`🔄 Reactivating activity timer for ${username} in game ${data.gameId}`);
+        updatePlayerActivity(data.gameId, userId);
+      } else {
+        // Nouveau timer (premier join ou partie qui commence)
+        console.log(`🆕 Initializing new activity timer for ${username} in game ${data.gameId}`);
+        initializePlayerActivity(data.gameId, userId, username);
+      }
+    } else {
+      console.error(`❌ Could not find userId for username ${username}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error setting up activity timer for ${username}:`, error);
+  }
+  
   // Send confirmation to the client
   try {
-      socket.send(JSON.stringify({
-          event: 'gameSubscribed',
-          data: { gameId: data.gameId }
-      }));
+    socket.send(JSON.stringify({
+      event: 'gameSubscribed',
+      data: { gameId: data.gameId }
+    }));
   } catch (error) {
-      console.error(`❌ Error sending subscription confirmation to ${username}:`, error);
+    console.error(`❌ Error sending subscription confirmation to ${username}:`, error);
   }
 }
 
