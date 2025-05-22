@@ -326,27 +326,52 @@ function initializePlayerActivity(gameId: string, playerId: string, username: st
   console.log(`🕐 Initialized activity timer for ${username} in game ${gameId}`);
 }
 
-function updatePlayerActivity(gameId: string, playerId: string) {
+async function updatePlayerActivity(gameId: string, playerId: string) {
   const key = `${gameId}-${playerId}`;
   const activity = playerActivities.get(key);
   
   if (!activity) return;
   
-  // Reset timer
+  // Reset timer pour le joueur qui vient de jouer
   if (activity.timeout) {
     clearTimeout(activity.timeout);
+    activity.timeout = null;
   }
   
-  // IMPORTANT: Always update lastActionAt timestamp
+  // Mettre à jour le timestamp
   activity.lastActionAt = new Date();
   
-  // Start new timer
-  startInactivityTimer(gameId, playerId);
-  
-  // Notify all players
-  broadcastActivityTimers(gameId);
-  
-  console.log(`⏰ Timer RESET for ${activity.username} after action`);
+  try {
+    // Charger la partie pour déterminer le joueur actif après cette action
+    const game = await loadGameFromDatabase(gameId);
+    
+    // Identifier qui est le joueur actif maintenant (après l'action)
+    const currentActivePlayerId = game.currentPlayerId;
+    
+    // Réinitialiser TOUS les timers pour cette partie
+    playerActivities.forEach((activity, activityKey) => {
+      if (activity.gameId === gameId) {
+        // Annuler tout timer existant
+        if (activity.timeout) {
+          clearTimeout(activity.timeout);
+          activity.timeout = null;
+        }
+        
+        // Mettre à jour lastActionAt pour tous les joueurs
+        activity.lastActionAt = new Date();
+      }
+    });
+    
+    // Démarrer un timer UNIQUEMENT pour le joueur actif actuel
+    startInactivityTimer(gameId, currentActivePlayerId);
+    
+    // Notifier tous les joueurs
+    broadcastActivityTimers(gameId);
+    
+    console.log(`⏰ Timers updated for game ${gameId}. Active player: ${currentActivePlayerId}`);
+  } catch (error) {
+    console.error(`Error updating player activity: ${error}`);
+  }
 }
 
 // Vérifier qui doit avoir un timer actif
@@ -374,17 +399,43 @@ function startInactivityTimer(gameId: string, playerId: string) {
   
   if (!activity) return;
   
-  activity.timeout = setTimeout(async () => {
-    console.log(`⏰ Player ${activity.username} has been inactive for 3 minutes in game ${gameId}`);
-    await autoFinishGameForInactivity(gameId, playerId);
-  }, INACTIVITY_TIMEOUT);
+  // Annuler tout timer existant d'abord
+  if (activity.timeout) {
+    clearTimeout(activity.timeout);
+    activity.timeout = null;
+  }
+  
+  // Vérifier si c'est le tour du joueur avant de démarrer un nouveau timer
+  loadGameFromDatabase(gameId).then(game => {
+    if (game.currentPlayerId === playerId && game.gameStatus === 'in_progress') {
+      // Seulement démarrer un timer si c'est le tour du joueur
+      activity.timeout = setTimeout(async () => {
+        console.log(`⏰ Player ${activity.username} has been inactive for 3 minutes in game ${gameId}`);
+        await autoFinishGameForInactivity(gameId, playerId);
+      }, INACTIVITY_TIMEOUT);
+      
+      console.log(`⏰ Started inactivity timer for ${activity.username} (their turn)`);
+    } else {
+      console.log(`⏸️ No timer started for ${activity.username} (not their turn)`);
+    }
+  }).catch(error => {
+    console.error(`Error checking game state for timer: ${error}`);
+  });
 }
 
 async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: string) {
   try {
+    // Double-vérification que c'est toujours le tour de ce joueur
+    const game = await loadGameFromDatabase(gameId);
+    
+    if (game.currentPlayerId !== inactivePlayerId) {
+      console.log(`⚠️ Ignoring inactivity for player ${inactivePlayerId} - no longer their turn`);
+      return; // Ne pas terminer la partie si ce n'est plus le tour de ce joueur
+    }
+    
     console.log(`🏳️ Auto-finishing game ${gameId} due to player ${inactivePlayerId} inactivity`);
     
-    const game = await loadGameFromDatabase(gameId);
+    // Le reste du code pour terminer la partie...
     const winnerId = game.player1.id === inactivePlayerId ? game.player2.id : game.player1.id;
     
     game.gameStatus = 'finished';
@@ -400,7 +451,6 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
     // IMPORTANT : Créer un gameState avec les infos d'inactivité
     const gameState = game.getGameState();
     
-    //S'assurer que les données d'inactivité sont bien présentes
     gameState.inactivityInfo = {
       inactivePlayerId: inactivePlayerId,
       inactivePlayerName: inactivePlayerName,
@@ -412,7 +462,6 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
     await notifyGamePlayers(gameId, gameState);
     
     console.log(`✅ Game ${gameId} finished due to inactivity of player ${inactivePlayerName}`);
-    
   } catch (error) {
     console.error(`❌ Error auto-finishing game ${gameId}:`, error);
   }
