@@ -435,22 +435,29 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
     
     console.log(`🏳️ Auto-finishing game ${gameId} due to player ${inactivePlayerId} inactivity`);
     
-    // Le reste du code pour terminer la partie...
+    // Déterminer le gagnant (l'autre joueur)
     const winnerId = game.player1.id === inactivePlayerId ? game.player2.id : game.player1.id;
-    
-    game.gameStatus = 'finished';
-    game.winner = winnerId;
     
     // Information sur l'inactivité
     const inactivePlayerName = playerActivities.get(`${gameId}-${inactivePlayerId}`)?.username || 'Joueur';
     
+    // Mettre à jour le statut du jeu
+    game.gameStatus = 'finished';
+    game.winner = winnerId;
+    
+    // Sauvegarder les modifications dans la base de données
     await game.save();
+    
+    // Nettoyer les timers
     cleanupGameActivityTimers(gameId);
+    
+    // Mettre à jour le leaderboard
     await updateLeaderboardForGame(gameId);
     
-    // IMPORTANT : Créer un gameState avec les infos d'inactivité
+    // MODIFICATION: Créer le gameState et y ajouter l'info d'inactivité APRÈS
     const gameState = game.getGameState();
     
+    // Ajouter l'info d'inactivité au gameState (pas directement au game)
     gameState.inactivityInfo = {
       inactivePlayerId: inactivePlayerId,
       inactivePlayerName: inactivePlayerName,
@@ -459,6 +466,7 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
     
     console.log(`🔍 Sending game state with inactivity info:`, gameState.inactivityInfo);
     
+    // Notifier tous les joueurs avec le gameState modifié
     await notifyGamePlayers(gameId, gameState);
     
     console.log(`✅ Game ${gameId} finished due to inactivity of player ${inactivePlayerName}`);
@@ -472,13 +480,20 @@ function broadcastActivityTimers(gameId: string) {
   
   const subscribers = gameSubscriptions.get(gameId);
   if (!subscribers) {
-    console.log(`❌ No subscribers found for game ${gameId}`);
-    return;
+      console.log(`❌ No subscribers found for game ${gameId}`);
+      return;
   }
   
   console.log(`📡 Found ${subscribers.size} subscribers for game ${gameId}`);
   
   loadGameFromDatabase(gameId).then(game => {
+    // ✅ AJOUTER CETTE VÉRIFICATION
+    if (game.gameStatus === 'finished') {
+        console.log(`⏹️ Game ${gameId} is finished, stopping timer broadcasts`);
+        // Nettoyer également les abonnements
+        cleanupGameSubscriptions(gameId);
+        return;
+    }
     const timers = {};
     
     playerActivities.forEach((activity, key) => {
@@ -522,6 +537,11 @@ function broadcastActivityTimers(gameId: string) {
   }).catch(error => {
     console.error(`❌ Error broadcasting timers: ${error}`);
   });
+}
+
+function cleanupGameSubscriptions(gameId: string) {
+  gameSubscriptions.delete(gameId);
+  console.log(`🧹 Removed all subscribers for finished game ${gameId}`);
 }
 
 
@@ -936,6 +956,11 @@ async function notifyGamePlayers(gameId: string, gameState: any): Promise<void> 
         
         // Get player-specific game state with hand data included
         const playerState = fullGame.getGameState(userId);
+
+        if (gameState.inactivityInfo) {
+          playerState.inactivityInfo = gameState.inactivityInfo;
+          console.log(`⚠️ Préservation de l'info d'inactivité pour ${username}:`, playerState.inactivityInfo);
+        }
         
         // MODIFICATION: Enrichir avec les informations utilisateur
         playerState.player1.username = userInfo.player1_username;

@@ -579,6 +579,9 @@ function showGameEnd(isSurrender = false) {
         return;
     }
     
+    // NOUVEAU: Ajouter un log complet de l'état du jeu pour diagnostic
+    console.log('🔍 FULL GAME DATA:', JSON.stringify(gameState.gameData, null, 2));
+    
     // DEBUG: Inspecter en détail l'information d'inactivité
     console.log('🔎 INSPECTION DE L\'INFO D\'INACTIVITÉ:', gameState.gameData.inactivityInfo);
     
@@ -620,7 +623,7 @@ function showGameEnd(isSurrender = false) {
     }
     // Si la partie est officiellement terminée
     else if (gameState.gameData.status === 'finished') {
-        isWinner = gameState.gameData.winner == gameState.userId;
+        isWinner = Number(gameState.gameData.winner) === Number(gameState.userId);
         isDraw = gameState.gameData.winner === null;
         
         // IMPORTANT: Log détaillé de la décision du type de résultat
@@ -628,15 +631,18 @@ function showGameEnd(isSurrender = false) {
             isWinner,
             isDraw,
             inactivityInfo: gameState.gameData.inactivityInfo ? 'présent' : 'absent',
-            surrenderInfo: gameState.gameData.surrenderInfo ? 'présent' : 'absent'
+            surrenderInfo: gameState.gameData.surrenderInfo ? 'présent' : 'absent',
+            winnerId: gameState.gameData.winner,
+            userId: gameState.userId
         });
         
-        // Vérifier si l'information d'inactivité existe dans les propriétés directes
-        if (gameState.gameData.inactivityInfo) {
+        // AMÉLIORÉ: Vérification plus robuste de l'information d'inactivité
+        if (gameState.gameData.inactivityInfo && typeof gameState.gameData.inactivityInfo === 'object') {
             const inactivePlayerId = gameState.gameData.inactivityInfo.inactivePlayerId;
             console.log(`🔍 Inactivité détectée! Joueur inactif: ${inactivePlayerId}, Mon ID: ${gameState.userId}`);
+            console.log(`🔍 Types: inactivePlayerId (${typeof inactivePlayerId}), userId (${typeof gameState.userId})`);
             
-            if (Number(inactivePlayerId) === Number(gameState.userId)) {
+            if (String(inactivePlayerId) === String(gameState.userId)) {
                 console.log(`🔍 C'est MOI qui suis inactif`);
                 resultType = 'inactivity-self';
                 isWinner = false;
@@ -647,11 +653,12 @@ function showGameEnd(isSurrender = false) {
             }
         }
         // Vérifier s'il y a eu un abandon (info du serveur)
-        else if (gameState.gameData.surrenderInfo) {
+        else if (gameState.gameData.surrenderInfo && typeof gameState.gameData.surrenderInfo === 'object') {
             const surrenderPlayerId = gameState.gameData.surrenderInfo.playerId;
             console.log(`🔍 Abandon détecté! Joueur: ${surrenderPlayerId}, Mon ID: ${gameState.userId}`);
+            console.log(`🔍 Types: surrenderPlayerId (${typeof surrenderPlayerId}), userId (${typeof gameState.userId})`);
             
-            if (Number(surrenderPlayerId) === Number(gameState.userId)) {
+            if (String(surrenderPlayerId) === String(gameState.userId)) {
                 resultType = 'abandon-self';
                 isWinner = false;
             } else {
@@ -746,7 +753,10 @@ function showGameEnd(isSurrender = false) {
         elements.winnerText.textContent = message.subtitle;
     }
     
-    // Calcul de la durée
+    // [Reste du code identique...]
+    // Calcul de la durée, création du HTML, etc.
+    
+    // [Le code existant pour la durée et le HTML reste identique]
     let durationDisplay = '0m';
     let durationMinutes = 0;
 
@@ -1080,12 +1090,12 @@ function requestGameState() {
 }
 
 // Gestion des mises à jour de la partie
+// Gestion des mises à jour de la partie
 function handleGameUpdate(data) {
     if (!data.gameState) return;
     
     console.log('🔍 Raw game state received:', data.gameState);
-    console.log('🔍 Player1 data:', data.gameState.player1);
-    console.log('🔍 Player2 data:', data.gameState.player2);
+    console.log('🔍 TRÈS IMPORTANT - INACTIVITÉ INFO:', data.gameState.inactivityInfo);
     
     // Store the game state
     gameState.gameData = data.gameState;
@@ -1095,14 +1105,6 @@ function handleGameUpdate(data) {
     const opponentSide = playerSide === 'player1' ? 'player2' : 'player1';
     gameState.playerSide = playerSide;
     gameState.opponentSide = opponentSide;
-    
-    console.log("Scores reçus:", {
-        playerSide: gameState.playerSide,
-        opponentSide: gameState.opponentSide,
-        playerScore: gameState.gameData?.scores?.[gameState.playerSide]?.total || 0,
-        opponentScore: gameState.gameData?.scores?.[gameState.opponentSide]?.total || 0,
-        winner: gameState.gameData?.winner
-    });
     
     // Update current phase and turn
     gameState.currentPhase = data.gameState.turnPhase;
@@ -1116,6 +1118,7 @@ function handleGameUpdate(data) {
 
     // Vérifier si la partie est terminée
     if (gameState.gameData.status === 'finished') {
+        console.log('🚨 Partie terminée, affichage de la fin avec inactivityInfo:', gameState.gameData.inactivityInfo);
         showGameEnd();
     }
 }
