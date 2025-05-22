@@ -591,7 +591,8 @@ function showGameEnd(isSurrender = false) {
         currentRound: gameState.gameData.currentRound,
         totalRounds: gameState.gameData.totalRounds,
         winner: gameState.gameData.winner,
-        inactivityInfo: gameState.gameData.inactivityInfo // AJOUT: Log de l'info d'inactivité
+        inactivityInfo: gameState.gameData.inactivityInfo, // AJOUT: Log de l'info d'inactivité
+        surrenderInfo: gameState.gameData.surrenderInfo    // AJOUT: Log de l'info d'abandon
     });
     
     console.log('🔍 Game data available:', gameState.gameData);
@@ -1002,16 +1003,7 @@ function handleActivityTimers(data) {
         : gameState.gameData.player1.id;
     const opponentTimer = data.timers[opponentId];
     
-    // Stocker les timers pour le décompte local
-    gameState.playerTimerData = playerTimer;
-    gameState.opponentTimerData = opponentTimer;
-    
-    // Démarrer le décompte local si pas déjà actif
-    if (!gameState.localTimerInterval) {
-        startLocalTimer();
-    }
-    
-    // Mettre à jour immédiatement
+    // Juste afficher les données du serveur, pas de décompte local
     if (playerTimer) updatePlayerTimerDisplay('player-timer', playerTimer);
     if (opponentTimer) updatePlayerTimerDisplay('opponent-timer', opponentTimer);
 }

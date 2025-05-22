@@ -397,15 +397,21 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
     cleanupGameActivityTimers(gameId);
     await updateLeaderboardForGame(gameId);
     
-    // Ajouter les infos d'inactivité
+    // IMPORTANT : Créer un gameState avec les infos d'inactivité
     const gameState = game.getGameState();
+    
+    //S'assurer que les données d'inactivité sont bien présentes
     gameState.inactivityInfo = {
       inactivePlayerId: inactivePlayerId,
       inactivePlayerName: inactivePlayerName,
       type: 'inactivity'
     };
     
+    console.log(`🔍 Sending game state with inactivity info:`, gameState.inactivityInfo);
+    
     await notifyGamePlayers(gameId, gameState);
+    
+    console.log(`✅ Game ${gameId} finished due to inactivity of player ${inactivePlayerName}`);
     
   } catch (error) {
     console.error(`❌ Error auto-finishing game ${gameId}:`, error);
@@ -429,8 +435,16 @@ function broadcastActivityTimers(gameId: string) {
     playerActivities.forEach((activity, key) => {
       if (activity.gameId === gameId) {
         const isCurrentPlayer = game.currentPlayerId === activity.playerId;
-        const timeElapsed = Date.now() - activity.lastActionAt.getTime();
-        const timeRemaining = Math.max(0, INACTIVITY_TIMEOUT - timeElapsed);
+        
+        let timeRemaining;
+        if (isCurrentPlayer) {
+          // SEUL le joueur actuel voit son timer se décrémenter
+          const timeElapsed = Date.now() - activity.lastActionAt.getTime();
+          timeRemaining = Math.max(0, INACTIVITY_TIMEOUT - timeElapsed);
+        } else {
+          // L'autre joueur garde son timer figé
+          timeRemaining = INACTIVITY_TIMEOUT;
+        }
         
         timers[activity.playerId] = {
           playerId: activity.playerId,
