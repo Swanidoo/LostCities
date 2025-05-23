@@ -290,6 +290,8 @@ body {
     gap: var(--card-spacing);
     width: 100%;
     max-width: min(100vw, calc(6 * (var(--card-width) + var(--card-spacing))));
+    position: relative;
+    z-index: 10;
 }
 
 .opponent-area {
@@ -341,6 +343,7 @@ body {
     width: var(--card-width);
     min-height: var(--card-height);
     transition: all 0.3s ease;
+    transform-style: preserve-3d;
     z-index: 20;
 }
 
@@ -349,6 +352,8 @@ body {
     left: 0;
     transition: transform 0.3s ease;
     z-index: var(--z-card);
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
 }
 
 /* Player expeditions stack upward */
@@ -387,12 +392,14 @@ body {
 
 /* Enhanced hover effects pour les expéditions */
 .expedition-stack:hover {
-    z-index: 300;
+    z-index: 9999 !important;
 }
 
 .expedition-stack:hover .card {
-    z-index: 350 !important;
+    z-index: 10000 !important;
+    transform-style: preserve-3d;
 }
+
 
 #player-area .expedition-stack:hover .card:nth-child(1) { transform: translateY(0); z-index: 1; }
 #player-area .expedition-stack:hover .card:nth-child(2) { transform: translateY(calc(-2 * var(--card-spacing))); z-index: 2; }
@@ -420,6 +427,15 @@ body {
 #opponent-area .expedition-stack:hover .card:nth-child(10) { transform: translateY(calc(18 * var(--card-spacing))); z-index: 10; }
 #opponent-area .expedition-stack:hover .card:nth-child(11) { transform: translateY(calc(20 * var(--card-spacing))); z-index: 11; }
 #opponent-area .expedition-stack:hover .card:nth-child(12) { transform: translateY(calc(22 * var(--card-spacing))); z-index: 12; }
+
+
+
+
+body:has(.expedition-stack:hover) .discard-pile {
+    z-index: 5 !important; /* Force les discard piles à rester en arrière */
+}
+
+
 
 /* RESTAURÉ: Expedition tooltip */
 #expedition-tooltip {
