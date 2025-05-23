@@ -370,6 +370,7 @@ body {
 #player-area .expedition-stack .card:nth-child(11) { transform: translateY(calc(-10 * var(--card-spacing))); z-index: 11; }
 #player-area .expedition-stack .card:nth-child(12) { transform: translateY(calc(-11 * var(--card-spacing))); z-index: 12; }
 
+
 /* Opponent expeditions stack downward */
 #opponent-area .expedition-stack .card:nth-child(1) { transform: translateY(0); z-index: 1; }
 #opponent-area .expedition-stack .card:nth-child(2) { transform: translateY(calc(1.3 * var(--card-spacing))); z-index: 2; }
@@ -386,11 +387,11 @@ body {
 
 /* Enhanced hover effects pour les expéditions */
 .expedition-stack:hover {
-    z-index: 100;
+    z-index: 300;
 }
 
 .expedition-stack:hover .card {
-    z-index: 200 !important;
+    z-index: 350 !important;
 }
 
 #player-area .expedition-stack:hover .card:nth-child(1) { transform: translateY(0); z-index: 1; }
@@ -401,6 +402,11 @@ body {
 #player-area .expedition-stack:hover .card:nth-child(6) { transform: translateY(calc(-10 * var(--card-spacing))); z-index: 6; }
 #player-area .expedition-stack:hover .card:nth-child(7) { transform: translateY(calc(-12 * var(--card-spacing))); z-index: 7; }
 #player-area .expedition-stack:hover .card:nth-child(8) { transform: translateY(calc(-14 * var(--card-spacing))); z-index: 8; }
+#player-area .expedition-stack:hover .card:nth-child(9) { transform: translateY(calc(-16 * var(--card-spacing))); z-index: 9; }
+#player-area .expedition-stack:hover .card:nth-child(10) { transform: translateY(calc(-18 * var(--card-spacing))); z-index: 10; }
+#player-area .expedition-stack:hover .card:nth-child(11) { transform: translateY(calc(-20 * var(--card-spacing))); z-index: 11; }
+#player-area .expedition-stack:hover .card:nth-child(12) { transform: translateY(calc(-22 * var(--card-spacing))); z-index: 12; }
+
 
 #opponent-area .expedition-stack:hover .card:nth-child(1) { transform: translateY(0); z-index: 1; }
 #opponent-area .expedition-stack:hover .card:nth-child(2) { transform: translateY(calc(2 * var(--card-spacing))); z-index: 2; }
@@ -410,6 +416,10 @@ body {
 #opponent-area .expedition-stack:hover .card:nth-child(6) { transform: translateY(calc(10 * var(--card-spacing))); z-index: 6; }
 #opponent-area .expedition-stack:hover .card:nth-child(7) { transform: translateY(calc(12 * var(--card-spacing))); z-index: 7; }
 #opponent-area .expedition-stack:hover .card:nth-child(8) { transform: translateY(calc(14 * var(--card-spacing))); z-index: 8; }
+#opponent-area .expedition-stack:hover .card:nth-child(9) { transform: translateY(calc(16 * var(--card-spacing))); z-index: 9; }
+#opponent-area .expedition-stack:hover .card:nth-child(10) { transform: translateY(calc(18 * var(--card-spacing))); z-index: 10; }
+#opponent-area .expedition-stack:hover .card:nth-child(11) { transform: translateY(calc(20 * var(--card-spacing))); z-index: 11; }
+#opponent-area .expedition-stack:hover .card:nth-child(12) { transform: translateY(calc(22 * var(--card-spacing))); z-index: 12; }
 
 /* RESTAURÉ: Expedition tooltip */
 #expedition-tooltip {
@@ -558,7 +568,7 @@ body {
 
 /* Animation au survol - étalement en éventail pour voir toutes les cartes */
 .discard-pile:hover {
-    z-index: 100; /* Au-dessus de tout pour éviter les coupures */
+    z-index: 250; /* Au-dessus de tout pour éviter les coupures */
 }
 /* Effet d'éventail responsive pour les cartes de défausse au survol */
 .discard-pile:hover .card:nth-child(1) { 
@@ -627,7 +637,14 @@ body {
 .draw-phase .discard-pile.valid-target {
     z-index: 50 !important;
     position: relative;
-    
+}
+
+.draw-phase .discard-pile.valid-target:hover {
+    z-index: 250 !important;
+}
+
+.draw-phase .discard-pile:hover .card {
+    z-index: 260 !important;
 }
 
 .discard-pile.valid-target {
