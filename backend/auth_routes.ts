@@ -93,15 +93,33 @@ authRouter.post("/login", async (ctx) => {
     console.log("🔍 JWT length:", jwt.length); // DEBUG
 
     // Au lieu de retourner le token, le mettre dans un cookie HTTP-only
-    const isProduction = Deno.env.get("ENV") === "production";
+    try {
+      // Vérifier explicitement le protocole pour contourner la détection limitée d'Oak
+      const proto = ctx.request.headers.get("x-forwarded-proto") || "http";
+      const isSecure = isProduction || proto === "https";
 
-    ctx.cookies.set("authToken", jwt, {
-      httpOnly: true,
-      secure: false, // Désactiver temporairement même en production
-      sameSite: "lax", // Utiliser "lax" qui fonctionne mieux cross-domain
-      maxAge: 60 * 60 * 1000, 
-      path: "/"
-    });
+      const isProduction = Deno.env.get("ENV") === "production";
+      
+      // En production, on doit utiliser SameSite=None avec Secure=true
+      ctx.cookies.set("authToken", jwt, {
+        httpOnly: true,
+        secure: isSecure, // true si proto est https
+        sameSite: isProduction ? "none" : "lax", // "none" nécessaire pour cross-domain
+        maxAge: 60 * 60 * 1000,
+        path: "/"
+      });
+      
+      console.log(`✅ Cookie set with secure=${isSecure}, sameSite=${isProduction ? "none" : "lax"}`);
+    } catch (err) {
+      console.error("❌ Error setting cookie:", err);
+      // Fallback en cas d'erreur
+      ctx.cookies.set("authToken", jwt, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 1000,
+        path: "/"
+      });
 
     console.log("✅ Cookie set successfully"); // DEBUG
 

@@ -61,7 +61,7 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
-        credentials: 'include', // IMPORTANT: pour envoyer/recevoir les cookies
+        credentials: 'include',
     })
     .then(response => {
         if (!response.ok) {

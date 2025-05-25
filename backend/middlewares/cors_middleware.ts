@@ -11,6 +11,7 @@ export const corsMiddleware = oakCors({
       "https://localhost:3000",
       "https://localhost:443",
       "http://localhost:80",
+      "https://lostcitiesfrontend.onrender.com/",
       "https://lostcitiesfrontend.onrender.com"
     ];
     
