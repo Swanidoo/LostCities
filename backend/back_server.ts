@@ -23,7 +23,6 @@ const app = new Application({
   proxy: true // Permet de faire confiance aux en-têtes de proxy (X-Forwarded-Proto)
 });
 
-
 const rawDatabaseUrl = Deno.env.get("DATABASE_URL");
 if (!rawDatabaseUrl) {
   console.error("❌ DATABASE_URL is not set in the environment variables.");
@@ -111,39 +110,10 @@ setInterval(cleanupExpiredBansAndMutes, 5 * 60 * 1000);
 // Nettoyer au démarrage également
 cleanupExpiredBansAndMutes();
 
-
 // 🚀 Lancer le serveur
 const port = parseInt(Deno.env.get("PORT") || "3000");
-const isLocalDev = Deno.env.get("ENV") !== "production";
-const enableTls = Deno.env.get("ENABLE_TLS") === "true";
+const isProduction = Deno.env.get("ENV") === "production";
 
-// Determine the server configuration based on environment
-if (isLocalDev && enableTls) {
-  try {
-    // For local development with HTTPS
-    const certFile = Deno.env.get("CERT_FILE") || "./localhost+1.pem";
-    const keyFile = Deno.env.get("KEY_FILE") || "./localhost+1-key.pem";
-    
-    console.log("🔒 Starting HTTPS server for local development");
-    console.log(`🔒 Port: ${port}`);
-    console.log(`🔒 Certificate: ${certFile}`);
-    console.log(`🔒 Key: ${keyFile}`);
-    
-    await app.listen({
-      port,
-      secure: true,
-      certFile,
-      keyFile
-    });
-  } catch (error) {
-    console.error("❌ Failed to start HTTPS server:", error);
-    console.log("⚠️ Falling back to HTTP...");
-    console.log(`🚀 HTTP server running on port ${port}`);
-    await app.listen({ port });
-  }
-} else {
-  // For production or local HTTP
-  console.log(`🚀 HTTP server running on port ${port}`);
-  console.log(`🌐 Environment: ${isLocalDev ? 'development' : 'production'}`);
-  await app.listen({ port });
-}
+console.log(`🚀 HTTP server running on port ${port}`);
+console.log(`🌐 Environment: ${isProduction ? 'production' : 'development'}`);
+await app.listen({ port });
