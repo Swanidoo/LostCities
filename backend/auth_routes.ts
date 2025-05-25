@@ -99,12 +99,12 @@ authRouter.post("/login", async (ctx) => {
 
     try {
       if (isRenderProduction) {
-        // Sur Render, utiliser une approche spéciale pour contourner la vérification d'Oak
+        // Chrome exige un formatage plus strict pour SameSite=None
         ctx.response.headers.set(
           "Set-Cookie", 
-          `authToken=${jwt}; HttpOnly; Secure; SameSite=None; Max-Age=3600; Path=/`
+          `authToken=${jwt}; HttpOnly; Secure; SameSite=None; Max-Age=3600; Path=/; Partitioned`
         );
-        console.log(`✅ Cookie set manually for Render production`);
+        console.log(`✅ Cookie set manually for Render production with Chrome compatibility`);
       } else {
         // Localement ou autres environnements, utiliser Oak normalement
         const proto = ctx.request.headers.get("x-forwarded-proto") || "http";
