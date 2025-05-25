@@ -93,17 +93,28 @@ authRouter.post("/login", async (ctx) => {
 
     // Au lieu de retourner le token, le mettre dans un cookie HTTP-only
     const isProduction = Deno.env.get("ENV") === "production";
-    
+
     try {
-      // Vérifier explicitement le protocole pour contourner la détection limitée d'Oak
-      const proto = ctx.request.headers.get("x-forwarded-proto") || "http";
-      const isSecure = isProduction || proto === "https";
+      // Render utilise plusieurs headers pour indiquer HTTPS
+      const proto = ctx.request.headers.get("x-forwarded-proto") || 
+                    ctx.request.headers.get("x-forwarded-protocol") ||
+                    ctx.request.headers.get("x-url-scheme") ||
+                    "http";
       
-      // En production, on doit utiliser SameSite=None avec Secure=true
+      // En production Render, on est toujours derrière HTTPS
+      const isSecure = isProduction || proto === "https" || proto === "https,http";
+      
+      console.log(`🔍 Headers check:`, {
+        'x-forwarded-proto': ctx.request.headers.get("x-forwarded-proto"),
+        'host': ctx.request.headers.get("host"),
+        'isProduction': isProduction,
+        'isSecure': isSecure
+      });
+      
       ctx.cookies.set("authToken", jwt, {
         httpOnly: true,
-        secure: isSecure, // true si proto est https
-        sameSite: isProduction ? "none" : "lax", // "none" nécessaire pour cross-domain
+        secure: isSecure,
+        sameSite: isProduction ? "none" : "lax",
         maxAge: 60 * 60 * 1000,
         path: "/"
       });
@@ -111,7 +122,7 @@ authRouter.post("/login", async (ctx) => {
       console.log(`✅ Cookie set with secure=${isSecure}, sameSite=${isProduction ? "none" : "lax"}`);
     } catch (err) {
       console.error("❌ Error setting cookie:", err);
-      // Fallback en cas d'erreur
+      // Fallback pour éviter le crash
       ctx.cookies.set("authToken", jwt, {
         httpOnly: true,
         secure: false,
