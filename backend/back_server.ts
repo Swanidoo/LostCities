@@ -19,7 +19,10 @@ import { checkUserStatus } from "./middlewares/check_user_status.ts";
 import gameDetailsRouter from "./game_details_routes.ts";
 import "https://deno.land/x/dotenv@v3.2.2/load.ts";
 
-const app = new Application();
+const app = new Application({
+  proxy: true // Permet de faire confiance aux en-têtes de proxy (X-Forwarded-Proto)
+});
+
 
 const rawDatabaseUrl = Deno.env.get("DATABASE_URL");
 if (!rawDatabaseUrl) {
