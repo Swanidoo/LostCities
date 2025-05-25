@@ -57,7 +57,6 @@ authRouter.post("/register", async (ctx) => {
 });
 
 // Route for user login
-// Route for user login - MODIFIER cette section
 authRouter.post("/login", async (ctx) => {
   try {
     const { email, password } = await ctx.request.body({ type: "json" }).value;
@@ -93,12 +92,12 @@ authRouter.post("/login", async (ctx) => {
     console.log("🔍 JWT length:", jwt.length); // DEBUG
 
     // Au lieu de retourner le token, le mettre dans un cookie HTTP-only
+    const isProduction = Deno.env.get("ENV") === "production";
+    
     try {
       // Vérifier explicitement le protocole pour contourner la détection limitée d'Oak
       const proto = ctx.request.headers.get("x-forwarded-proto") || "http";
       const isSecure = isProduction || proto === "https";
-
-      const isProduction = Deno.env.get("ENV") === "production";
       
       // En production, on doit utiliser SameSite=None avec Secure=true
       ctx.cookies.set("authToken", jwt, {
@@ -120,6 +119,7 @@ authRouter.post("/login", async (ctx) => {
         maxAge: 60 * 60 * 1000,
         path: "/"
       });
+    }
 
     console.log("✅ Cookie set successfully"); // DEBUG
 
