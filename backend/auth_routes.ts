@@ -97,9 +97,9 @@ authRouter.post("/login", async (ctx) => {
 
     ctx.cookies.set("authToken", jwt, {
       httpOnly: true,
-      secure: isProduction, // true en production (HTTPS requis)
-      sameSite: isProduction ? "none" : "lax", // "none" pour cross-domain
-      maxAge: 60 * 60 * 1000, // 1 heure
+      secure: false, // Désactiver temporairement même en production
+      sameSite: "lax", // Utiliser "lax" qui fonctionne mieux cross-domain
+      maxAge: 60 * 60 * 1000, 
       path: "/"
     });
 
