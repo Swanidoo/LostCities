@@ -1490,7 +1490,7 @@ function updateExpeditions() {
                 if (cards.length > 1) {
                     const summaryElement = document.createElement('div');
                     summaryElement.className = 'expedition-summary';
-                    summaryElement.innerHTML = `${cards.length} cards • <span class="${scoreClass}">${scoreDisplay}</span> pts • x${multiplier}`;
+                    summaryElement.innerHTML = `${cards.length} cards • <span class="${scoreClass}">${scoreDisplay}</span> pts`;
                     stackElement.appendChild(summaryElement);
                 }
             }

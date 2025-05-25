@@ -108,7 +108,7 @@ authRouter.post("/login", async (ctx) => {
       } else {
         // Localement ou autres environnements, utiliser Oak normalement
         const proto = ctx.request.headers.get("x-forwarded-proto") || "http";
-        const isSecure = proto === "https" || !isProduction;
+        const isSecure = isProduction && proto === "https";
         
         ctx.cookies.set("authToken", jwt, {
           httpOnly: true,
