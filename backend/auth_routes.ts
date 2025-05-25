@@ -94,42 +94,39 @@ authRouter.post("/login", async (ctx) => {
     // Au lieu de retourner le token, le mettre dans un cookie HTTP-only
     const isProduction = Deno.env.get("ENV") === "production";
 
+    // En production sur Render, on sait qu'on est derrière HTTPS même si Oak ne le sait pas
+    const isRenderProduction = isProduction && ctx.request.headers.get("host")?.includes("render.com");
+
     try {
-      // Render utilise plusieurs headers pour indiquer HTTPS
-      const proto = ctx.request.headers.get("x-forwarded-proto") || 
-                    ctx.request.headers.get("x-forwarded-protocol") ||
-                    ctx.request.headers.get("x-url-scheme") ||
-                    "http";
-      
-      // En production Render, on est toujours derrière HTTPS
-      const isSecure = isProduction || proto === "https" || proto === "https,http";
-      
-      console.log(`🔍 Headers check:`, {
-        'x-forwarded-proto': ctx.request.headers.get("x-forwarded-proto"),
-        'host': ctx.request.headers.get("host"),
-        'isProduction': isProduction,
-        'isSecure': isSecure
-      });
-      
-      ctx.cookies.set("authToken", jwt, {
-        httpOnly: true,
-        secure: isSecure,
-        sameSite: isProduction ? "none" : "lax",
-        maxAge: 60 * 60 * 1000,
-        path: "/"
-      });
-      
-      console.log(`✅ Cookie set with secure=${isSecure}, sameSite=${isProduction ? "none" : "lax"}`);
+      if (isRenderProduction) {
+        // Sur Render, utiliser une approche spéciale pour contourner la vérification d'Oak
+        ctx.response.headers.set(
+          "Set-Cookie", 
+          `authToken=${jwt}; HttpOnly; Secure; SameSite=None; Max-Age=3600; Path=/`
+        );
+        console.log(`✅ Cookie set manually for Render production`);
+      } else {
+        // Localement ou autres environnements, utiliser Oak normalement
+        const proto = ctx.request.headers.get("x-forwarded-proto") || "http";
+        const isSecure = proto === "https" || !isProduction;
+        
+        ctx.cookies.set("authToken", jwt, {
+          httpOnly: true,
+          secure: isSecure,
+          sameSite: isProduction ? "none" : "lax",
+          maxAge: 60 * 60 * 1000,
+          path: "/"
+        });
+        
+        console.log(`✅ Cookie set with Oak: secure=${isSecure}`);
+      }
     } catch (err) {
       console.error("❌ Error setting cookie:", err);
-      // Fallback pour éviter le crash
-      ctx.cookies.set("authToken", jwt, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "lax",
-        maxAge: 60 * 60 * 1000,
-        path: "/"
-      });
+      // Fallback ultime
+      ctx.response.headers.set(
+        "Set-Cookie", 
+        `authToken=${jwt}; HttpOnly; Max-Age=3600; Path=/`
+      );
     }
 
     console.log("✅ Cookie set successfully"); // DEBUG
