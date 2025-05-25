@@ -865,3 +865,9 @@ function addSystemMessage(message) {
     messagesContainer.appendChild(messageElement);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
+
+// Keep-alive pour éviter que Render Free s'endorme
+function keepBackendAlive() {
+    fetch(`${API_URL}/`, { credentials: 'include' }).catch(() => {});
+}
+setInterval(keepBackendAlive, 10 * 60 * 1000);

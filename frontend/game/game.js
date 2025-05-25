@@ -1728,3 +1728,18 @@ window.gameController = {
     surrenderGame,
     sendChatMessage
 };
+
+window.gameController = {
+    cancelCardSelection,
+    playCard,
+    discardCard,
+    drawCard,
+    surrenderGame,
+    sendChatMessage
+};
+
+// Keep-alive pour éviter que Render Free s'endorme pendant le jeu
+function keepBackendAlive() {
+    fetch(`${API_URL}/`, { credentials: 'include' }).catch(() => {});
+}
+setInterval(keepBackendAlive, 10 * 60 * 1000);
