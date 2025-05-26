@@ -1130,8 +1130,8 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
       // Save the updated game state
       await game.save();
 
-      const updatedGame = await loadGameFromDatabase(gameId);
-      if (updatedGame.gameStatus === 'finished') {
+      const updatedGameStatus = await loadGameFromDatabase(gameId);
+      if (updatedGameStatus.gameStatus === 'finished') {
         try {
           await updateLeaderboardForGame(gameId);
           console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
