@@ -1216,14 +1216,22 @@ async function updateLeaderboardForGame(gameId: string): Promise<void> {
       return;
     }
 
-    // Vérifier si des entrées existent déjà
+    // Vérifier si des entrées VALIDES existent déjà (avec de vrais scores)
     const existingEntries = await client.queryObject(`
-      SELECT id FROM leaderboard WHERE game_id = $1
+      SELECT id, score FROM leaderboard 
+      WHERE game_id = $1 AND (score != 0 OR score IS NULL)
     `, [gameId]);
 
-    if (existingEntries.rows.length > 0) {
-      console.log(`ℹ️ Leaderboard entries already exist for game ${gameId}`);
+    // Si on a déjà des entrées avec de vrais scores, ne pas les écraser
+    if (existingEntries.rows.length > 0 && existingEntries.rows.some(entry => entry.score > 0)) {
+      console.log(`ℹ️ Valid leaderboard entries already exist for game ${gameId}`);
       return;
+    }
+
+    // Sinon, supprimer les éventuelles entrées invalides (scores 0) et continuer
+    if (existingEntries.rows.length > 0) {
+      console.log(`🧹 Cleaning up invalid entries for game ${gameId}`);
+      await client.queryObject(`DELETE FROM leaderboard WHERE game_id = $1`, [gameId]);
     }
 
     console.log(`🏆 Recording leaderboard entries for game ${gameId}`);
