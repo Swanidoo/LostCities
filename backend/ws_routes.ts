@@ -487,13 +487,12 @@ function broadcastActivityTimers(gameId: string) {
   console.log(`📡 Found ${subscribers.size} subscribers for game ${gameId}`);
   
   loadGameFromDatabase(gameId).then(game => {
-    // ✅ AJOUTER CETTE VÉRIFICATION
+    // ✅ MODIFICATION: Ne PAS nettoyer les subscribers immédiatement
     if (game.gameStatus === 'finished') {
         console.log(`⏹️ Game ${gameId} is finished, stopping timer broadcasts`);
-        // Nettoyer également les abonnements
-        cleanupGameSubscriptions(gameId);
-        return;
+        return; // Ne pas envoyer de timers mais garder les subscribers
     }
+    
     const timers = {};
     
     playerActivities.forEach((activity, key) => {
@@ -1112,6 +1111,16 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
     const game = await loadGameState(gameId);
     const userId = await getUserIdFromUsername(username);
     
+    // AJOUT: Vérifier si la partie est déjà terminée
+    if (game.gameStatus === 'finished') {
+      console.log(`⚠️ Player ${username} tried to play on finished game ${gameId}`);
+      socket.send(JSON.stringify({
+        event: 'error',
+        data: { message: 'Game is already finished' }
+      }));
+      return; // Sortir immédiatement
+    }
+    
     // Make the move
     console.log(`Before move: ${game.player1.hand.length} cards in P1 hand`);
     const success = game.playCardToExpedition(userId, cardId, color);
@@ -1129,29 +1138,40 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
       
       // Save the updated game state
       await game.save();
-      
-      // Si la partie vient de se terminer, mettre à jour le leaderboard
-      if (game.gameStatus === 'finished') {
-        try {
-          await updateLeaderboardForGame(gameId);
-          console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
-        } catch (error) {
-          console.error(`❌ Error updating leaderboard: ${error}`);
-        }
-      }
 
       // Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
       updatePlayerActivity(gameId, userId);
 
       // Get updated game state to notify players
       const updatedGame = await loadGameState(gameId);
-      const gameState = updatedGame.getGameState();
       
-      // Debug
-      console.log(`State to broadcast: P1 ${gameState.player1.handSize} cards, P2 ${gameState.player2.handSize} cards`);
-      
-      // Notify all players with the full game
-      notifyGamePlayers(gameId, gameState);
+      // CORRECTION: Gestion de la fin de partie
+      if (updatedGame.gameStatus === 'finished') {
+        try {
+          await updateLeaderboardForGame(gameId);
+          console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
+          
+          // Notifier les joueurs AVANT de nettoyer
+          const gameState = updatedGame.getGameState();
+          await notifyGamePlayers(gameId, gameState);
+          
+          // MAINTENANT nettoyer les subscribers
+          cleanupGameSubscriptions(gameId);
+          console.log(`🧹 Cleaned up subscribers AFTER final notification`);
+          
+        } catch (error) {
+          console.error(`❌ Error updating leaderboard: ${error}`);
+        }
+      } else {
+        // Partie pas finie, notification normale
+        const gameState = updatedGame.getGameState();
+        
+        // Debug
+        console.log(`State to broadcast: P1 ${gameState.player1.handSize} cards, P2 ${gameState.player2.handSize} cards`);
+        
+        // Notify all players with the full game
+        notifyGamePlayers(gameId, gameState);
+      }
     } else {
       // Send error back to player
       socket.send(JSON.stringify({
@@ -1179,6 +1199,16 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
     const game = await loadGameFromDatabase(gameId);
     const userId = await getUserIdFromUsername(username);
     
+    // AJOUT: Vérifier si la partie est déjà terminée
+    if (game.gameStatus === 'finished') {
+      console.log(`⚠️ Player ${username} tried to play on finished game ${gameId}`);
+      socket.send(JSON.stringify({
+        event: 'error',
+        data: { message: 'Game is already finished' }
+      }));
+      return; // Sortir immédiatement
+    }
+    
     // Make the move
     const success = game.discardCard(userId, cardId);
     
@@ -1198,19 +1228,31 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
       // Save the updated game state
       await game.save();
 
-      // Si la partie vient de se terminer, mettre à jour le leaderboard
-      if (game.gameStatus === 'finished') {
+      // AJOUT: Recharger pour vérifier l'état après sauvegarde
+      const reloadedGame = await loadGameFromDatabase(gameId);
+      
+      // CORRECTION: Gestion de la fin de partie
+      if (reloadedGame.gameStatus === 'finished') {
         try {
           await updateLeaderboardForGame(gameId);
           console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
+          
+          // Notifier les joueurs AVANT de nettoyer
+          const gameState = reloadedGame.getGameState();
+          await notifyGamePlayers(gameId, gameState);
+          
+          // MAINTENANT nettoyer les subscribers
+          cleanupGameSubscriptions(gameId);
+          console.log(`🧹 Cleaned up subscribers AFTER final notification`);
+          
         } catch (error) {
           console.error(`❌ Error updating leaderboard: ${error}`);
         }
+      } else {
+        // Partie pas finie, notification normale
+        const gameState = reloadedGame.getGameState();
+        notifyGamePlayers(gameId, gameState);
       }
-      
-      // Notify all players
-      const gameState = game.getGameState();
-      notifyGamePlayers(gameId, gameState);
     } else {
       // Send error back to player
       socket.send(JSON.stringify({
@@ -1239,6 +1281,16 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
     const game = await loadGameFromDatabase(gameId);
     const userId = await getUserIdFromUsername(username);
     
+    // AJOUT: Vérifier si la partie est déjà terminée
+    if (game.gameStatus === 'finished') {
+      console.log(`⚠️ Player ${username} tried to play on finished game ${gameId}`);
+      socket.send(JSON.stringify({
+        event: 'error',
+        data: { message: 'Game is already finished' }
+      }));
+      return; // Sortir immédiatement
+    }
+    
     // Make the move
     let success = false;
     if (source === 'deck') {
@@ -1256,26 +1308,37 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
         color: source === 'discard_pile' ? color : null
       });
 
-      
       // Save the updated game state
       await game.save();
 
-      // Si la partie vient de se terminer, mettre à jour le leaderboard
-      if (game.gameStatus === 'finished') {
+      //Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
+      updatePlayerActivity(gameId, userId);   
+
+      // AJOUT: Recharger pour vérifier l'état après sauvegarde
+      const refreshedGame = await loadGameFromDatabase(gameId);
+      
+      // CORRECTION: Gestion de la fin de partie
+      if (refreshedGame.gameStatus === 'finished') {
         try {
           await updateLeaderboardForGame(gameId);
           console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
+          
+          // Notifier les joueurs AVANT de nettoyer
+          const gameState = refreshedGame.getGameState();
+          await notifyGamePlayers(gameId, gameState);
+          
+          // MAINTENANT nettoyer les subscribers
+          cleanupGameSubscriptions(gameId);
+          console.log(`🧹 Cleaned up subscribers AFTER final notification`);
+          
         } catch (error) {
           console.error(`❌ Error updating leaderboard: ${error}`);
         }
+      } else {
+        // Partie pas finie, notification normale
+        const gameState = refreshedGame.getGameState();
+        notifyGamePlayers(gameId, gameState);
       }
-
-      //Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
-      updatePlayerActivity(gameId, userId);   
-      
-      // Notify all players
-      const gameState = game.getGameState();
-      notifyGamePlayers(gameId, gameState);
     } else {
       // Send error back to player
       socket.send(JSON.stringify({
