@@ -1129,17 +1129,7 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
       
       // Save the updated game state
       await game.save();
-
-      const updatedGameStatus = await loadGameFromDatabase(gameId);
-      if (updatedGameStatus.gameStatus === 'finished') {
-        try {
-          await updateLeaderboardForGame(gameId);
-          console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
-        } catch (error) {
-          console.error(`❌ Error updating leaderboard: ${error}`);
-        }
-      }
-
+      
       // Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
       updatePlayerActivity(gameId, userId);
 
@@ -1167,6 +1157,7 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
     }));
   }
 }
+
 
 
 async function handleDiscardCard(data: any, socket: WebSocket, username: string) {
