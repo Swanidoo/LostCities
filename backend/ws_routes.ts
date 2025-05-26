@@ -1129,9 +1129,9 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
       
       // Save the updated game state
       await game.save();
-      
-      // Si la partie vient de se terminer, mettre à jour le leaderboard
-      if (game.gameStatus === 'finished') {
+
+      const updatedGame = await loadGameFromDatabase(gameId);
+      if (updatedGame.gameStatus === 'finished') {
         try {
           await updateLeaderboardForGame(gameId);
           console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
@@ -1192,14 +1192,14 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
         color: null // La couleur est déterminée par la carte
       });
 
-      //Mettre à jour l'activité (important : après la sauvegarde car le tour a changé)
       updatePlayerActivity(gameId, userId);      
 
       // Save the updated game state
       await game.save();
 
-      // Si la partie vient de se terminer, mettre à jour le leaderboard
-      if (game.gameStatus === 'finished') {
+      // NOUVEAU: Recharger l'état pour vérifier si la partie est terminée
+      const updatedGame = await loadGameFromDatabase(gameId);
+      if (updatedGame.gameStatus === 'finished') {
         try {
           await updateLeaderboardForGame(gameId);
           console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
@@ -1260,8 +1260,8 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
       // Save the updated game state
       await game.save();
 
-      // Si la partie vient de se terminer, mettre à jour le leaderboard
-      if (game.gameStatus === 'finished') {
+      const updatedGame = await loadGameFromDatabase(gameId);
+      if (updatedGame.gameStatus === 'finished') {
         try {
           await updateLeaderboardForGame(gameId);
           console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
