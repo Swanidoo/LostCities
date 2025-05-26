@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                             window.location.href = `/profile/profile.html?id=${userId}`;
                         }
                     });
+
+                    loadUserAvatar(userId);
                 }
                 
                 // AJOUTEZ CETTE LIGNE : Mettre à jour le rôle utilisateur
