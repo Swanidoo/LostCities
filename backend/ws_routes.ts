@@ -451,8 +451,19 @@ async function autoFinishGameForInactivity(gameId: string, inactivePlayerId: str
     // Nettoyer les timers
     cleanupGameActivityTimers(gameId);
     
-    // Mettre à jour le leaderboard
-    await updateLeaderboardForGame(gameId);
+    // MODIFICATION: Mettre à jour le leaderboard avec les scores calculés
+    try {
+      const player1Score = game.calculatePlayerScore(game.player1);
+      const player2Score = game.calculatePlayerScore(game.player2);
+      
+      await updateLeaderboardForGame(gameId, {
+        player1: player1Score,
+        player2: player2Score
+      });
+      console.log(`🏆 Leaderboard updated for inactivity finish: P1=${player1Score}, P2=${player2Score}`);
+    } catch (error) {
+      console.error(`❌ Error updating leaderboard: ${error}`);
+    }
     
     // MODIFICATION: Créer le gameState et y ajouter l'info d'inactivité APRÈS
     const gameState = game.getGameState();
@@ -813,8 +824,19 @@ async function handleSurrender(data: any, socket: WebSocket, username: string) {
     // MODIFICATION: TOUJOURS sauvegarder le jeu après mise à jour
     await game.save();
     
-    // NOUVEAU: Mise à jour du leaderboard
-    await updateLeaderboardForGame(gameId);
+    // MODIFICATION: Mise à jour du leaderboard avec scores calculés
+    try {
+      const player1Score = game.calculatePlayerScore(game.player1);
+      const player2Score = game.calculatePlayerScore(game.player2);
+      
+      await updateLeaderboardForGame(gameId, {
+        player1: player1Score,
+        player2: player2Score
+      });
+      console.log(`🏆 Leaderboard updated for surrender: P1=${player1Score}, P2=${player2Score}`);
+    } catch (error) {
+      console.error(`❌ Error updating leaderboard: ${error}`);
+    }
     
     // IMPORTANT: Préparer un gameState spécial pour la notification
     const gameState = game.getGameState();
@@ -1148,8 +1170,14 @@ async function handlePlayCard(data: any, socket: WebSocket, username: string) {
       // CORRECTION: Gestion de la fin de partie
       if (updatedGame.gameStatus === 'finished') {
         try {
-          await updateLeaderboardForGame(gameId);
-          console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
+          const player1Score = updatedGame.calculatePlayerScore(updatedGame.player1);
+          const player2Score = updatedGame.calculatePlayerScore(updatedGame.player2);
+          
+          await updateLeaderboardForGame(gameId, {
+            player1: player1Score,
+            player2: player2Score
+          });
+          console.log(`🏆 Leaderboard updated for finished game ${gameId}: P1=${player1Score}, P2=${player2Score}`);
           
           // Notifier les joueurs AVANT de nettoyer
           const gameState = updatedGame.getGameState();
@@ -1234,8 +1262,14 @@ async function handleDiscardCard(data: any, socket: WebSocket, username: string)
       // CORRECTION: Gestion de la fin de partie
       if (reloadedGame.gameStatus === 'finished') {
         try {
-          await updateLeaderboardForGame(gameId);
-          console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
+          const player1Score = reloadedGame.calculatePlayerScore(reloadedGame.player1);
+          const player2Score = reloadedGame.calculatePlayerScore(reloadedGame.player2);
+          
+          await updateLeaderboardForGame(gameId, {
+            player1: player1Score,
+            player2: player2Score
+          });
+          console.log(`🏆 Leaderboard updated for finished game ${gameId}: P1=${player1Score}, P2=${player2Score}`);
           
           // Notifier les joueurs AVANT de nettoyer
           const gameState = reloadedGame.getGameState();
@@ -1320,8 +1354,14 @@ async function handleDrawCard(data: any, socket: WebSocket, username: string) {
       // CORRECTION: Gestion de la fin de partie
       if (refreshedGame.gameStatus === 'finished') {
         try {
-          await updateLeaderboardForGame(gameId);
-          console.log(`🏆 Leaderboard updated for finished game ${gameId}`);
+          const player1Score = refreshedGame.calculatePlayerScore(refreshedGame.player1);
+          const player2Score = refreshedGame.calculatePlayerScore(refreshedGame.player2);
+          
+          await updateLeaderboardForGame(gameId, {
+            player1: player1Score,
+            player2: player2Score
+          });
+          console.log(`🏆 Leaderboard updated for finished game ${gameId}: P1=${player1Score}, P2=${player2Score}`);
           
           // Notifier les joueurs AVANT de nettoyer
           const gameState = refreshedGame.getGameState();

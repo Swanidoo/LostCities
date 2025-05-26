@@ -938,7 +938,10 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
       
       // NOUVEAU: Appeler la fonction dédiée au leaderboard
       try {
-        await updateLeaderboardForGame(gameId);
+        await updateLeaderboardForGame(gameId, {
+          player1: player1Score,
+          player2: player2Score
+        });
       } catch (error) {
         console.error(`❌ Error updating leaderboard: ${error.message}`);
       }
@@ -1185,7 +1188,7 @@ async function saveGameState(game: LostCitiesGame): Promise<void> {
 }
 
 // Fonction dédiée à l'enregistrement dans le leaderboard
-async function updateLeaderboardForGame(gameId: string): Promise<void> {
+async function updateLeaderboardForGame(gameId: string, gameScores?: { player1: number; player2: number }): Promise<void> {
   try {
     console.log(`🏆 Starting leaderboard update for game ${gameId}`);
     
@@ -1216,6 +1219,21 @@ async function updateLeaderboardForGame(gameId: string): Promise<void> {
       return;
     }
 
+    // MODIFICATION : Utiliser les scores passés en paramètre ou ceux de la DB
+    let finalScoreP1, finalScoreP2;
+    
+    if (gameScores) {
+      // Utiliser les scores calculés (priorité)
+      finalScoreP1 = gameScores.player1;
+      finalScoreP2 = gameScores.player2;
+      console.log(`🎯 Using calculated scores: P1=${finalScoreP1}, P2=${finalScoreP2}`);
+    } else {
+      // Fallback sur les scores de la DB
+      finalScoreP1 = game.score_player1 || 0;
+      finalScoreP2 = game.score_player2 || 0;
+      console.log(`📋 Using DB scores: P1=${finalScoreP1}, P2=${finalScoreP2}`);
+    }
+
     // Vérifier si des entrées VALIDES existent déjà (avec de vrais scores)
     const existingEntries = await client.queryObject(`
       SELECT id, score FROM leaderboard 
@@ -1235,10 +1253,7 @@ async function updateLeaderboardForGame(gameId: string): Promise<void> {
     }
 
     console.log(`🏆 Recording leaderboard entries for game ${gameId}`);
-    console.log(`🔍 Player IDs: P1=${game.player1_id}, P2=${game.player2_id}`);
-    console.log(`🔍 Player Names: P1=${game.player1_name}, P2=${game.player2_name}`);
-    console.log(`🔍 Scores: P1=${game.score_player1}, P2=${game.score_player2}`);
-    console.log(`🔍 Game mode: ${game.game_mode}, Extension: ${game.use_purple_expedition}`);
+    console.log(`🔍 Final scores to record: P1=${finalScoreP1}, P2=${finalScoreP2}`);
 
     try {
       // Transaction pour garantir que les deux entrées sont créées ou aucune
@@ -1251,7 +1266,7 @@ async function updateLeaderboardForGame(gameId: string): Promise<void> {
       `, [
         game.player1_id, 
         game.player1_name, 
-        game.score_player1, 
+        finalScoreP1, 
         game.game_mode || 'classic', 
         game.use_purple_expedition, 
         gameId
@@ -1264,14 +1279,14 @@ async function updateLeaderboardForGame(gameId: string): Promise<void> {
       `, [
         game.player2_id, 
         game.player2_name, 
-        game.score_player2, 
+        finalScoreP2, 
         game.game_mode || 'classic', 
         game.use_purple_expedition, 
         gameId
       ]);
       
       await client.queryObject(`COMMIT`);
-      console.log(`✅ Leaderboard entries created for game ${gameId}`);
+      console.log(`✅ Leaderboard entries created for game ${gameId} with scores P1=${finalScoreP1}, P2=${finalScoreP2}`);
     } catch (error) {
       await client.queryObject(`ROLLBACK`);
       console.error(`❌ Failed to insert leaderboard entries:`, error);
